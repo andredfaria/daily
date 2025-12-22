@@ -1,0 +1,39 @@
+# Daily Status Dashboard
+
+Dashboard de performance e status diário construído com Next.js, TypeScript, Tailwind CSS e Supabase.
+
+## Configuração
+
+1. Instale as dependências:
+
+```bash
+npm install
+```
+
+2. Configure as variáveis de ambiente. Crie um arquivo `.env.local` na raiz do projeto:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://dmraqfnhffingqzkcfcg.supabase.co/
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_chave_aqui
+```
+
+3. Execute o servidor de desenvolvimento:
+
+```bash
+npm run dev
+```
+
+Abra [http://localhost:3000](http://localhost:3000) no navegador.
+
+## Estrutura do Projeto
+
+- `app/` - Páginas e layouts do Next.js (App Router)
+- `components/` - Componentes React reutilizáveis
+- `lib/` - Utilitários e configurações (Supabase, tipos TypeScript)
+
+## Funcionalidades
+
+- Dashboard de usuário com estatísticas de atividades
+- Criação de novos usuários com checklist dinâmico
+- Integração com Supabase para armazenamento de dados
+- Webhook para notificações (n8n)
