@@ -100,6 +100,39 @@ export async function getWhatsAppProfile(phone: string): Promise<WAHAProfile | n
 // ============================================
 
 /**
+ * Helper para validar variáveis de ambiente do WAHA
+ * @returns Object com wahaUrl e wahaApiKey (se configurado), ou erro
+ */
+function validateWAHAEnvironment(): { wahaUrl: string; wahaApiKey?: string; error?: string } {
+  const wahaUrl = process.env.WAHA_BASE_URL || ''
+  const wahaApiKey = process.env.WAHA_API_KEY || ''
+
+  if (!wahaUrl) {
+    return {
+      wahaUrl: '',
+      error: 'URL do WAHA não configurada. Configure WAHA_BASE_URL no arquivo .env.local'
+    }
+  }
+
+  return {
+    wahaUrl,
+    ...(wahaApiKey && { wahaApiKey })
+  }
+}
+
+/**
+ * Helper para adicionar dica sobre formato de telefone brasileiro
+ * @param phone Número de telefone
+ * @returns Texto com dica se for número brasileiro
+ */
+function getBrazilianPhoneTip(phone: string): string {
+  const isBrazilian = phone.includes('55') || phone.startsWith('+55')
+  return isBrazilian
+    ? ' Dica: números brasileiros geralmente precisam do "9" no início (ex: +55 11 99999-9999)'
+    : ''
+}
+
+/**
  * Valida um número de telefone diretamente com WAHA
  * USO: Apenas em API routes ou Server Components
  * IMPORTANTE: Requer variáveis WAHA_API_KEY e WAHA_BASE_URL
@@ -113,36 +146,31 @@ export async function validatePhoneWithWAHAServer(phone: string): Promise<WAHAVa
     }
   }
 
-  const wahaUrl = process.env.WAHA_BASE_URL || ''
-
-  if (!wahaUrl) {
+  // Validar ambiente
+  const env = validateWAHAEnvironment()
+  if (env.error) {
     return {
       isValid: false,
       exists: false,
-      error: 'URL do WAHA não configurada. Configure WAHA_BASE_URL no arquivo .env.local'
+      error: env.error
     }
   }
 
   try {
-    const normalizedPhone = phone.trim()
-    const endpoint = `${wahaUrl.replace(/\/$/, '')}/api/contacts/check-exists?phone=${normalizedPhone.replace(/\D/g, '')}&session=default`
+    const normalizedPhone = phone.trim().replace(/\D/g, '')
+    const endpoint = `${env.wahaUrl.replace(/\/$/, '')}/api/contacts/check-exists?phone=${normalizedPhone}&session=default`
 
     const response = await fetch(endpoint, {
       method: 'GET',
       headers: {
         'accept': 'application/json',
-        ...(process.env.WAHA_API_KEY && { 'X-Api-Key': process.env.WAHA_API_KEY }),
+        ...(env.wahaApiKey && { 'X-Api-Key': env.wahaApiKey }),
       },
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      let errorMessage = `Erro ao validar telefone: ${response.status} ${errorText || response.statusText}`
-
-      // Adicionar sugestão sobre o "9" no início para números brasileiros
-      if (normalizedPhone.includes('55') || normalizedPhone.startsWith('+55')) {
-        errorMessage += '. Dica: números brasileiros geralmente precisam do "9" no início do número (ex: +55 11 99999-9999)'
-      }
+      const errorMessage = `Erro ao validar telefone: ${response.status} ${errorText || response.statusText}${getBrazilianPhoneTip(phone)}`
 
       return {
         isValid: false,
@@ -169,16 +197,11 @@ export async function validatePhoneWithWAHAServer(phone: string): Promise<WAHAVa
       exists: exists,
       validatedPhone: exists ? validatedPhone : undefined,
       chatId: exists ? chatId : undefined,
-      error: exists ? undefined : 'Número não encontrado no WhatsApp. Verifique se o número está correto. Dica: números brasileiros geralmente precisam do "9" no início (ex: +55 11 99999-9999)'
+      error: exists ? undefined : `Número não encontrado no WhatsApp. Verifique se o número está correto.${getBrazilianPhoneTip(phone)}`
     }
   } catch (error: any) {
     console.error('Erro ao validar telefone com WAHA:', error)
-    let errorMessage = error.message || 'Erro de conexão ao validar telefone. Verifique sua conexão e a configuração do WAHA.'
-
-    // Adicionar sugestão sobre o "9" no início para números brasileiros
-    if (phone.includes('55') || phone.startsWith('+55')) {
-      errorMessage += ' Dica: números brasileiros geralmente precisam do "9" no início do número (ex: +55 11 99999-9999)'
-    }
+    const errorMessage = `${error.message || 'Erro de conexão ao validar telefone. Verifique sua conexão e a configuração do WAHA.'}${getBrazilianPhoneTip(phone)}`
 
     return {
       isValid: false,
@@ -195,10 +218,10 @@ export async function validatePhoneWithWAHAServer(phone: string): Promise<WAHAVa
  * IMPORTANTE: Requer variáveis WAHA_API_KEY e WAHA_BASE_URL
  */
 export async function getWhatsAppProfileServer(phone: string): Promise<WAHAProfile | null> {
-  const wahaUrl = process.env.WAHA_BASE_URL || ''
-
-  if (!wahaUrl) {
-    console.error('URL do WAHA não configurada')
+  // Validar ambiente
+  const env = validateWAHAEnvironment()
+  if (env.error) {
+    console.error('Erro de configuração WAHA:', env.error)
     return null
   }
 
@@ -216,25 +239,25 @@ export async function getWhatsAppProfileServer(phone: string): Promise<WAHAProfi
     const chatId = validation.chatId
     const headers = {
       'accept': 'application/json',
-      ...(process.env.WAHA_API_KEY && { 'X-Api-Key': process.env.WAHA_API_KEY }),
+      ...(env.wahaApiKey && { 'X-Api-Key': env.wahaApiKey }),
     }
 
     const requests = [
       // 2. Busca foto de perfil
       fetch(
-        `${wahaUrl.replace(/\/$/, '')}/api/contacts/profile-picture?contactId=${chatId}&session=default`,
+        `${env.wahaUrl.replace(/\/$/, '')}/api/contacts/profile-picture?contactId=${chatId}&session=default`,
         { method: 'GET', headers }
       ).then(r => r.ok ? r.json() : null).catch(() => null),
 
       // 3. Busca recado (About)
       fetch(
-        `${wahaUrl.replace(/\/$/, '')}/api/contacts/about?contactId=${chatId}&session=default`,
+        `${env.wahaUrl.replace(/\/$/, '')}/api/contacts/about?contactId=${chatId}&session=default`,
         { method: 'GET', headers }
       ).then(r => r.ok ? r.json() : null).catch(() => null),
 
       // 4. Busca dados do contato (Pushname)
       fetch(
-        `${wahaUrl.replace(/\/$/, '')}/api/contacts?contactId=${chatId}&session=default`,
+        `${env.wahaUrl.replace(/\/$/, '')}/api/contacts?contactId=${chatId}&session=default`,
         { method: 'GET', headers }
       ).then(r => r.ok ? r.json() : null).catch(() => null)
     ]
