@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect, FormEvent } from 'react'
-import { Plus, X, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Plus, X, UserPlus, Save, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { DailyUser } from '@/lib/types'
 import { validateName, validateTitle, validatePhone, validateSendTime, validateChecklist } from '@/lib/validations'
 import { validatePhoneWithWAHA } from '@/lib/waha'
 import LoadingOverlay from './LoadingOverlay'
@@ -12,13 +14,68 @@ import FormField from './ui/FormField'
 import Input from './ui/Input'
 import Card from './ui/Card'
 
-export default function CreateUserForm() {
-  const [name, setName] = useState('')
-  const [title, setTitle] = useState('')
-  const [phone, setPhone] = useState('')
-  const [phoneChatId, setPhoneChatId] = useState('') // chatId completo para salvar no backend
-  const [sendTime, setSendTime] = useState('')
-  const [checklistItems, setChecklistItems] = useState<string[]>([])
+interface UserFormProps {
+  user?: DailyUser  // Se fornecido, modo edição
+  onSuccess?: (userId?: number) => void  // Callback após sucesso
+  onCancel?: () => void  // Callback para cancelar (opcional)
+  embedded?: boolean  // Se true, opera inline sem navegação
+}
+
+export default function UserForm({ user, onSuccess, onCancel, embedded = false }: UserFormProps) {
+  const router = useRouter()
+  const isEditMode = !!user
+
+  // Converter time_to_send (hora) para sendTime (HH:00)
+  const getSendTimeFromHour = (hour: number | null | undefined): string => {
+    if (hour !== null && hour !== undefined) {
+      return `${String(hour).padStart(2, '0')}:00`
+    }
+    return ''
+  }
+
+  // Parsear option que pode vir como string JSON ou objeto
+  const parseOptionToChecklist = (option: any): string[] => {
+    if (!option) return []
+    // Se for string, tentar parsear como JSON
+    if (typeof option === 'string') {
+      try {
+        const parsed = JSON.parse(option)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return []
+      }
+    }
+    // Se for objeto com checklist
+    if (option.checklist && Array.isArray(option.checklist)) {
+      return option.checklist
+    }
+    // Se for array diretamente
+    if (Array.isArray(option)) {
+      return option
+    }
+    return []
+  }
+
+  const [name, setName] = useState(user?.name || '')
+  const [title, setTitle] = useState(user?.title || '')
+  // phone: número para exibição no frontend (sem @c.us)
+  // phoneChatId: chatId completo para salvar no backend (com @c.us)
+  const [phone, setPhone] = useState(() => {
+    // Se user.phone contém @c.us, extrair apenas o número
+    const userPhone = user?.phone || ''
+    return userPhone.includes('@') ? userPhone.split('@')[0] : userPhone
+  })
+  const [originalPhone, setOriginalPhone] = useState(() => {
+    const userPhone = user?.phone || ''
+    return userPhone.includes('@') ? userPhone.split('@')[0] : userPhone
+  })
+  const [phoneChatId, setPhoneChatId] = useState(user?.phone || '') // Valor original do banco
+  const [sendTime, setSendTime] = useState(
+    isEditMode ? getSendTimeFromHour(user?.time_to_send) : ''
+  )
+  const [checklistItems, setChecklistItems] = useState<string[]>(
+    isEditMode ? parseOptionToChecklist(user?.option) : []
+  )
   const [checklistInput, setChecklistInput] = useState('')
 
   // Estados de validação
@@ -34,6 +91,13 @@ export default function CreateUserForm() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [createdUserId, setCreatedUserId] = useState<number | undefined>()
+
+  // No modo edição, se o telefone não mudou, considerar como validado
+  useEffect(() => {
+    if (isEditMode && phone.trim() === originalPhone.trim() && phone.trim() !== '') {
+      setPhoneValidated(true)
+    }
+  }, [isEditMode, phone, originalPhone])
 
   // Validação em tempo real do nome
   useEffect(() => {
@@ -65,15 +129,23 @@ export default function CreateUserForm() {
       } else {
         setPhoneError(null)
       }
-      setPhoneValidated(false)
+      // No modo edição, se telefone não mudou, manter validado
+      if (!isEditMode || phone.trim() !== originalPhone.trim()) {
+        setPhoneValidated(false)
+      }
       return
     }
     const result = validatePhone(phone)
     setPhoneError(result.isValid ? null : result.error || null)
     if (result.isValid) {
-      setPhoneValidated(false) // Reset validação WAHA quando telefone muda
+      // No modo edição, se telefone não mudou, manter validado
+      if (isEditMode && phone.trim() === originalPhone.trim()) {
+        setPhoneValidated(true)
+      } else {
+        setPhoneValidated(false) // Reset validação WAHA quando telefone muda
+      }
     }
-  }, [phone, phoneTouched])
+  }, [phone, phoneTouched, isEditMode, originalPhone])
 
   // Validação em tempo real da hora
   useEffect(() => {
@@ -130,6 +202,13 @@ export default function CreateUserForm() {
       return
     }
 
+    // No modo edição, se telefone não mudou, não precisa revalidar
+    if (isEditMode && trimmedPhone === originalPhone.trim()) {
+      setPhoneValidated(true)
+      setPhoneError(null)
+      return
+    }
+
     // Primeiro valida formato básico
     const basicValidation = validatePhone(trimmedPhone)
     if (!basicValidation.isValid) {
@@ -152,6 +231,7 @@ export default function CreateUserForm() {
         // Atualiza o campo de exibição com o número validado (sem @c.us)
         if (wahaResult.validatedPhone) {
           setPhone(wahaResult.validatedPhone)
+          setOriginalPhone(wahaResult.validatedPhone)
         }
 
         // Armazena o chatId completo para salvar no backend
@@ -160,11 +240,11 @@ export default function CreateUserForm() {
         }
       } else {
         setPhoneValidated(false)
-        setPhoneError(wahaResult.error || 'Número não encontrado no WhatsApp')
+        setPhoneError(wahaResult.error || 'Número não encontrado no WhatsApp. Verifique se o número está correto. Dica: números brasileiros geralmente precisam do "9" no início (ex: +55 11 99999-9999)')
       }
     } catch (err: any) {
       setPhoneValidated(false)
-      setPhoneError('Erro ao validar telefone. Tente novamente.')
+      setPhoneError('Erro ao validar telefone. Tente novamente. Dica: números brasileiros geralmente precisam do "9" no início (ex: +55 11 99999-9999)')
     } finally {
       setPhoneValidating(false)
     }
@@ -174,7 +254,7 @@ export default function CreateUserForm() {
     setName('')
     setTitle('')
     setPhone('')
-    setPhoneChatId('')
+    setOriginalPhone('')
     setSendTime('')
     setChecklistItems([])
     setChecklistInput('')
@@ -224,7 +304,9 @@ export default function CreateUserForm() {
     }
 
     // Verificar se o telefone foi validado com WAHA
-    if (!phoneValidated) {
+    // No modo edição, se telefone não mudou, considerar validado
+    const phoneChanged = isEditMode && phone.trim() !== originalPhone.trim()
+    if (!phoneValidated && (phoneChanged || !isEditMode)) {
       setPhoneError('Por favor, saia do campo de telefone para validar o número no WhatsApp')
       return
     }
@@ -248,7 +330,7 @@ export default function CreateUserForm() {
     const phoneValue = phone.trim() || null
     const sendTimeValue = sendTime.trim() || null
 
-    // Preparar dados para inserção no Supabase
+    // Preparar dados para inserção/atualização no Supabase
     const userData: any = {}
     if (nameValue) userData.name = nameValue
     if (titleValue) userData.title = titleValue
@@ -260,39 +342,94 @@ export default function CreateUserForm() {
       userData.phone = phoneValue
     }
 
-    // Converter sendTime (HH:mm) para time_to_send (minutos desde meia-noite)
+    // Converter sendTime (HH:mm) para time_to_send (apenas hora)
     if (sendTimeValue) {
       const [hours] = sendTimeValue.split(':').map(Number)
       userData.time_to_send = hours // Salvar apenas a hora
+    } else {
+      if (isEditMode) {
+        userData.time_to_send = null
+      }
     }
 
     // Preparar option como JSON string array
     if (checklistItems.length > 0) {
       userData.option = JSON.stringify(checklistItems)
+    } else {
+      if (isEditMode) {
+        userData.option = null
+      }
     }
 
     try {
-      const { data, error: insertError } = await supabase
-        .from('daily_user')
-        .insert([userData])
-        .select()
-        .single()
+      if (isEditMode) {
+        // Modo edição: atualizar
+        const { error: updateError } = await supabase
+          .from('daily_user')
+          .update(userData)
+          .eq('id', user.id)
 
-      if (insertError) throw insertError
+        if (updateError) throw updateError
 
-      setCreatedUserId(data.id)
-      setSuccess(true)
-      setLoading(false)
+        setSuccess(true)
+        setLoading(false)
+
+        // Callback de sucesso
+        if (onSuccess) {
+          onSuccess(user.id)
+        } else if (!embedded) {
+          // Redirecionar para lista de usuários após 1 segundo (apenas se não embedded)
+          setTimeout(() => {
+            router.push('/users')
+          }, 1000)
+        }
+      } else {
+        // Modo criação: inserir
+        const { data, error: insertError } = await supabase
+          .from('daily_user')
+          .insert([userData])
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+
+        setCreatedUserId(data.id)
+        setSuccess(true)
+        setLoading(false)
+
+        // Callback de sucesso
+        if (onSuccess) {
+          onSuccess(data.id)
+        }
+      }
     } catch (err: any) {
-      console.error('Erro ao criar usuário:', err)
-      setError(err.message || 'Ocorreu um erro ao cadastrar o usuário. Tente novamente.')
+      console.error(`Erro ao ${isEditMode ? 'atualizar' : 'criar'} usuário:`, err)
+      setError(err.message || `Ocorreu um erro ao ${isEditMode ? 'atualizar' : 'cadastrar'} o usuário. Tente novamente.`)
       setLoading(false)
+    }
+  }
+
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel()
+    } else if (!embedded) {
+      if (isEditMode) {
+        router.push('/users')
+      } else {
+        router.push('/')
+      }
     }
   }
 
   return (
     <>
-      {success && <SuccessMessage userId={createdUserId} onReset={resetForm} />}
+      {success && (
+        <SuccessMessage
+          userId={isEditMode ? user?.id : createdUserId}
+          onReset={isEditMode ? undefined : resetForm}
+          mode={isEditMode ? 'edit' : 'create'}
+        />
+      )}
 
       {error && (
         <Card className="mb-6 border-red-100">
@@ -301,7 +438,9 @@ export default function CreateUserForm() {
               <AlertCircle className="text-red-600 w-6 h-6" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-red-900 mb-1">Erro ao criar usuário</h3>
+              <h3 className="font-semibold text-red-900 mb-1">
+                Erro ao {isEditMode ? 'atualizar' : 'criar'} usuário
+              </h3>
               <p className="text-sm text-red-700">{error}</p>
             </div>
           </div>
@@ -385,6 +524,31 @@ export default function CreateUserForm() {
             />
           </FormField>
 
+          <hr></hr>
+          <div className="mb-4 pb-4 border-b border-slate-200">
+            <p className="text-sm text-slate-500">
+              Campos do envio no whatsapp
+            </p>
+          </div>
+
+
+          {/* Título */}
+          <FormField
+            label="Título"
+            optional
+            error={titleError}
+          >
+            <Input
+              type="text"
+              id="title"
+              name="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              error={!!titleError}
+              placeholder="Ex: Como foi seu dia"
+            />
+          </FormField>
+
           {/* Checklist */}
           <FormField
             label="Checklist"
@@ -456,14 +620,17 @@ export default function CreateUserForm() {
               type="submit"
               disabled={loading || phoneValidating}
               className="flex-1"
-              icon={UserPlus}
+              icon={isEditMode ? Save : UserPlus}
             >
-              {loading ? 'Criando...' : 'Criar Usuário'}
+              {loading
+                ? (isEditMode ? 'Salvando...' : 'Criando...')
+                : (isEditMode ? 'Salvar Alterações' : 'Criar Usuário')
+              }
             </Button>
             <Button
               type="button"
               variant="secondary"
-              onClick={() => window.location.href = '/'}
+              onClick={handleCancel}
               disabled={loading}
             >
               Cancelar
@@ -472,7 +639,9 @@ export default function CreateUserForm() {
         </form>
       </Card>
 
-      {loading && <LoadingOverlay message="Criando usuário..." />}
+      {loading && (
+        <LoadingOverlay message={isEditMode ? 'Salvando alterações...' : 'Criando usuário...'} />
+      )}
     </>
   )
 }

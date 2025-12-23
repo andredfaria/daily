@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Activity } from 'lucide-react'
+import { Activity, Users } from 'lucide-react'
 
 interface NavbarProps {
   title?: string
@@ -21,20 +21,31 @@ export default function Navbar({ title, showBack = false }: NavbarProps) {
               </span>
             </Link>
           ) : (
-            <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <div className="bg-indigo-600 p-2 rounded-lg">
                 <Activity className="text-white w-5 h-5" />
               </div>
               <span className="font-bold text-xl tracking-tight text-slate-900">
                 Daily<span className="text-indigo-600">Sync</span>
               </span>
-            </div>
+            </Link>
           )}
-          {title && (
-            <div className="text-sm text-slate-500 hidden sm:block">
-              {title}
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            {title && (
+              <div className="text-sm text-slate-500 hidden sm:block">
+                {title}
+              </div>
+            )}
+            {!showBack && (
+              <Link
+                href="/users"
+                className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors text-sm font-medium"
+              >
+                <Users className="w-4 h-4" />
+                <span className="hidden sm:inline">Usuários</span>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </nav>

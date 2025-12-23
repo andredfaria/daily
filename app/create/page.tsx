@@ -1,5 +1,5 @@
 import Navbar from '@/components/Navbar'
-import CreateUserForm from '@/components/CreateUserForm'
+import UserForm from '@/components/UserForm'
 
 export default function CreatePage() {
   return (
@@ -7,7 +7,7 @@ export default function CreatePage() {
       <Navbar title="Criar Novo Usuário" showBack />
       <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="fade-in">
-          <CreateUserForm />
+          <UserForm />
         </div>
       </main>
     </>

@@ -7,6 +7,8 @@ import LoadingSpinner from './LoadingSpinner'
 import ErrorMessage from './ErrorMessage'
 import KPICard from './KPICard'
 import ActivityTable from './ActivityTable'
+import Button from './ui/Button'
+import Card from './ui/Card'
 import { PieChart, Layers, CheckCircle2, Phone, Calendar, UserPlus, Plus, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 
@@ -72,7 +74,7 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
 
   if (!userId) {
     return (
-      <div className="text-center py-20 bg-white rounded-2xl shadow-sm border border-slate-100">
+      <Card className="text-center py-20">
         <div className="bg-indigo-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
           <UserPlus className="text-indigo-600 w-8 h-8" />
         </div>
@@ -80,14 +82,12 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
         <p className="text-slate-500 mb-6">
           Para visualizar um dashboard, você precisa criar um usuário primeiro ou acessar um usuário existente através do ID.
         </p>
-        <Link
-          href="/create"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Criar Novo Usuário
+        <Link className="w-full block" href="/create">
+          <Button icon={Plus} className="w-full">
+            Criar Novo Usuário
+          </Button>
         </Link>
-      </div>
+      </Card>
     )
   }
 
@@ -117,7 +117,7 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
   return (
     <div className="fade-in space-y-8">
       {/* Cabeçalho do usuário */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <Card className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <h1 className="text-2xl font-bold text-slate-900">{user.title || 'Sem Título'}</h1>
@@ -136,15 +136,19 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
             </span>
           </div>
         </div>
-        {user.option && (
-          <div className="bg-slate-50 px-4 py-2 rounded-lg text-xs text-slate-600 border border-slate-200">
-            <p className="font-semibold mb-1">Configurações (JSON)</p>
-            <code className="block whitespace-pre-wrap">
-              {JSON.stringify(user.option, null, 2).replace(/[{}"]/g, '')}
-            </code>
+        {Array.isArray(user.option) && user.option.length > 0 && (
+          <div className="flex flex-wrap gap-2 max-w-2xl md:justify-end">
+            {user.option.map((habit, index) => (
+              <span
+                key={index}
+                className="px-3 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100 transition-colors hover:bg-indigo-100"
+              >
+                {habit}
+              </span>
+            ))}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Cards de KPI */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -164,7 +168,7 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
           iconColor="text-indigo-600"
           subtitle="Registros totais no banco"
         />
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <Card>
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm font-medium text-slate-500">Dias Concluídos</p>
@@ -178,7 +182,7 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
             <TrendingUp className="w-4 h-4" />
             Performance positiva
           </p>
-        </div>
+        </Card>
       </div>
 
       {/* Tabela de atividades */}

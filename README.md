@@ -15,6 +15,7 @@ npm install
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://dmraqfnhffingqzkcfcg.supabase.co/
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_chave_aqui
+NEXT_PUBLIC_WAHA_URL=http://localhost:3000
 ```
 
 3. Execute o servidor de desenvolvimento:
@@ -35,5 +36,15 @@ Abra [http://localhost:3000](http://localhost:3000) no navegador.
 
 - Dashboard de usuário com estatísticas de atividades
 - Criação de novos usuários com checklist dinâmico
+- Listagem de usuários cadastrados
+- Edição de usuários com validação em tempo real
+- Validação de telefone usando WAHA (WhatsApp HTTP API)
 - Integração com Supabase para armazenamento de dados
 - Webhook para notificações (n8n)
+
+## Validações
+
+- **Título**: Opcional, mínimo 2 caracteres, máximo 100 caracteres
+- **Telefone**: Opcional, validação de formato e verificação via WAHA `/api/contacts/check-exists`
+- **Hora de Envio**: Opcional, formato HH:mm
+- **Checklist**: Opcional, cada item entre 1 e 200 caracteres
