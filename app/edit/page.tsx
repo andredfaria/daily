@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import UserForm from '@/components/UserForm'
@@ -9,7 +9,7 @@ import ErrorMessage from '@/components/ErrorMessage'
 import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
 
-export default function EditPage() {
+function EditPageContent() {
   const searchParams = useSearchParams()
   const userId = searchParams.get('id')
   const [user, setUser] = useState<DailyUser | null>(null)
@@ -68,8 +68,8 @@ export default function EditPage() {
       <>
         <Navbar title="Editar Usuário" showBack />
         <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <ErrorMessage 
-            message={error || 'Usuário não encontrado'} 
+          <ErrorMessage
+            message={error || 'Usuário não encontrado'}
             showCreateButton={false}
           />
         </main>
@@ -86,5 +86,20 @@ export default function EditPage() {
         </div>
       </main>
     </>
+  )
+}
+
+export default function EditPage() {
+  return (
+    <Suspense fallback={
+      <>
+        <Navbar title="Editar Usuário" showBack />
+        <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <LoadingSpinner message="Carregando..." />
+        </main>
+      </>
+    }>
+      <EditPageContent />
+    </Suspense>
   )
 }

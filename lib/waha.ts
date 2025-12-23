@@ -1,5 +1,6 @@
 /**
  * Utilitário para validação de telefone usando WAHA (WhatsApp HTTP API)
+ * Este arquivo contém tanto funções client-side (para componentes) quanto server-side (para API routes)
  */
 
 export interface WAHAValidationResult {
@@ -10,10 +11,21 @@ export interface WAHAValidationResult {
   error?: string
 }
 
+export interface WAHAProfile {
+  pushname?: string
+  about?: string
+  profilePicUrl?: string
+  chatId: string
+  error?: string
+}
+
+// ============================================
+// CLIENT-SIDE FUNCTIONS (For Components)
+// ============================================
+
 /**
- * Valida um número de telefone usando o endpoint WAHA /api/contacts/check-exists
- * @param phone - Número de telefone a ser validado
- * @returns Resultado da validação com informações se o número existe no WhatsApp
+ * Valida um número de telefone chamando a API route segura
+ * USO: Componentes React no frontend
  */
 export async function validatePhoneWithWAHA(phone: string): Promise<WAHAValidationResult> {
   if (!phone || phone.trim() === '') {
@@ -24,13 +36,90 @@ export async function validatePhoneWithWAHA(phone: string): Promise<WAHAValidati
     }
   }
 
-  const wahaUrl = process.env.NEXT_PUBLIC_WAHA_BASE_URL || ''
+  try {
+    const response = await fetch('/api/waha/validate-phone', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ phone: phone.trim() }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const result: WAHAValidationResult = await response.json()
+    return result
+
+  } catch (error: any) {
+    console.error('Erro ao validar telefone:', error)
+    return {
+      isValid: false,
+      exists: false,
+      error: error.message || 'Erro de conexão ao validar telefone'
+    }
+  }
+}
+
+/**
+ * Busca informações completas do perfil do WhatsApp chamando a API route segura
+ * USO: Componentes React no frontend
+ */
+export async function getWhatsAppProfile(phone: string): Promise<WAHAProfile | null> {
+  try {
+    const response = await fetch('/api/waha/profile', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ phone: phone.trim() }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const result: WAHAProfile = await response.json()
+
+    if (result.error) {
+      console.error('Erro ao buscar perfil:', result.error)
+      return null
+    }
+
+    return result
+
+  } catch (error) {
+    console.error('Erro ao buscar perfil do WhatsApp:', error)
+    return null
+  }
+}
+
+// ============================================
+// SERVER-SIDE FUNCTIONS (For API Routes)
+// ============================================
+
+/**
+ * Valida um número de telefone diretamente com WAHA
+ * USO: Apenas em API routes ou Server Components
+ * IMPORTANTE: Requer variáveis WAHA_API_KEY e WAHA_BASE_URL
+ */
+export async function validatePhoneWithWAHAServer(phone: string): Promise<WAHAValidationResult> {
+  if (!phone || phone.trim() === '') {
+    return {
+      isValid: false,
+      exists: false,
+      error: 'Telefone não pode estar vazio'
+    }
+  }
+
+  const wahaUrl = process.env.WAHA_BASE_URL || ''
 
   if (!wahaUrl) {
     return {
       isValid: false,
       exists: false,
-      error: 'URL do WAHA não configurada. Configure NEXT_PUBLIC_WAHA_BASE_URL no arquivo .env.local'
+      error: 'URL do WAHA não configurada. Configure WAHA_BASE_URL no arquivo .env.local'
     }
   }
 
@@ -42,7 +131,7 @@ export async function validatePhoneWithWAHA(phone: string): Promise<WAHAValidati
       method: 'GET',
       headers: {
         'accept': 'application/json',
-        ...(process.env.NEXT_PUBLIC_WAHA_API_KEY && { 'X-Api-Key': process.env.NEXT_PUBLIC_WAHA_API_KEY }),
+        ...(process.env.WAHA_API_KEY && { 'X-Api-Key': process.env.WAHA_API_KEY }),
       },
     })
 
@@ -100,20 +189,13 @@ export async function validatePhoneWithWAHA(phone: string): Promise<WAHAValidati
 
 }
 
-export interface WAHAProfile {
-  pushname?: string
-  about?: string
-  profilePicUrl?: string
-  chatId: string
-  error?: string
-}
-
 /**
- * Busca informações completas do perfil do WhatsApp (Foto, Recado/About, Nome)
- * @param phone - Número de telefone
+ * Busca informações completas do perfil do WhatsApp diretamente com WAHA
+ * USO: Apenas em API routes ou Server Components
+ * IMPORTANTE: Requer variáveis WAHA_API_KEY e WAHA_BASE_URL
  */
-export async function getWhatsAppProfile(phone: string): Promise<WAHAProfile | null> {
-  const wahaUrl = process.env.NEXT_PUBLIC_WAHA_BASE_URL || ''
+export async function getWhatsAppProfileServer(phone: string): Promise<WAHAProfile | null> {
+  const wahaUrl = process.env.WAHA_BASE_URL || ''
 
   if (!wahaUrl) {
     console.error('URL do WAHA não configurada')
@@ -122,7 +204,7 @@ export async function getWhatsAppProfile(phone: string): Promise<WAHAProfile | n
 
   try {
     // 1. Primeiro valida o número para pegar o chatId correto
-    const validation = await validatePhoneWithWAHA(phone)
+    const validation = await validatePhoneWithWAHAServer(phone)
 
     if (!validation.exists || !validation.chatId) {
       return {
@@ -134,7 +216,7 @@ export async function getWhatsAppProfile(phone: string): Promise<WAHAProfile | n
     const chatId = validation.chatId
     const headers = {
       'accept': 'application/json',
-      ...(process.env.NEXT_PUBLIC_WAHA_API_KEY && { 'X-Api-Key': process.env.NEXT_PUBLIC_WAHA_API_KEY }),
+      ...(process.env.WAHA_API_KEY && { 'X-Api-Key': process.env.WAHA_API_KEY }),
     }
 
     const requests = [
