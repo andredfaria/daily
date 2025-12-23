@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { DailyUser, DailyData } from '@/lib/types'
+import { getWhatsAppProfile, WAHAProfile } from '@/lib/waha'
 import LoadingSpinner from './LoadingSpinner'
 import ErrorMessage from './ErrorMessage'
 import KPICard from './KPICard'
@@ -21,6 +22,8 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
   const [user, setUser] = useState<DailyUser | null>(null)
   const [activities, setActivities] = useState<DailyData[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [waProfile, setWaProfile] = useState<WAHAProfile | null>(null)
+  const [loadingWa, setLoadingWa] = useState(false)
 
   useEffect(() => {
     async function loadData() {
@@ -67,6 +70,26 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
 
     loadData()
   }, [userId])
+
+  useEffect(() => {
+    const fetchWhatsAppProfile = async () => {
+      if (!user?.phone) return
+
+      try {
+        setLoadingWa(true)
+        const profile = await getWhatsAppProfile(user.phone)
+        if (profile) {
+          setWaProfile(profile)
+        }
+      } catch (error) {
+        console.error('Erro ao buscar perfil do WhatsApp:', error)
+      } finally {
+        setLoadingWa(false)
+      }
+    }
+
+    fetchWhatsAppProfile()
+  }, [user?.phone])
 
   if (loading) {
     return <LoadingSpinner message="Carregando dados do usuário..." />
@@ -145,26 +168,58 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
           {/* INFO - Cabeçalho do usuário */}
           <Card className="bg-gradient-to-r from-slate-50 to-white border-l-4 border-l-indigo-500">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl font-bold text-slate-900">{user.title || 'Sem Título'}</h1>
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-400 to-green-500 text-white shadow-sm">
-                    Ativo
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
-                  <span className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full">
-                    <Phone className="w-4 h-4 text-indigo-500" />
-                    <span className="font-medium">{user.phone || 'N/A'}</span>
-                  </span>
-                  <span className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full">
-                    <Calendar className="w-4 h-4 text-indigo-500" />
-                    <span className="font-medium">Desde: {formattedDate}</span>
-                  </span>
+              <div className="flex items-start gap-4">
+                {/* Avatar do WhatsApp */}
+                {waProfile?.profilePicUrl && (
+                  <div className="relative">
+                    <img
+                      src={waProfile.profilePicUrl}
+                      alt="WhatsApp Profile"
+                      className="w-16 h-16 rounded-full border-4 border-white shadow-md object-cover"
+                    />
+                    <div className="absolute bottom-0 right-0 w-5 h-5 bg-green-500 border-2 border-white rounded-full flex items-center justify-center">
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-white">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-2xl font-bold text-slate-900">{user.name}</h1>
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-400 to-green-500 text-white shadow-sm">
+                      Ativo
+                    </span>
+                  </div>
+                  {/* Pushname do WhatsApp */}
+                  {waProfile?.pushname && (
+                    <div className="mb-1">
+                      <span className="text-sm font-medium text-slate-700 block">
+                        {waProfile.pushname}
+                        <span className="text-xs font-normal text-slate-400 ml-2">(Nome no WhatsApp)</span>
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Status/About do WhatsApp */}
+                  {waProfile?.about && (
+                    <div className="mb-2 text-sm text-slate-500 italic flex items-center gap-1">
+                      <span>💬</span>
+                      <span>"{waProfile.about}"</span>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+                    <span className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full">
+                      <Phone className="w-4 h-4 text-indigo-500" />
+                      <span className="font-medium">{user.phone || 'N/A'}</span>
+                    </span>
+                  </div>
+
                 </div>
               </div>
-            </div>
-          </Card>
+            </div>          </Card>
 
           {/* Grid 2x2 de Cards de KPI */}
           <div className="grid grid-cols-2 gap-4">
@@ -257,7 +312,7 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">Enquete</h3>
+                <h3 className="text-lg font-bold text-white">{user.title || 'Enquete'}</h3>
                 <p className="text-sm text-white/80">Opções diárias</p>
               </div>
             </div>
@@ -313,88 +368,100 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
         </div>
       </div>
 
-      {/* EVOLUÇÃO - Grid de Opções (Heatmap) */}
+      {/* EVOLUÇÃO DAS OPÇÕES - Heatmap/Grid */}
       <Card className="overflow-hidden">
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2.5 bg-indigo-100 rounded-xl">
             <TrendingUp className="w-5 h-5 text-indigo-600" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Evolução das Opções</h3>
-            <p className="text-sm text-slate-500">Acompanhamento diário das escolhas (últimos 14 dias)</p>
+            <h3 className="text-lg font-bold text-slate-900">Evolução das Atividades</h3>
+            <p className="text-sm text-slate-500">Acompanhamento diário dos últimos 14 dias</p>
           </div>
         </div>
 
-        <div className="overflow-x-auto pb-2">
-          <div className="min-w-[800px]">
-            {/* Header com as datas */}
-            <div className="grid grid-cols-[200px_repeat(14,1fr)] gap-2 mb-2">
-              <div className="font-semibold text-slate-400 text-xs uppercase tracking-wider self-end pb-2">Opção</div>
-              {Array.from({ length: 14 }).map((_, i) => {
-                const d = new Date()
-                d.setDate(d.getDate() - (13 - i))
-                const isToday = i === 13
+        <div className="overflow-x-auto">
+          <div className="min-w-[800px] pb-4">
+            {(() => {
+              // Get all unique options from activities
+              const uniqueOptions = Array.from(new Set(activities.map(a => a.option).filter(Boolean)))
+
+              if (uniqueOptions.length === 0) {
                 return (
-                  <div key={i} className={`flex flex-col items-center justify-end pb-2 ${isToday ? 'text-indigo-600 font-bold' : 'text-slate-400'}`}>
-                    <span className="text-[10px] uppercase">{d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</span>
-                    <span className="text-sm">{d.getDate()}</span>
+                  <div className="text-center py-8 text-slate-400 italic">
+                    Nenhuma atividade registrada para este usuário.
                   </div>
                 )
-              })}
-            </div>
+              }
 
-            {/* Linhas das opções */}
-            <div className="space-y-2">
-              {pollOptions.map((optionName, optIndex) => (
-                <div key={optIndex} className="grid grid-cols-[200px_repeat(14,1fr)] gap-2 items-center hover:bg-slate-50 rounded-lg transition-colors p-1">
-                  {/* Nome da Opção */}
-                  <div className="text-sm font-medium text-slate-700 truncate pr-4" title={optionName}>
-                    {optionName}
+              return (
+                <>
+                  {/* Header Dates */}
+                  <div className="grid grid-cols-[200px_repeat(14,1fr)] gap-2 mb-2">
+                    <div className="font-semibold text-slate-500 text-sm">Opção</div>
+                    {Array.from({ length: 14 }).map((_, i) => {
+                      const d = new Date()
+                      d.setDate(d.getDate() - (13 - i))
+                      return (
+                        <div key={i} className="text-center">
+                          <span className="text-xs font-medium text-slate-400 block mb-1">
+                            {d.toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}
+                          </span>
+                          <span className="text-xs font-bold text-slate-600">
+                            {d.getDate()}/{d.getMonth() + 1}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </div>
 
-                  {/* Células dos dias */}
-                  {Array.from({ length: 14 }).map((_, dayIndex) => {
-                    const d = new Date()
-                    d.setDate(d.getDate() - (13 - dayIndex))
-                    const dateStr = d.toISOString().split('T')[0]
-
-                    // Encontrar atividade deste dia
-                    const activity = activities.find(a => a.activity_date === dateStr)
-
-                    // Verificar se esta opção estava selecionada neste dia
-                    let isSelected = false
-                    if (activity && activity.option) {
-                      const dailyOptions = parseOptions(activity.option)
-                      isSelected = dailyOptions.includes(optionName)
-                    }
-
-                    return (
-                      <div key={dayIndex} className="flex justify-center h-8 items-center">
-                        <div
-                          className={`
-                            transition-all duration-300 rounded-md
-                            ${isSelected
-                              ? 'w-8 h-8 bg-green-500 text-white shadow-sm shadow-green-200 scale-100'
-                              : 'w-2 h-2 bg-slate-100 scale-75'
-                            }
-                            flex items-center justify-center
-                          `}
-                          title={`${optionName} em ${d.toLocaleDateString('pt-BR')}: ${isSelected ? 'Realizado' : 'Não realizado'}`}
-                        >
-                          {isSelected && <CheckCircle2 className="w-5 h-5" />}
-                        </div>
+                  {/* Rows for each unique option */}
+                  {uniqueOptions.map((optionName, idx) => (
+                    <div key={idx} className="grid grid-cols-[200px_repeat(14,1fr)] gap-2 mb-2 items-center hover:bg-slate-50 rounded-lg p-1 transition-colors">
+                      <div className="text-sm font-medium text-slate-700 truncate pr-4" title={optionName ?? undefined}>
+                        {optionName}
                       </div>
-                    )
-                  })}
-                </div>
-              ))}
+                      {Array.from({ length: 14 }).map((_, i) => {
+                        const d = new Date()
+                        d.setDate(d.getDate() - (13 - i))
+                        const dateStr = d.toISOString().split('T')[0]
 
-              {pollOptions.length === 0 && (
-                <div className="text-center py-8 text-slate-400 text-sm italic">
-                  Nenhuma opção configurada para este usuário.
-                </div>
-              )}
-            </div>
+                        // Find activity for this option on this day
+                        const dayActivity = activities.find(a => {
+                          const actDate = new Date(a.activity_date)
+                          return actDate.toISOString().split('T')[0] === dateStr && a.option === optionName
+                        })
+
+                        const isCompleted = dayActivity?.check_status === true
+                        const exists = !!dayActivity
+
+                        return (
+                          <div key={i} className="flex justify-center">
+                            <div
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 ${isCompleted
+                                ? 'bg-green-500 shadow-md shadow-green-200 scale-100'
+                                : exists
+                                  ? 'bg-red-400 shadow-sm shadow-red-200 scale-100'
+                                  : 'bg-slate-100 scale-75 opacity-50'
+                                }`}
+                              title={`${optionName} em ${d.toLocaleDateString('pt-BR')}: ${isCompleted ? 'Concluído ✓' : exists ? 'Não concluído ✗' : 'Sem registro'
+                                }`}
+                            >
+                              {isCompleted && <CheckCircle2 className="w-5 h-5 text-white" />}
+                              {exists && !isCompleted && (
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </>
+              )
+            })()}
           </div>
         </div>
       </Card>
@@ -410,6 +477,6 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
         </div>
         <ActivityTable activities={activities} />
       </Card>
-    </div>
+    </div >
   )
 }
