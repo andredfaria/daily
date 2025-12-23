@@ -11,7 +11,7 @@ export default async function Home({ searchParams }: PageProps) {
 
   return (
     <>
-      <Navbar title="Dashboard de Performance" />
+      <Navbar title="Dashboard" />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <DashboardContent userId={userId} />
       </main>

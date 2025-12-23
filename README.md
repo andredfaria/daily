@@ -1,6 +1,6 @@
 # Daily Status Dashboard
 
-Dashboard de performance e status diário construído com Next.js, TypeScript, Tailwind CSS e Supabase.
+Dashboard e status diário construído com Next.js, TypeScript, Tailwind CSS e Supabase.
 
 ## Configuração
 
@@ -46,5 +46,5 @@ Abra [http://localhost:3000](http://localhost:3000) no navegador.
 
 - **Título**: Opcional, mínimo 2 caracteres, máximo 100 caracteres
 - **Telefone**: Opcional, validação de formato e verificação via WAHA `/api/contacts/check-exists`
-- **Hora de Envio**: Opcional, formato HH:mm
-- **Checklist**: Opcional, cada item entre 1 e 200 caracteres
+- **Hora de Envio**: Opcional, formato HH
+- **Checklist**: Obrigatorio, mínimo 1 item, máximo 50 itens

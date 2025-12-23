@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Daily Status Dashboard',
-  description: 'Dashboard de performance e status diário',
+  description: 'Dashboard e status diário',
 }
 
 export default function RootLayout({
