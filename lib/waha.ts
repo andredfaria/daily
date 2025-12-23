@@ -97,4 +97,77 @@ export async function validatePhoneWithWAHA(phone: string): Promise<WAHAValidati
       error: errorMessage
     }
   }
+
+}
+
+export interface WAHAProfile {
+  pushname?: string
+  about?: string
+  profilePicUrl?: string
+  chatId: string
+  error?: string
+}
+
+/**
+ * Busca informações completas do perfil do WhatsApp (Foto, Recado/About, Nome)
+ * @param phone - Número de telefone
+ */
+export async function getWhatsAppProfile(phone: string): Promise<WAHAProfile | null> {
+  const wahaUrl = process.env.NEXT_PUBLIC_WAHA_BASE_URL || ''
+
+  if (!wahaUrl) {
+    console.error('URL do WAHA não configurada')
+    return null
+  }
+
+  try {
+    // 1. Primeiro valida o número para pegar o chatId correto
+    const validation = await validatePhoneWithWAHA(phone)
+
+    if (!validation.exists || !validation.chatId) {
+      return {
+        chatId: '',
+        error: 'Número não encontrado no WhatsApp'
+      }
+    }
+
+    const chatId = validation.chatId
+    const headers = {
+      'accept': 'application/json',
+      ...(process.env.NEXT_PUBLIC_WAHA_API_KEY && { 'X-Api-Key': process.env.NEXT_PUBLIC_WAHA_API_KEY }),
+    }
+
+    const requests = [
+      // 2. Busca foto de perfil
+      fetch(
+        `${wahaUrl.replace(/\/$/, '')}/api/contacts/profile-picture?contactId=${chatId}&session=default`,
+        { method: 'GET', headers }
+      ).then(r => r.ok ? r.json() : null).catch(() => null),
+
+      // 3. Busca recado (About)
+      fetch(
+        `${wahaUrl.replace(/\/$/, '')}/api/contacts/about?contactId=${chatId}&session=default`,
+        { method: 'GET', headers }
+      ).then(r => r.ok ? r.json() : null).catch(() => null),
+
+      // 4. Busca dados do contato (Pushname)
+      fetch(
+        `${wahaUrl.replace(/\/$/, '')}/api/contacts?contactId=${chatId}&session=default`,
+        { method: 'GET', headers }
+      ).then(r => r.ok ? r.json() : null).catch(() => null)
+    ]
+
+    const [picData, aboutData, contactData] = await Promise.all(requests)
+
+    return {
+      chatId,
+      profilePicUrl: picData?.profilePictureURL || picData?.url,
+      about: aboutData?.about || aboutData?.status,
+      pushname: contactData?.pushname
+    }
+
+  } catch (error) {
+    console.error('Erro ao buscar perfil do WhatsApp:', error)
+    return null
+  }
 }
