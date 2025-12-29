@@ -1,3 +1,6 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
 CREATE TABLE public.daily_data (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
   id_user bigint NOT NULL,
@@ -16,5 +19,7 @@ CREATE TABLE public.daily_user (
   option text,
   time_to_send integer,
   name text,
-  CONSTRAINT daily_user_pkey PRIMARY KEY (id)
+  auth_user_id uuid UNIQUE,
+  CONSTRAINT daily_user_pkey PRIMARY KEY (id),
+  CONSTRAINT daily_user_auth_user_id_fkey FOREIGN KEY (auth_user_id) REFERENCES auth.users(id)
 );
