@@ -20,6 +20,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [dailyUser, setDailyUser] = useState<DailyUser | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const fetchDailyUser = async (authUserId: string) => {
+    const { data: dailyUserData, error } = await supabase
+      .from('daily_user')
+      .select('*')
+      .eq('auth_user_id', authUserId)
+      .single()
+
+    if (error) {
+      console.error('Erro ao buscar daily_user:', error)
+      setDailyUser(null)
+    } else if (dailyUserData) {
+      setDailyUser(dailyUserData as DailyUser)
+    } else {
+      setDailyUser(null)
+    }
+  }
+
   const loadUser = async () => {
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -27,13 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (authUser) {
         // Buscar daily_user associado
-        const { data: dailyUserData } = await supabase
-          .from('daily_user')
-          .select('*')
-          .eq('auth_user_id', authUser.id)
-          .single()
-
-        setDailyUser(dailyUserData as DailyUser)
+        await fetchDailyUser(authUser.id)
       } else {
         setDailyUser(null)
       }
@@ -56,13 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (session?.user) {
           // Buscar daily_user quando usuário fizer login
-          const { data: dailyUserData } = await supabase
-            .from('daily_user')
-            .select('*')
-            .eq('auth_user_id', session.user.id)
-            .single()
-
-          setDailyUser(dailyUserData as DailyUser)
+          await fetchDailyUser(session.user.id)
         } else {
           setDailyUser(null)
         }
