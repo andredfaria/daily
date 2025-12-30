@@ -27,13 +27,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (authUser) {
         // Buscar daily_user associado
-        const { data: dailyUserData } = await supabase
+        const { data: dailyUserData, error } = await supabase
           .from('daily_user')
           .select('*')
           .eq('auth_user_id', authUser.id)
           .single()
 
-        setDailyUser(dailyUserData as DailyUser)
+        if (error) {
+          console.error('Erro ao buscar daily_user:', error)
+          setDailyUser(null)
+        } else if (dailyUserData) {
+          setDailyUser(dailyUserData as DailyUser)
+        } else {
+          setDailyUser(null)
+        }
       } else {
         setDailyUser(null)
       }
@@ -56,13 +63,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (session?.user) {
           // Buscar daily_user quando usuário fizer login
-          const { data: dailyUserData } = await supabase
+          const { data: dailyUserData, error } = await supabase
             .from('daily_user')
             .select('*')
             .eq('auth_user_id', session.user.id)
             .single()
 
-          setDailyUser(dailyUserData as DailyUser)
+          if (error) {
+            console.error('Erro ao buscar daily_user:', error)
+            setDailyUser(null)
+          } else if (dailyUserData) {
+            setDailyUser(dailyUserData as DailyUser)
+          } else {
+            setDailyUser(null)
+          }
         } else {
           setDailyUser(null)
         }
