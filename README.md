@@ -1,4 +1,4 @@
-# Daily Status Dashboard
+# Daily Status Dashboard 
 
 Dashboard e status diário construído com Next.js, TypeScript, Tailwind CSS e Supabase.
 
