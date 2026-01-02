@@ -268,7 +268,16 @@ export default function CreateUserForm() {
 
     // Preparar option como JSON string array
     if (checklistItems.length > 0) {
-      userData.option = JSON.stringify(checklistItems)
+      // Garantir que todos os items são strings não vazias
+      const validItems = checklistItems.filter(item => 
+        typeof item === 'string' && item.trim().length > 0
+      )
+      
+      if (validItems.length > 0) {
+        userData.option = JSON.stringify(validItems)
+        console.log('✅ Salvando checklist:', validItems)
+        console.log('📦 JSON stringificado:', userData.option)
+      }
     }
 
     try {
@@ -521,6 +530,19 @@ export default function CreateUserForm() {
                 <strong>Dica:</strong> Use emojis no início de cada opção para tornar a enquete mais visual e engajante!
               </p>
             </div>
+
+            {/* Debug/Preview do JSON em modo desenvolvimento */}
+            {checklistItems.length > 0 && process.env.NODE_ENV === 'development' && (
+              <div className="mt-4 p-4 bg-slate-100 rounded-lg border border-slate-300">
+                <p className="text-xs font-semibold text-slate-700 mb-2">🔍 Preview - Formato no Banco de Dados:</p>
+                <pre className="text-xs font-mono text-slate-600 bg-white p-3 rounded border border-slate-200 overflow-x-auto">
+                  {JSON.stringify(checklistItems, null, 2)}
+                </pre>
+                <p className="text-xs text-slate-500 mt-2">
+                  ✅ Será salvo como string JSON: <code className="bg-white px-1 py-0.5 rounded">{JSON.stringify(checklistItems)}</code>
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

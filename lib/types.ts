@@ -4,7 +4,9 @@ export interface ChecklistItem {
   text: string
 }
 
-// Interface para opções do usuário (JSON armazenado no campo option)
+// Interface para opções do usuário (FORMATO ANTIGO - Mantido para compatibilidade)
+// NOTA: O campo 'option' agora armazena apenas array JSON: ["item1", "item2"]
+// Não usar mais o formato de objeto
 export interface UserOptions {
   checklist?: string[]
   sendTime?: string
@@ -18,7 +20,9 @@ export interface DailyUser {
   title: string | null
   name: string | null
   time_to_send: number | null
-  option: UserOptions | null
+  option: string | null  // JSON stringified array de strings: ["⏰ Item 1", "💪 Item 2"] - Enquete WhatsApp
+  auth_user_id: string | null  // UUID do Supabase Auth - UNIQUE, nullable
+  is_admin: boolean  // Flag de administrador
 }
 
 // Alias para compatibilidade

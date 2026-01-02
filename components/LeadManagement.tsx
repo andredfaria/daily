@@ -358,7 +358,18 @@ export default function LeadManagement() {
         }
 
         if (checklistItems.length > 0) {
-            userData.option = JSON.stringify(checklistItems)
+            // Garantir que todos os items são strings não vazias
+            const validItems = checklistItems.filter(item => 
+                typeof item === 'string' && item.trim().length > 0
+            )
+            
+            if (validItems.length > 0) {
+                userData.option = JSON.stringify(validItems)
+                console.log('✅ Salvando checklist:', validItems)
+                console.log('📦 JSON stringificado:', userData.option)
+            } else if (isEditMode) {
+                userData.option = null
+            }
         } else if (isEditMode) {
             userData.option = null
         }

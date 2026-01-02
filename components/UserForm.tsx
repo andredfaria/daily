@@ -9,6 +9,7 @@ import { validateName, validateTitle, validatePhone, validateSendTime, validateC
 import { validatePhoneWithWAHA } from '@/lib/waha'
 import LoadingOverlay from './LoadingOverlay'
 import SuccessMessage from './SuccessMessage'
+import AdminUserFields from './AdminUserFields'
 import Button from './ui/Button'
 import FormField from './ui/FormField'
 import Input from './ui/Input'
@@ -19,9 +20,10 @@ interface UserFormProps {
   onSuccess?: (userId?: number) => void  // Callback após sucesso
   onCancel?: () => void  // Callback para cancelar (opcional)
   embedded?: boolean  // Se true, opera inline sem navegação
+  showAdminFields?: boolean  // Se true, mostra campos administrativos (apenas para admins)
 }
 
-export default function UserForm({ user, onSuccess, onCancel, embedded = false }: UserFormProps) {
+export default function UserForm({ user, onSuccess, onCancel, embedded = false, showAdminFields = false }: UserFormProps) {
   const router = useRouter()
   const isEditMode = !!user
 
@@ -35,24 +37,43 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false }
 
   // Parsear option que pode vir como string JSON ou objeto
   const parseOptionToChecklist = (option: any): string[] => {
-    if (!option) return []
+    console.log('📥 Carregando option do banco:', option)
+    console.log('📥 Tipo do option:', typeof option)
+    
+    if (!option) {
+      console.log('⚠️ Option vazio, retornando array vazio')
+      return []
+    }
+    
     // Se for string, tentar parsear como JSON
     if (typeof option === 'string') {
       try {
         const parsed = JSON.parse(option)
-        return Array.isArray(parsed) ? parsed : []
-      } catch {
+        if (Array.isArray(parsed)) {
+          console.log('✅ Checklist parseado com sucesso:', parsed)
+          return parsed
+        }
+        console.log('⚠️ JSON parseado não é array:', parsed)
+        return []
+      } catch (error) {
+        console.error('❌ Erro ao parsear JSON:', error)
         return []
       }
     }
-    // Se for objeto com checklist
+    
+    // Se for objeto com checklist (formato antigo - compatibilidade)
     if (option.checklist && Array.isArray(option.checklist)) {
+      console.log('⚠️ Option em formato objeto antigo, usando checklist:', option.checklist)
       return option.checklist
     }
+    
     // Se for array diretamente
     if (Array.isArray(option)) {
+      console.log('✅ Option já é array:', option)
       return option
     }
+    
+    console.log('⚠️ Option em formato desconhecido, retornando vazio')
     return []
   }
 
@@ -354,7 +375,21 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false }
 
     // Preparar option como JSON string array
     if (checklistItems.length > 0) {
-      userData.option = JSON.stringify(checklistItems)
+      // Garantir que todos os items são strings não vazias
+      const validItems = checklistItems.filter(item => 
+        typeof item === 'string' && item.trim().length > 0
+      )
+      
+      if (validItems.length > 0) {
+        userData.option = JSON.stringify(validItems)
+        console.log('✅ Salvando checklist:', validItems)
+        console.log('📦 JSON stringificado:', userData.option)
+      } else {
+        // Se após filtrar não sobrou nenhum item válido
+        if (isEditMode) {
+          userData.option = null
+        }
+      }
     } else {
       if (isEditMode) {
         userData.option = null
@@ -658,6 +693,19 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false }
                 </div>
               )}
             </div>
+
+            {/* Debug/Preview do JSON em modo desenvolvimento */}
+            {checklistItems.length > 0 && process.env.NODE_ENV === 'development' && (
+              <div className="mt-4 p-4 bg-slate-100 rounded-lg border border-slate-300">
+                <p className="text-xs font-semibold text-slate-700 mb-2">🔍 Preview - Formato no Banco de Dados:</p>
+                <pre className="text-xs font-mono text-slate-600 bg-white p-3 rounded border border-slate-200 overflow-x-auto">
+                  {JSON.stringify(checklistItems, null, 2)}
+                </pre>
+                <p className="text-xs text-slate-500 mt-2">
+                  ✅ Será salvo como string JSON: <code className="bg-white px-1 py-0.5 rounded">{JSON.stringify(checklistItems)}</code>
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -684,6 +732,21 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false }
           </div>
         </form>
       </Card>
+
+      {/* Campos Administrativos - Apenas para Admins */}
+      {showAdminFields && isEditMode && user && (
+        <AdminUserFields
+          userId={user.id}
+          currentIsAdmin={user.is_admin}
+          currentAuthUserId={user.auth_user_id}
+          onSuccess={() => {
+            // Callback quando alguma operação admin for bem-sucedida
+            if (onSuccess) {
+              onSuccess(user.id)
+            }
+          }}
+        />
+      )}
 
       {loading && (
         <LoadingOverlay message={isEditMode ? 'Salvando alterações...' : 'Criando usuário...'} />

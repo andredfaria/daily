@@ -75,6 +75,40 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(homeUrl)
   }
 
+  // Verificação de permissões para a rota /edit
+  if (user && request.nextUrl.pathname === '/edit') {
+    const targetUserId = request.nextUrl.searchParams.get('id')
+    
+    if (targetUserId) {
+      try {
+        // Buscar daily_user do usuário autenticado
+        const { data: dailyUser, error: dailyUserError } = await supabase
+          .from('daily_user')
+          .select('id, is_admin')
+          .eq('auth_user_id', user.id)
+          .single()
+
+        if (dailyUserError || !dailyUser) {
+          // Se não encontrou o daily_user, redireciona para home
+          const homeUrl = new URL('/', request.url)
+          return NextResponse.redirect(homeUrl)
+        }
+
+        // Verificar se pode editar
+        const canEdit = dailyUser.is_admin || dailyUser.id === parseInt(targetUserId)
+
+        if (!canEdit) {
+          // Se não tem permissão, redireciona para a listagem de usuários
+          const usersUrl = new URL('/users', request.url)
+          return NextResponse.redirect(usersUrl)
+        }
+      } catch (error) {
+        console.error('Erro ao verificar permissões no middleware:', error)
+        // Em caso de erro, permite o acesso e deixa a validação para a página
+      }
+    }
+  }
+
   return response
 }
 

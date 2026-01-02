@@ -11,6 +11,8 @@ interface AuthContextType {
   loading: boolean
   signOut: () => Promise<void>
   refreshUser: () => Promise<void>
+  isAdmin: () => boolean
+  canEdit: (userId: number) => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -86,8 +88,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loadUser()
   }
 
+  // Verifica se o usuário atual é administrador
+  const isAdmin = (): boolean => {
+    return dailyUser?.is_admin === true
+  }
+
+  // Verifica se o usuário atual pode editar um determinado usuário
+  // Admin pode editar todos, não-admin pode editar apenas seus próprios dados
+  const canEdit = (userId: number): boolean => {
+    if (!dailyUser) return false
+    if (dailyUser.is_admin) return true
+    return dailyUser.id === userId
+  }
+
   return (
-    <AuthContext.Provider value={{ user, dailyUser, loading, signOut, refreshUser }}>
+    <AuthContext.Provider value={{ user, dailyUser, loading, signOut, refreshUser, isAdmin, canEdit }}>
       {children}
     </AuthContext.Provider>
   )

@@ -5,12 +5,14 @@ import { Edit, Users, ExternalLink, Clock, CheckSquare, UserPlus } from 'lucide-
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
+import { useAuth } from './AuthProvider'
 import LoadingSpinner from './LoadingSpinner'
 import ErrorMessage from './ErrorMessage'
 import Button from './ui/Button'
 import Card from './ui/Card'
 
 export default function UserList() {
+  const { canEdit } = useAuth()
   const [users, setUsers] = useState<DailyUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -212,16 +214,18 @@ export default function UserList() {
                             Ver Dashboard
                           </Button>
                         </Link>
-                        <Link href={`/edit?id=${user.id}`}>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            icon={Edit}
-                            className="text-indigo-600 hover:bg-indigo-50 border-0"
-                          >
-                            Editar
-                          </Button>
-                        </Link>
+                        {canEdit(user.id) && (
+                          <Link href={`/edit?id=${user.id}`}>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              icon={Edit}
+                              className="text-indigo-600 hover:bg-indigo-50 border-0"
+                            >
+                              Editar
+                            </Button>
+                          </Link>
+                        )}
                       </div>
                     </td>
                   </tr>
