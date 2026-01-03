@@ -23,7 +23,6 @@ export default function CreateUserForm() {
 
   // Estados de validação
   const [nameError, setNameError] = useState<string | null>(null)
-  const [titleError, setTitleError] = useState<string | null>(null)
   const [phoneError, setPhoneError] = useState<string | null>(null)
   const [phoneValidating, setPhoneValidating] = useState(false)
   const [phoneValidated, setPhoneValidated] = useState(false)
@@ -162,7 +161,7 @@ export default function CreateUserForm() {
         setPhoneValidated(false)
         setPhoneError(wahaResult.error || 'Número não encontrado no WhatsApp')
       }
-    } catch (err: any) {
+    } catch {
       setPhoneValidated(false)
       setPhoneError('Erro ao validar telefone. Tente novamente.')
     } finally {
@@ -249,7 +248,7 @@ export default function CreateUserForm() {
     const sendTimeValue = sendTime.trim() || null
 
     // Preparar dados para inserção no Supabase
-    const userData: any = {}
+    const userData: Record<string, unknown> = {}
     if (nameValue) userData.name = nameValue
     if (titleValue) userData.title = titleValue
     // Salvar o chatId completo (com @c.us) no banco de dados
@@ -292,9 +291,9 @@ export default function CreateUserForm() {
       setCreatedUserId(data.id)
       setSuccess(true)
       setLoading(false)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao criar usuário:', err)
-      setError(err.message || 'Ocorreu um erro ao cadastrar o usuário. Tente novamente.')
+      setError(err instanceof Error ? err.message : 'Ocorreu um erro ao cadastrar o usuário. Tente novamente.')
       setLoading(false)
     }
   }

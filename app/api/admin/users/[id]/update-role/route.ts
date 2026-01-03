@@ -57,10 +57,10 @@ export async function POST(
       message: `Usuário ${is_admin ? 'promovido a' : 'removido de'} administrador com sucesso`,
       user: updatedUser,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Erro ao atualizar permissões:', error)
     return NextResponse.json(
-      { error: error.message || 'Erro ao atualizar permissões' },
+      { error: error instanceof Error ? error.message : 'Erro ao atualizar permissões' },
       { status: 500 }
     )
   }

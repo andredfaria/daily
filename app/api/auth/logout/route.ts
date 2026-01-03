@@ -5,17 +5,17 @@ export async function POST() {
   try {
     const supabase = await createClient()
 
-    const { error } = await supabase.auth.signOut()
+    const { error: signOutError } = await supabase.auth.signOut()
 
-    if (error) {
+    if (signOutError) {
       return NextResponse.json(
-        { error: error.message },
+        { error: signOutError.message },
         { status: 500 }
       )
     }
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
       { error: 'Erro ao fazer logout' },
       { status: 500 }

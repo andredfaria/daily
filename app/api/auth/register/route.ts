@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       session: data.session,
       message: 'Usuário criado com sucesso',
     })
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
       { error: 'Erro ao criar usuário' },
       { status: 500 }

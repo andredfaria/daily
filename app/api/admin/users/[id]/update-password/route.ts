@@ -87,12 +87,12 @@ export async function POST(
       success: true,
       message: 'Senha atualizada com sucesso',
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Erro ao atualizar senha:', error)
     
     // Tratar erros específicos do Supabase
     let errorMessage = 'Erro ao atualizar senha'
-    if (error.message?.includes('weak')) {
+    if (error instanceof Error && error.message.includes('weak')) {
       errorMessage = 'A senha é muito fraca. Use uma senha mais forte.'
     }
 

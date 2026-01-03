@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase-server'
 import { isUserAdmin, listAuthUsers } from '@/lib/supabase-admin'
 import { createClient } from '@/lib/supabase-server'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Verificar autenticação
     const authUser = await getUser()
@@ -60,8 +60,8 @@ export async function GET(request: NextRequest) {
       total: formattedUsers.length,
       available: formattedUsers.filter(u => !u.is_linked).length,
     })
-  } catch (error: any) {
-    console.error('Erro ao listar usuários de autenticação:', error)
+  } catch {
+    console.error('Erro ao listar usuários de autenticação')
     return NextResponse.json(
       { error: 'Erro ao listar usuários de autenticação' },
       { status: 500 }

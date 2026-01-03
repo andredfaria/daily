@@ -61,15 +61,17 @@ export async function POST(
         : 'Usuário de autenticação desvinculado com sucesso',
       user: updatedUser,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Erro ao vincular usuário de autenticação:', error)
     
     // Tratar erros específicos
     let errorMessage = 'Erro ao vincular usuário de autenticação'
-    if (error.message.includes('não encontrado')) {
-      errorMessage = error.message
-    } else if (error.message.includes('já está vinculado')) {
-      errorMessage = error.message
+    if (error instanceof Error) {
+      if (error.message.includes('não encontrado')) {
+        errorMessage = error.message
+      } else if (error.message.includes('já está vinculado')) {
+        errorMessage = error.message
+      }
     }
 
     return NextResponse.json(

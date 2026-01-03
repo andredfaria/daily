@@ -76,8 +76,8 @@ export default function AdminUserFields({
       } else {
         console.error('Erro ao carregar usuários auth:', data.error)
       }
-    } catch (error) {
-      console.error('Erro ao carregar usuários auth:', error)
+    } catch {
+      console.error('Erro ao carregar usuários auth')
     } finally {
       setLoadingAuthUsers(false)
     }
@@ -109,7 +109,7 @@ export default function AdminUserFields({
       } else {
         setRoleMessage({ type: 'error', text: data.error })
       }
-    } catch (error) {
+    } catch {
       setRoleMessage({ type: 'error', text: 'Erro ao atualizar permissões' })
     } finally {
       setUpdatingRole(false)
@@ -149,7 +149,7 @@ export default function AdminUserFields({
       } else {
         setLinkMessage({ type: 'error', text: data.error })
       }
-    } catch (error) {
+    } catch {
       setLinkMessage({ type: 'error', text: 'Erro ao vincular usuário de autenticação' })
     } finally {
       setLinkingAuth(false)
@@ -182,7 +182,7 @@ export default function AdminUserFields({
       } else {
         setLinkMessage({ type: 'error', text: data.error })
       }
-    } catch (error) {
+    } catch {
       setLinkMessage({ type: 'error', text: 'Erro ao desvincular usuário de autenticação' })
     } finally {
       setLinkingAuth(false)
@@ -218,7 +218,7 @@ export default function AdminUserFields({
       } else {
         setEmailMessage({ type: 'error', text: data.error })
       }
-    } catch (error) {
+    } catch {
       setEmailMessage({ type: 'error', text: 'Erro ao atualizar email' })
     } finally {
       setUpdatingEmail(false)
@@ -265,7 +265,7 @@ export default function AdminUserFields({
       } else {
         setPasswordMessage({ type: 'error', text: data.error })
       }
-    } catch (error) {
+    } catch {
       setPasswordMessage({ type: 'error', text: 'Erro ao atualizar senha' })
     } finally {
       setUpdatingPassword(false)

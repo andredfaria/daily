@@ -48,8 +48,8 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
       // Redirecionar para a home após login/registro bem-sucedido
       router.push('/')
       router.refresh()
-    } catch (err: any) {
-      setError(err.message || 'Erro ao processar solicitação')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao processar solicitação')
     } finally {
       setLoading(false)
     }

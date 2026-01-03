@@ -34,9 +34,9 @@ export default function UserList() {
       if (fetchError) throw fetchError
 
       setUsers((data as DailyUser[]) || [])
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao carregar usuários:', err)
-      setError(err.message || 'Erro ao carregar lista de usuários')
+      setError(err instanceof Error ? err.message : 'Erro ao carregar lista de usuários')
     } finally {
       setLoading(false)
     }

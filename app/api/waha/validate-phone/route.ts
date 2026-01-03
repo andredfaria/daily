@@ -18,12 +18,12 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(result)
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Erro ao validar telefone com WAHA:', error)
         return NextResponse.json({
             isValid: false,
             exists: false,
-            error: error.message || 'Erro de conexão ao validar telefone'
+            error: error instanceof Error ? error.message : 'Erro de conexão ao validar telefone'
         } as WAHAValidationResult, { status: 500 })
     }
 }

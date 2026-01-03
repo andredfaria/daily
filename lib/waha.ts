@@ -52,12 +52,12 @@ export async function validatePhoneWithWAHA(phone: string): Promise<WAHAValidati
     const result: WAHAValidationResult = await response.json()
     return result
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Erro ao validar telefone:', error)
     return {
       isValid: false,
       exists: false,
-      error: error.message || 'Erro de conexão ao validar telefone'
+      error: error instanceof Error ? error.message : 'Erro de conexão ao validar telefone'
     }
   }
 }
@@ -199,9 +199,9 @@ export async function validatePhoneWithWAHAServer(phone: string): Promise<WAHAVa
       chatId: exists ? chatId : undefined,
       error: exists ? undefined : `Número não encontrado no WhatsApp. Verifique se o número está correto.${getBrazilianPhoneTip(phone)}`
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Erro ao validar telefone com WAHA:', error)
-    const errorMessage = `${error.message || 'Erro de conexão ao validar telefone. Verifique sua conexão e a configuração do WAHA.'}${getBrazilianPhoneTip(phone)}`
+    const errorMessage = `${error instanceof Error ? error.message : 'Erro de conexão ao validar telefone. Verifique sua conexão e a configuração do WAHA.'}${getBrazilianPhoneTip(phone)}`
 
     return {
       isValid: false,

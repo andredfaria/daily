@@ -89,15 +89,17 @@ export async function POST(
       message: 'Email atualizado com sucesso',
       new_email: email,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Erro ao atualizar email:', error)
     
     // Tratar erros específicos do Supabase
     let errorMessage = 'Erro ao atualizar email'
-    if (error.message?.includes('already been registered')) {
-      errorMessage = 'Este email já está em uso por outro usuário'
-    } else if (error.message?.includes('invalid')) {
-      errorMessage = 'Email inválido'
+    if (error instanceof Error) {
+      if (error.message.includes('already been registered')) {
+        errorMessage = 'Este email já está em uso por outro usuário'
+      } else if (error.message.includes('invalid')) {
+        errorMessage = 'Email inválido'
+      }
     }
 
     return NextResponse.json(

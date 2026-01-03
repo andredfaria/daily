@@ -15,7 +15,7 @@ export async function createClient() {
         set(name: string, value: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value, ...options })
-          } catch (error) {
+          } catch {
             // The `set` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
             // user sessions.
@@ -24,7 +24,7 @@ export async function createClient() {
         remove(name: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value: '', ...options })
-          } catch (error) {
+          } catch {
             // The `delete` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
             // user sessions.
@@ -37,9 +37,9 @@ export async function createClient() {
 
 export async function getUser() {
   const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
+  const { data: { user }, error: getUserError } = await supabase.auth.getUser()
   
-  if (error || !user) {
+  if (getUserError || !user) {
     return null
   }
   
@@ -48,9 +48,9 @@ export async function getUser() {
 
 export async function getSession() {
   const supabase = await createClient()
-  const { data: { session }, error } = await supabase.auth.getSession()
+  const { data: { session }, error: getSessionError } = await supabase.auth.getSession()
   
-  if (error || !session) {
+  if (getSessionError || !session) {
     return null
   }
   

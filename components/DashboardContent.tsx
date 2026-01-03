@@ -1,17 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { DailyUser, DailyData } from '@/lib/types'
 import { getWhatsAppProfile, WAHAProfile } from '@/lib/waha'
 import LoadingSpinner from './LoadingSpinner'
 import ErrorMessage from './ErrorMessage'
-import KPICard from './KPICard'
 import ActivityTable from './ActivityTable'
-import Button from './ui/Button'
 import Card from './ui/Card'
-import { PieChart, Layers, CheckCircle2, Phone, Calendar, UserPlus, Plus, TrendingUp } from 'lucide-react'
-import Link from 'next/link'
+import { PieChart, Layers, CheckCircle2, Phone, Calendar, UserPlus, TrendingUp } from 'lucide-react'
 
 interface DashboardContentProps {
   userId?: string
@@ -23,7 +21,6 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
   const [activities, setActivities] = useState<DailyData[]>([])
   const [error, setError] = useState<string | null>(null)
   const [waProfile, setWaProfile] = useState<WAHAProfile | null>(null)
-  const [loadingWa, setLoadingWa] = useState(false)
 
   useEffect(() => {
     async function loadData() {
@@ -58,15 +55,15 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
           throw activitiesError
         }
 
-        setUser(userData as DailyUser)
-        setActivities((activitiesData as DailyData[]) || [])
-      } catch (err: any) {
-        console.error(err)
-        setError(err.message || 'Erro ao carregar dados')
-      } finally {
-        setLoading(false)
-      }
+      setUser(userData as DailyUser)
+      setActivities((activitiesData as DailyData[]) || [])
+    } catch (err: unknown) {
+      console.error(err)
+      setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
+    } finally {
+      setLoading(false)
     }
+  }
 
     loadData()
   }, [userId])
@@ -76,15 +73,12 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
       if (!user?.phone) return
 
       try {
-        setLoadingWa(true)
         const profile = await getWhatsAppProfile(user.phone)
         if (profile) {
           setWaProfile(profile)
         }
       } catch (error) {
         console.error('Erro ao buscar perfil do WhatsApp:', error)
-      } finally {
-        setLoadingWa(false)
       }
     }
 
@@ -135,10 +129,8 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
   else if (rate < 80) progressColor = 'yellow'
   else progressColor = 'green'
 
-  const formattedDate = new Date(user.created_at).toLocaleDateString('pt-BR')
-
   // Parsear option que pode vir como string JSON ou array
-  const parseOptions = (option: any): string[] => {
+  const parseOptions = (option: unknown): string[] => {
     if (!option) return []
     if (typeof option === 'string') {
       try {
@@ -148,8 +140,8 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
         return []
       }
     }
-    if (option.checklist && Array.isArray(option.checklist)) {
-      return option.checklist
+    if (typeof option === 'object' && option !== null && 'checklist' in option && Array.isArray((option as { checklist: unknown }).checklist)) {
+      return (option as { checklist: string[] }).checklist
     }
     if (Array.isArray(option)) {
       return option
@@ -171,11 +163,14 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
               <div className="flex items-start gap-4">
                 {/* Avatar do WhatsApp */}
                 {waProfile?.profilePicUrl && (
-                  <div className="relative">
-                    <img
+                  <div className="relative w-16 h-16">
+                    <Image
                       src={waProfile.profilePicUrl}
                       alt="WhatsApp Profile"
-                      className="w-16 h-16 rounded-full border-4 border-white shadow-md object-cover"
+                      width={64}
+                      height={64}
+                      className="rounded-full border-4 border-white shadow-md object-cover"
+                      unoptimized
                     />
                     <div className="absolute bottom-0 right-0 w-5 h-5 bg-green-500 border-2 border-white rounded-full flex items-center justify-center">
                       <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-white">
@@ -206,7 +201,7 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
                   {waProfile?.about && (
                     <div className="mb-2 text-sm text-slate-500 italic flex items-center gap-1">
                       <span>💬</span>
-                      <span>"{waProfile.about}"</span>
+                      <span>&quot;{waProfile.about}&quot;</span>
                     </div>
                   )}
 

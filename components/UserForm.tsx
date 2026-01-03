@@ -36,7 +36,7 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false, 
   }
 
   // Parsear option que pode vir como string JSON ou objeto
-  const parseOptionToChecklist = (option: any): string[] => {
+  const parseOptionToChecklist = (option: unknown): string[] => {
     console.log('📥 Carregando option do banco:', option)
     console.log('📥 Tipo do option:', typeof option)
     
@@ -62,9 +62,9 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false, 
     }
     
     // Se for objeto com checklist (formato antigo - compatibilidade)
-    if (option.checklist && Array.isArray(option.checklist)) {
-      console.log('⚠️ Option em formato objeto antigo, usando checklist:', option.checklist)
-      return option.checklist
+    if (typeof option === 'object' && option !== null && 'checklist' in option && Array.isArray((option as { checklist: unknown }).checklist)) {
+      console.log('⚠️ Option em formato objeto antigo, usando checklist:', (option as { checklist: string[] }).checklist)
+      return (option as { checklist: string[] }).checklist
     }
     
     // Se for array diretamente
@@ -263,7 +263,7 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false, 
         setPhoneValidated(false)
         setPhoneError(wahaResult.error || 'Número não encontrado no WhatsApp. Verifique se o número está correto. Dica: números brasileiros geralmente precisam do "9" no início (ex: +55 11 99999-9999)')
       }
-    } catch (err: any) {
+    } catch {
       setPhoneValidated(false)
       setPhoneError('Erro ao validar telefone. Tente novamente. Dica: números brasileiros geralmente precisam do "9" no início (ex: +55 11 99999-9999)')
     } finally {
@@ -352,7 +352,7 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false, 
     const sendTimeValue = sendTime.trim() || null
 
     // Preparar dados para inserção/atualização no Supabase
-    const userData: any = {}
+    const userData: Record<string, unknown> = {}
     if (nameValue) userData.name = nameValue
     if (titleValue) userData.title = titleValue
     // Salvar o chatId completo (com @c.us) no banco de dados
@@ -437,9 +437,9 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false, 
           onSuccess(data.id)
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`Erro ao ${isEditMode ? 'atualizar' : 'criar'} usuário:`, err)
-      setError(err.message || `Ocorreu um erro ao ${isEditMode ? 'atualizar' : 'cadastrar'} o usuário. Tente novamente.`)
+      setError(err instanceof Error ? err.message : `Ocorreu um erro ao ${isEditMode ? 'atualizar' : 'cadastrar'} o usuário. Tente novamente.`)
       setLoading(false)
     }
   }

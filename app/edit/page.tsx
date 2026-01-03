@@ -11,7 +11,7 @@ import { DailyUser } from '@/lib/types'
 import { useAuth } from '@/components/AuthProvider'
 
 function EditPageContent() {
-  const { canEdit } = useAuth()
+  const { canEdit, isAdmin } = useAuth()
   const searchParams = useSearchParams()
   const userId = searchParams.get('id')
   const [user, setUser] = useState<DailyUser | null>(null)
@@ -66,9 +66,9 @@ function EditPageContent() {
         }
 
         setUser(data as DailyUser)
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Erro ao carregar usuário:', err)
-        setError(err.message || 'Erro ao carregar dados do usuário')
+        setError(err instanceof Error ? err.message : 'Erro ao carregar dados do usuário')
         setAuthorized(false)
       } finally {
         setLoading(false)
@@ -102,8 +102,6 @@ function EditPageContent() {
       </>
     )
   }
-
-  const { isAdmin } = useAuth()
 
   return (
     <>

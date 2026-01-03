@@ -65,8 +65,8 @@ export async function GET(
       },
       { status: 403 }
     )
-  } catch (error: any) {
-    console.error('Erro ao validar permissões de edição:', error)
+  } catch {
+    console.error('Erro ao validar permissões de edição')
     return NextResponse.json(
       { error: 'Erro ao validar permissões', authorized: false },
       { status: 500 }

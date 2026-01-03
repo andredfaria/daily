@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, FormEvent } from 'react'
-import { Plus, X, UserPlus, Save, AlertCircle, CheckCircle2, Edit, Users, Clock, CheckSquare, Trash2, ExternalLink } from 'lucide-react'
+import { Plus, X, UserPlus, Save, AlertCircle, CheckCircle2, Edit, Users, Clock, Trash2, ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
 import { validateName, validateTitle, validatePhone, validateSendTime, validateChecklist } from '@/lib/validations'
@@ -57,7 +57,7 @@ export default function LeadManagement() {
 
             if (fetchError) throw fetchError
             setUsers((data as DailyUser[]) || [])
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Erro ao carregar usuários:', err)
         } finally {
             setLoadingUsers(false)
@@ -76,7 +76,7 @@ export default function LeadManagement() {
         return ''
     }
 
-    const parseOptionToChecklist = (option: any): string[] => {
+    const parseOptionToChecklist = (option: unknown): string[] => {
         if (!option) return []
         if (typeof option === 'string') {
             try {
@@ -86,8 +86,8 @@ export default function LeadManagement() {
                 return []
             }
         }
-        if (option.checklist && Array.isArray(option.checklist)) {
-            return option.checklist
+        if (typeof option === 'object' && option !== null && 'checklist' in option && Array.isArray((option as { checklist: unknown }).checklist)) {
+            return (option as { checklist: string[] }).checklist
         }
         if (Array.isArray(option)) {
             return option
@@ -283,7 +283,7 @@ export default function LeadManagement() {
                 setPhoneValidated(false)
                 setPhoneError(wahaResult.error || 'Número não encontrado no WhatsApp')
             }
-        } catch (err: any) {
+        } catch {
             setPhoneValidated(false)
             setPhoneError('Erro ao validar telefone. Tente novamente.')
         } finally {
@@ -341,7 +341,7 @@ export default function LeadManagement() {
         const titleValue = title.trim() || null
         const sendTimeValue = sendTime.trim() || null
 
-        const userData: any = {}
+        const userData: Record<string, unknown> = {}
         if (nameValue) userData.name = nameValue
         if (titleValue) userData.title = titleValue
         if (phoneChatId) {
@@ -399,9 +399,9 @@ export default function LeadManagement() {
                     resetForm()
                 }, 1500)
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(`Erro ao ${isEditMode ? 'atualizar' : 'criar'} lead:`, err)
-            setError(err.message || `Ocorreu um erro ao ${isEditMode ? 'atualizar' : 'cadastrar'} o lead.`)
+            setError(err instanceof Error ? err.message : `Ocorreu um erro ao ${isEditMode ? 'atualizar' : 'cadastrar'} o lead.`)
         } finally {
             setLoading(false)
         }
@@ -425,9 +425,9 @@ export default function LeadManagement() {
                 resetForm()
                 setSelectedUser(null)
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Erro ao excluir lead:', err)
-            setError(err.message || 'Erro ao excluir lead')
+            setError(err instanceof Error ? err.message : 'Erro ao excluir lead')
         } finally {
             setLoading(false)
         }
@@ -461,7 +461,7 @@ export default function LeadManagement() {
                         <div className="p-8 text-center">
                             <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                             <p className="text-slate-500 text-sm">Nenhum lead cadastrado</p>
-                            <p className="text-slate-400 text-xs mt-1">Clique em "Novo" para começar</p>
+                            <p className="text-slate-400 text-xs mt-1">Clique em &quot;Novo&quot; para começar</p>
                         </div>
                     ) : (
                         <div className="divide-y divide-slate-100">

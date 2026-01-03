@@ -24,11 +24,11 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(profile)
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Erro ao buscar perfil do WhatsApp:', error)
         return NextResponse.json({
             chatId: '',
-            error: error.message || 'Erro ao buscar perfil'
+            error: error instanceof Error ? error.message : 'Erro ao buscar perfil'
         } as WAHAProfile, { status: 500 })
     }
 }
