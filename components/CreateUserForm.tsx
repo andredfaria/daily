@@ -44,16 +44,6 @@ export default function CreateUserForm() {
     setNameError(result.isValid ? null : result.error || null)
   }, [name])
 
-  // Validação em tempo real do título
-  useEffect(() => {
-    if (title.trim() === '') {
-      setTitleError(null)
-      return
-    }
-    const result = validateTitle(title)
-    setTitleError(result.isValid ? null : result.error || null)
-  }, [title])
-
   // Validação em tempo real do telefone (formato básico)
   const [phoneTouched, setPhoneTouched] = useState(false)
 
@@ -181,7 +171,6 @@ export default function CreateUserForm() {
     setError(null)
     setCreatedUserId(undefined)
     setNameError(null)
-    setTitleError(null)
     setPhoneError(null)
     setPhoneValidated(false)
     setPhoneValidating(false)
@@ -207,7 +196,6 @@ export default function CreateUserForm() {
     const checklistResult = validateChecklist(checklistItems)
 
     setNameError(nameResult.isValid ? null : nameResult.error || null)
-    setTitleError(titleResult.isValid ? null : titleResult.error || null)
     setSendTimeError(sendTimeResult.isValid ? null : sendTimeResult.error || null)
     setChecklistError(checklistResult.isValid ? null : checklistResult.error || null)
 
