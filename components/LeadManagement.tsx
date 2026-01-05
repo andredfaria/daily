@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
 import { validateName, validateTitle, validatePhone, validateSendTime, validateChecklist } from '@/lib/validations'
 import { validatePhoneWithWAHA } from '@/lib/waha'
+import { useAuth } from './AuthProvider'
 import LoadingOverlay from './LoadingOverlay'
 import LoadingSpinner from './LoadingSpinner'
 import Button from './ui/Button'
@@ -14,6 +15,9 @@ import Input from './ui/Input'
 import Card from './ui/Card'
 
 export default function LeadManagement() {
+    // ===== CONTROLE DE ACESSO =====
+    const { isAdmin, canEdit, dailyUser } = useAuth()
+
     // ===== LISTAGEM DE USUARIO =====
     const [users, setUsers] = useState<DailyUser[]>([])
     const [loadingUsers, setLoadingUsers] = useState(true)
@@ -296,6 +300,17 @@ export default function LeadManagement() {
         e.preventDefault()
         setError(null)
 
+        // Validação de permissões
+        if (!isEditMode && !isAdmin()) {
+            setError('Apenas administradores podem criar usuários')
+            return
+        }
+
+        if (isEditMode && selectedUser && !canEdit(selectedUser.id)) {
+            setError('Você não tem permissão para editar este usuário')
+            return
+        }
+
         setPhoneTouched(true)
         setChecklistTouched(true)
 
@@ -401,7 +416,29 @@ export default function LeadManagement() {
             }
         } catch (err: unknown) {
             console.error(`Erro ao ${isEditMode ? 'atualizar' : 'criar'} lead:`, err)
-            setError(err instanceof Error ? err.message : `Ocorreu um erro ao ${isEditMode ? 'atualizar' : 'cadastrar'} o lead.`)
+            
+            // Mensagens de erro amigáveis baseadas no tipo de erro
+            if (err instanceof Error) {
+                const errorMessage = err.message.toLowerCase()
+                
+                if (errorMessage.includes('permission') || errorMessage.includes('policy') || errorMessage.includes('row-level security')) {
+                    if (isEditMode) {
+                        setError('Você não tem permissão para editar este usuário. Apenas administradores ou o próprio usuário podem editar seus dados.')
+                    } else {
+                        setError('Você não tem permissão para criar usuários. Apenas administradores podem realizar esta ação.')
+                    }
+                } else if (errorMessage.includes('duplicate') || errorMessage.includes('unique')) {
+                    if (errorMessage.includes('phone')) {
+                        setError('Este número de telefone já está cadastrado no sistema.')
+                    } else {
+                        setError('Já existe um registro com estas informações.')
+                    }
+                } else {
+                    setError(err.message)
+                }
+            } else {
+                setError(`Ocorreu um erro ao ${isEditMode ? 'atualizar' : 'cadastrar'} o lead.`)
+            }
         } finally {
             setLoading(false)
         }
@@ -409,6 +446,12 @@ export default function LeadManagement() {
 
     // ===== DELETE =====
     const handleDelete = async (userId: number) => {
+        // Validação de permissões
+        if (!isAdmin()) {
+            setError('Apenas administradores podem deletar usuários')
+            return
+        }
+
         if (!confirm('Tem certeza que deseja excluir este lead?')) return
 
         try {
@@ -427,7 +470,16 @@ export default function LeadManagement() {
             }
         } catch (err: unknown) {
             console.error('Erro ao excluir lead:', err)
-            setError(err instanceof Error ? err.message : 'Erro ao excluir lead')
+            // Mensagem de erro amigável baseada no tipo de erro
+            if (err instanceof Error) {
+                if (err.message.includes('permission') || err.message.includes('policy')) {
+                    setError('Você não tem permissão para deletar usuários. Apenas administradores podem realizar esta ação.')
+                } else {
+                    setError(err.message)
+                }
+            } else {
+                setError('Erro ao excluir lead')
+            }
         } finally {
             setLoading(false)
         }
@@ -446,9 +498,11 @@ export default function LeadManagement() {
                                 {users.length}
                             </span>
                         </div>
-                        <Button size="sm" icon={Plus} onClick={newLead}>
-                            Novo
-                        </Button>
+                        {isAdmin() && (
+                            <Button size="sm" icon={Plus} onClick={newLead}>
+                                Novo
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -496,27 +550,34 @@ export default function LeadManagement() {
                                                     window.location.href = `/?id=${user.id}`;
                                                 }}
                                                 className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                title="Ver dashboard"
                                             >
                                                 <ExternalLink className="w-4 h-4" />
                                             </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    selectUser(user);
-                                                }}
-                                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                            >
-                                                <Edit className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDelete(user.id);
-                                                }}
-                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            {canEdit(user.id) && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        selectUser(user);
+                                                    }}
+                                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                    title="Editar usuário"
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                            {isAdmin() && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDelete(user.id);
+                                                    }}
+                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Deletar usuário"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
