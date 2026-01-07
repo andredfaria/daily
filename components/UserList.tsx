@@ -11,7 +11,7 @@ import Card from './ui/Card'
 
 export default function UserList() {
   const { canEdit } = useAuth()
-  const { users, loading, error, refetch } = useUsers()
+  const { users, loading, error } = useUsers()
 
   if (loading) {
     return <UserListSkeleton />

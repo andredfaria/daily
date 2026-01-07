@@ -16,7 +16,7 @@ import Card from './ui/Card'
 
 export default function LeadManagement() {
     // ===== CONTROLE DE ACESSO =====
-    const { isAdmin, canEdit, dailyUser } = useAuth()
+    const { isAdmin, canEdit } = useAuth()
 
     // ===== LISTAGEM DE USUARIO =====
     const [users, setUsers] = useState<DailyUser[]>([])
