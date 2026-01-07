@@ -1,11 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validatePhoneWithWAHAServer, WAHAValidationResult } from '@/lib/waha'
+import { createStrictRateLimiter } from '@/lib/middleware/rateLimit'
+import { sanitizeString } from '@/lib/utils/sanitize'
+
+const rateLimiter = createStrictRateLimiter()
 
 export async function POST(request: NextRequest) {
     try {
-        const { phone } = await request.json()
+        // Rate limiting para endpoint sensível
+        const rateLimitResult = await rateLimiter(request)
+        if (!rateLimitResult.allowed) {
+            return NextResponse.json(
+                {
+                    isValid: false,
+                    exists: false,
+                    error: 'Muitas requisições. Aguarde um momento antes de tentar novamente.',
+                } as WAHAValidationResult,
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000)),
+                        'X-RateLimit-Limit': '10',
+                        'X-RateLimit-Remaining': String(rateLimitResult.remaining),
+                    },
+                }
+            )
+        }
 
-        if (!phone || phone.trim() === '') {
+        const { phone } = await request.json()
+        
+        // Sanitizar input
+        const sanitizedPhone = sanitizeString(phone?.toString() || '')
+
+        if (!sanitizedPhone || sanitizedPhone.trim() === '') {
             return NextResponse.json({
                 isValid: false,
                 exists: false,
@@ -14,7 +41,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Usa a função server-side do lib/waha.ts
-        const result = await validatePhoneWithWAHAServer(phone.trim())
+        const result = await validatePhoneWithWAHAServer(sanitizedPhone.trim())
 
         return NextResponse.json(result)
 

@@ -1,53 +1,24 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { Edit, Users, ExternalLink, Clock, CheckSquare, UserPlus } from 'lucide-react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
-import { DailyUser } from '@/lib/types'
 import { useAuth } from './AuthProvider'
-import LoadingSpinner from './LoadingSpinner'
+import { useUsers } from '@/lib/hooks'
 import ErrorMessage from './ErrorMessage'
+import UserListSkeleton from './UserListSkeleton'
 import Button from './ui/Button'
 import Card from './ui/Card'
 
 export default function UserList() {
   const { canEdit } = useAuth()
-  const [users, setUsers] = useState<DailyUser[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    loadUsers()
-  }, [])
-
-  const loadUsers = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const { data, error: fetchError } = await supabase
-        .from('daily_user')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (fetchError) throw fetchError
-
-      setUsers((data as DailyUser[]) || [])
-    } catch (err: unknown) {
-      console.error('Erro ao carregar usuários:', err)
-      setError(err instanceof Error ? err.message : 'Erro ao carregar lista de usuários')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { users, loading, error, refetch } = useUsers()
 
   if (loading) {
-    return <LoadingSpinner message="Carregando usuários..." />
+    return <UserListSkeleton />
   }
 
   if (error) {
-    return <ErrorMessage message={error} />
+    return <ErrorMessage message={error.message || 'Erro ao carregar lista de usuários'} />
   }
 
   if (users.length === 0) {

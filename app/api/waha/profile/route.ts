@@ -1,11 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getWhatsAppProfileServer, WAHAProfile } from '@/lib/waha'
+import { createRateLimiter } from '@/lib/middleware/rateLimit'
+import { sanitizeString } from '@/lib/utils/sanitize'
+
+const rateLimiter = createRateLimiter()
 
 export async function POST(request: NextRequest) {
     try {
-        const { phone } = await request.json()
+        // Rate limiting
+        const rateLimitResult = await rateLimiter(request)
+        if (!rateLimitResult.allowed) {
+            return NextResponse.json(
+                {
+                    chatId: '',
+                    error: 'Muitas requisições. Aguarde um momento antes de tentar novamente.',
+                } as WAHAProfile,
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000)),
+                        'X-RateLimit-Limit': '100',
+                        'X-RateLimit-Remaining': String(rateLimitResult.remaining),
+                    },
+                }
+            )
+        }
 
-        if (!phone || phone.trim() === '') {
+        const { phone } = await request.json()
+        
+        // Sanitizar input
+        const sanitizedPhone = sanitizeString(phone?.toString() || '')
+
+        if (!sanitizedPhone || sanitizedPhone.trim() === '') {
             return NextResponse.json({
                 chatId: '',
                 error: 'Telefone não pode estar vazio'
@@ -13,7 +39,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Usa a função server-side do lib/waha.ts
-        const profile = await getWhatsAppProfileServer(phone.trim())
+        const profile = await getWhatsAppProfileServer(sanitizedPhone.trim())
 
         if (!profile) {
             return NextResponse.json({

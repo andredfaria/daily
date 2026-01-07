@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabase'
-import { DailyUser, DailyData } from '@/lib/types'
 import { getWhatsAppProfile, WAHAProfile } from '@/lib/waha'
-import LoadingSpinner from './LoadingSpinner'
+import { useUser, useActivities } from '@/lib/hooks'
+import DashboardSkeleton from './DashboardSkeleton'
 import ErrorMessage from './ErrorMessage'
 import ActivityTable from './ActivityTable'
 import Card from './ui/Card'
@@ -16,58 +15,14 @@ interface DashboardContentProps {
 }
 
 export default function DashboardContent({ userId }: DashboardContentProps) {
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<DailyUser | null>(null)
-  const [activities, setActivities] = useState<DailyData[]>([])
-  const [error, setError] = useState<string | null>(null)
+  const { user, loading: userLoading, error: userError } = useUser(userId)
+  const { activities, loading: activitiesLoading, error: activitiesError, stats } = useActivities({
+    userId,
+    autoLoad: !!userId,
+  })
   const [waProfile, setWaProfile] = useState<WAHAProfile | null>(null)
 
-  useEffect(() => {
-    async function loadData() {
-      if (!userId) {
-        setLoading(false)
-        return
-      }
-
-      try {
-        setLoading(true)
-        setError(null)
-
-        // Buscar usuário
-        const { data: userData, error: userError } = await supabase
-          .from('daily_user')
-          .select('*')
-          .eq('id', userId)
-          .single()
-
-        if (userError || !userData) {
-          throw userError || new Error('Usuário não encontrado')
-        }
-
-        // Buscar atividades
-        const { data: activitiesData, error: activitiesError } = await supabase
-          .from('daily_data')
-          .select('*')
-          .eq('id_user', userId)
-          .order('activity_date', { ascending: false })
-
-        if (activitiesError) {
-          throw activitiesError
-        }
-
-      setUser(userData as DailyUser)
-      setActivities((activitiesData as DailyData[]) || [])
-    } catch (err: unknown) {
-      console.error(err)
-      setError(err instanceof Error ? err.message : 'Erro ao carregar dados')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-    loadData()
-  }, [userId])
-
+  // Buscar perfil WhatsApp em paralelo (não bloqueia renderização)
   useEffect(() => {
     const fetchWhatsAppProfile = async () => {
       if (!user?.phone) return
@@ -85,8 +40,11 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
     fetchWhatsAppProfile()
   }, [user?.phone])
 
+  const loading = userLoading || activitiesLoading
+  const error = userError || activitiesError
+
   if (loading) {
-    return <LoadingSpinner message="Carregando dados do usuário..." />
+    return <DashboardSkeleton />
   }
 
   if (!userId) {
@@ -118,10 +76,8 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
     )
   }
 
-  // Calcular estatísticas
-  const total = activities.length
-  const completed = activities.filter(a => a.check_status).length
-  const rate = total > 0 ? Math.round((completed / total) * 100) : 0
+  // Usar estatísticas do hook
+  const rate = stats.completionRate
 
   // Determinar cor da barra de progresso
   let progressColor: 'red' | 'yellow' | 'green' | 'blue' = 'blue'
@@ -252,7 +208,7 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
                 </span>
               </div>
               <p className="text-sm font-medium text-slate-500 mb-1">Total de Atividades</p>
-              <h3 className="text-3xl font-bold text-slate-900">{total}</h3>
+              <h3 className="text-3xl font-bold text-slate-900">{stats.total}</h3>
               <p className="text-xs text-slate-400 mt-2">Registros no banco</p>
             </Card>
 
@@ -267,7 +223,7 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
                 </span>
               </div>
               <p className="text-sm font-medium text-slate-500 mb-1">Dias Concluídos</p>
-              <h3 className="text-3xl font-bold text-slate-900">{completed}</h3>
+              <h3 className="text-3xl font-bold text-slate-900">{stats.completed}</h3>
               <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" /> Performance positiva
               </p>

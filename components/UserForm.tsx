@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
 import { validateName, validateTitle, validatePhone, validateSendTime, validateChecklist } from '@/lib/validations'
 import { validatePhoneWithWAHA } from '@/lib/waha'
+import { useDebounce } from '@/lib/hooks'
 import LoadingOverlay from './LoadingOverlay'
 import SuccessMessage from './SuccessMessage'
 import AdminUserFields from './AdminUserFields'
@@ -120,25 +121,29 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false, 
     }
   }, [isEditMode, phone, originalPhone])
 
-  // Validação em tempo real do nome
+  // Debounce para evitar validações excessivas
+  const debouncedName = useDebounce(name, 300)
+  const debouncedTitle = useDebounce(title, 300)
+
+  // Validação em tempo real do nome (com debounce)
   useEffect(() => {
-    if (name.trim() === '') {
+    if (debouncedName.trim() === '') {
       setNameError(null)
       return
     }
-    const result = validateName(name)
+    const result = validateName(debouncedName)
     setNameError(result.isValid ? null : result.error || null)
-  }, [name])
+  }, [debouncedName])
 
-  // Validação em tempo real do título
+  // Validação em tempo real do título (com debounce)
   useEffect(() => {
-    if (title.trim() === '') {
+    if (debouncedTitle.trim() === '') {
       setTitleError(null)
       return
     }
-    const result = validateTitle(title)
+    const result = validateTitle(debouncedTitle)
     setTitleError(result.isValid ? null : result.error || null)
-  }, [title])
+  }, [debouncedTitle])
 
   // Validação em tempo real do telefone (formato básico)
   const [phoneTouched, setPhoneTouched] = useState(false)
