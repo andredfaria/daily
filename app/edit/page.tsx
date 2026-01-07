@@ -76,7 +76,8 @@ function EditPageContent() {
     }
 
     loadUser()
-  }, [userId, canEdit])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
 
   if (loading) {
     return (

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
@@ -89,17 +89,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Verifica se o usuário atual é administrador
-  const isAdmin = (): boolean => {
+  const isAdmin = useCallback((): boolean => {
     return dailyUser?.is_admin === true
-  }
+  }, [dailyUser?.is_admin])
 
   // Verifica se o usuário atual pode editar um determinado usuário
   // Admin pode editar todos, não-admin pode editar apenas seus próprios dados
-  const canEdit = (userId: number): boolean => {
+  const canEdit = useCallback((userId: number): boolean => {
     if (!dailyUser) return false
     if (dailyUser.is_admin) return true
     return dailyUser.id === userId
-  }
+  }, [dailyUser])
 
   return (
     <AuthContext.Provider value={{ user, dailyUser, loading, signOut, refreshUser, isAdmin, canEdit }}>
