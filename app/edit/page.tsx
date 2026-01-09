@@ -81,50 +81,50 @@ function EditPageContent() {
 
   if (loading) {
     return (
-      <>
+      <div className="min-h-screen bg-slate-950">
         <Navbar title="Editar Usuário" showBack />
-        <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
           <LoadingSpinner message="Carregando usuário..." />
         </main>
-      </>
+      </div>
     )
   }
 
   if (error || !user || !authorized) {
     return (
-      <>
+      <div className="min-h-screen bg-slate-950">
         <Navbar title="Editar Usuário" showBack />
-        <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
           <ErrorMessage
             message={error || 'Usuário não encontrado ou acesso negado'}
             showCreateButton={false}
           />
         </main>
-      </>
+      </div>
     )
   }
 
   return (
-    <>
+    <div className="min-h-screen bg-slate-950">
       <Navbar title="Editar Usuário" showBack />
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
         <div className="fade-in">
           <UserForm user={user} showAdminFields={isAdmin()} />
         </div>
       </main>
-    </>
+    </div>
   )
 }
 
 export default function EditPage() {
   return (
     <Suspense fallback={
-      <>
+      <div className="min-h-screen bg-slate-950">
         <Navbar title="Editar Usuário" showBack />
-        <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
           <LoadingSpinner message="Carregando..." />
         </main>
-      </>
+      </div>
     }>
       <EditPageContent />
     </Suspense>

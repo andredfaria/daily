@@ -25,7 +25,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body className={`${inter.className} bg-slate-50 text-slate-800 min-h-screen`}>
+      <body className={`${inter.className} bg-slate-950 text-slate-50 min-h-screen`}>
         <ErrorBoundary>
           <AuthProvider>
             {children}
