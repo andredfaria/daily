@@ -1,3 +1,5 @@
+import { cn } from '@/lib/utils'
+
 interface SkeletonProps {
   className?: string
   variant?: 'text' | 'circular' | 'rectangular'
@@ -11,21 +13,23 @@ interface SkeletonProps {
  * Melhora a percepção de velocidade da aplicação
  */
 export default function Skeleton({
-  className = '',
+  className,
   variant = 'rectangular',
   width,
   height,
   animation = 'pulse',
 }: SkeletonProps) {
-  const baseClasses = 'bg-slate-200 dark:bg-slate-700'
+  const baseClasses = 'bg-slate-800'
+
   const variantClasses = {
     text: 'rounded h-4',
     circular: 'rounded-full',
     rectangular: 'rounded-lg',
   }
+
   const animationClasses = {
     pulse: 'animate-pulse',
-    wave: 'animate-[shimmer_2s_infinite] bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 bg-[length:200%_100%]',
+    wave: 'animate-[shimmer_2s_infinite] bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 bg-[length:200%_100%]',
     none: '',
   }
 
@@ -35,7 +39,12 @@ export default function Skeleton({
 
   return (
     <div
-      className={`${baseClasses} ${variantClasses[variant]} ${animationClasses[animation]} ${className}`}
+      className={cn(
+        baseClasses,
+        variantClasses[variant],
+        animationClasses[animation],
+        className
+      )}
       style={style}
     />
   )

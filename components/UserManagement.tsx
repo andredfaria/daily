@@ -5,8 +5,8 @@ import { Users, UserPlus, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
 import UserForm from './UserForm'
-import LoadingSpinner from './LoadingSpinner'
-import ErrorMessage from './ErrorMessage'
+import Spinner from './ui/Spinner'
+import Alert from './ui/Alert'
 import Button from './ui/Button'
 import Card from './ui/Card'
 
@@ -89,11 +89,11 @@ export default function UserManagement() {
     }
 
     if (loading && users.length === 0) {
-        return <LoadingSpinner message="Carregando usuários..." />
+        return <Spinner variant="page" message="Carregando usuários..." />
     }
 
     if (error && users.length === 0) {
-        return <ErrorMessage message={error} />
+        return <Alert variant="error" className="max-w-2xl mx-auto mt-10">{error}</Alert>
     }
 
     return (
@@ -124,44 +124,44 @@ export default function UserManagement() {
                 >
                     {users.length === 0 ? (
                         <div className="p-8 text-center">
-                            <div className="bg-slate-100 p-4 rounded-full w-fit mx-auto mb-4">
-                                <Users className="w-8 h-8 text-slate-400" />
+                            <div className="bg-slate-800 p-4 rounded-full w-fit mx-auto mb-4">
+                                <Users className="w-8 h-8 text-slate-500" />
                             </div>
-                            <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                            <h3 className="text-lg font-semibold text-slate-100 mb-1">
                                 Nenhum usuário encontrado
                             </h3>
-                            <p className="text-sm text-slate-500">
+                            <p className="text-sm text-slate-400">
                                 Crie seu primeiro usuário usando o formulário ao lado
                             </p>
                         </div>
                     ) : (
-                        <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+                        <div className="divide-y divide-slate-800 max-h-[600px] overflow-y-auto">
                             {users.map((user) => (
                                 <button
                                     key={user.id}
                                     onClick={() => handleUserSelect(user)}
-                                    className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${selectedUser?.id === user.id
-                                        ? 'bg-indigo-50 border-l-4 border-indigo-600'
-                                        : ''
+                                    className={`w-full text-left px-4 py-3 hover:bg-slate-800/50 transition-colors ${selectedUser?.id === user.id
+                                            ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
+                                            : ''
                                         }`}
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="min-w-0 flex-1">
-                                            <p className="font-medium text-slate-900 truncate">
+                                            <p className="font-medium text-slate-100 truncate">
                                                 {user.name || 'Sem nome'}
                                             </p>
-                                            <p className="text-sm text-slate-500 truncate">
+                                            <p className="text-sm text-slate-400 truncate">
                                                 {user.title || 'Sem título'}
                                             </p>
                                         </div>
                                         <div className="text-right ml-3">
-                                            <p className="text-xs text-slate-400">#{user.id}</p>
-                                            <p className="text-xs text-slate-400">
+                                            <p className="text-xs text-slate-500">#{user.id}</p>
+                                            <p className="text-xs text-slate-500">
                                                 {formatSendTime(user.time_to_send)}
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                                    <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
                                         <span>{formatPhone(user.phone)}</span>
                                         <span>•</span>
                                         <span>{formatDate(user.created_at)}</span>
@@ -176,7 +176,7 @@ export default function UserManagement() {
             {/* Painel do Formulário (60%) */}
             <div className="lg:col-span-3">
                 <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-slate-900">
+                    <h2 className="text-lg font-semibold text-slate-100">
                         {selectedUser ? `Editando: ${selectedUser.name || 'Usuário #' + selectedUser.id}` : 'Novo Usuário'}
                     </h2>
                     {selectedUser && (

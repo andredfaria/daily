@@ -4,21 +4,23 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { getWhatsAppProfile, WAHAProfile } from '@/lib/waha'
 import { useUser, useActivities } from '@/lib/hooks'
-import DashboardSkeleton from './DashboardSkeleton'
-import ErrorMessage from './ErrorMessage'
 import ActivityTable from './ActivityTable'
 import Card from './ui/Card'
-import { PieChart, Layers, CheckCircle2, Phone, Calendar, UserPlus, TrendingUp } from 'lucide-react'
+import Alert from './ui/Alert'
+import Skeleton from './ui/Skeleton'
+import { PieChart, Layers, CheckCircle2, Phone, Calendar, UserPlus, TrendingUp, AlertCircle } from 'lucide-react'
 
 interface DashboardContentProps {
   userId?: string
 }
 
 export default function DashboardContent({ userId }: DashboardContentProps) {
-  const { user, loading: userLoading, error: userError } = useUser(userId)
-  const { activities, loading: activitiesLoading, error: activitiesError, stats } = useActivities({
-    userId,
-    autoLoad: !!userId,
+  const { user, loading: userLoading } = useUser(userId)
+
+  // Só carrega atividades se tivermos um usuário carregado (seja por ID ou auto-fetch)
+  const { activities, loading: activitiesLoading, stats } = useActivities({
+    userId: user?.id?.toString(), // Use o ID do usuário carregado
+    autoLoad: !!user,
   })
   const [waProfile, setWaProfile] = useState<WAHAProfile | null>(null)
 
@@ -40,39 +42,53 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
     fetchWhatsAppProfile()
   }, [user?.phone])
 
-  const loading = userLoading || activitiesLoading
-  const error = userError || activitiesError
+  const loading = userLoading || (!!user && activitiesLoading)
 
   if (loading) {
-    return <DashboardSkeleton />
-  }
-
-  if (!userId) {
     return (
-      <Card className="text-center py-20">
-        <div className="bg-indigo-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-          <UserPlus className="text-indigo-600 w-8 h-8" />
+      <div className="space-y-6">
+        <Card>
+          <div className="flex items-center gap-4">
+            <Skeleton variant="circular" width={64} height={64} />
+            <div className="flex-1 space-y-2">
+              <Skeleton variant="text" width="40%" height={24} />
+              <Skeleton variant="text" width="60%" height={16} />
+            </div>
+          </div>
+        </Card>
+        <div className="grid grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <Skeleton variant="rectangular" height={120} />
+            </Card>
+          ))}
         </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">Nenhum usuário selecionado</h2>
-        <p className="text-slate-500 mb-6">
-          Para visualizar um dashboard, você precisa criar um usuário primeiro ou acessar um usuário existente através do ID.
-        </p>
-        {/* <Link className="w-full block" href="/create">
-          <Button icon={Plus} className="w-full">
-            Criar Novo Usuário
-          </Button>
-        </Link> */}
-      </Card>
+      </div>
     )
   }
 
-  if (error || !user) {
+  // Se não carregou usuário e não está carregando, mostra erro ou empty state
+  if (!user) {
+    if (userId) {
+      return (
+        <Alert variant="error" title="Usuário não encontrado" className="max-w-2xl mx-auto mt-10">
+          Verifique se o ID na URL está correto.
+        </Alert>
+      )
+    }
+
+    // Se não tem userId e não achou usuário (não logado?)
+    // O middleware deve tratar redirecionamento, mas por segurança:
     return (
-      <ErrorMessage
-        title="Usuário não encontrado"
-        message="Verifique se o ID na URL está correto (ex: ?id=1)."
-        showCreateButton
-      />
+      <Card className="text-center py-20 bg-slate-900/50 border-slate-800">
+        <div className="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <UserPlus className="text-emerald-500 w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-white mb-2">Sessão não encontrada</h2>
+        <p className="text-slate-400 mb-6">
+          Por favor, faça login novamente para acessar seus dados.
+        </p>
+      </Card>
     )
   }
 
@@ -107,14 +123,64 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
 
   const pollOptions = parseOptions(user.option)
 
+  // Verificar Status da Assinatura
+  const daysInTrial = user.trial_ends_at
+    ? Math.ceil((new Date(user.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : 0
+
+  const isTrial = user.subscription_status === 'trial'
+  const isSubscriptionActive = user.subscription_status === 'active' || (isTrial && daysInTrial > 0) || user.is_admin
+
+  if (!isSubscriptionActive) {
+    return (
+      <Card className="text-center py-20 max-w-2xl mx-auto mt-10 border-red-500/20 bg-red-500/5">
+        <div className="bg-red-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+          <AlertCircle className="text-red-500 w-10 h-10" />
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-4">Sua assinatura expirou</h2>
+        <p className="text-lg text-slate-400 mb-8 max-w-md mx-auto">
+          O período de teste gratuito encerrou. Para continuar automatizando seus Daily&apos;s no WhatsApp, escolha um plano.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-8 rounded-lg shadow-lg hover:shadow-emerald-500/20 transition-all">
+            Assinar Agora
+          </button>
+          <button className="bg-transparent border border-slate-700 text-slate-300 font-semibold py-3 px-8 rounded-lg hover:bg-slate-800 transition-all">
+            Falar com Suporte
+          </button>
+        </div>
+      </Card>
+    )
+  }
+
   return (
-    <div className="fade-in space-y-6">
+    <div className="fade-in space-y-6 pt-8">
+      {/* Banner de Trial */}
+      {isTrial && !user.is_admin && (
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl p-4 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 border border-emerald-500/20">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <Calendar className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-lg">Período de Teste Gratuito</p>
+              <p className="text-emerald-100 text-sm">
+                Você tem <span className="font-bold bg-black/20 px-2 py-0.5 rounded text-white border border-emerald-400/30">{daysInTrial} dias</span> restantes para testar todas as funcionalidades.
+              </p>
+            </div>
+          </div>
+          <button className="bg-white text-emerald-700 font-bold py-2 px-6 rounded-lg hover:bg-emerald-50 transition-colors shadow-sm whitespace-nowrap">
+            Assinar Plano
+          </button>
+        </div>
+      )}
+
       {/* Layout Principal: Grid com 2 colunas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Coluna Esquerda: INFO + 4 Cards */}
         <div className="lg:col-span-2 space-y-6">
           {/* INFO - Cabeçalho do usuário */}
-          <Card className="bg-gradient-to-r from-slate-50 to-white border-l-4 border-l-indigo-500">
+          <Card className="bg-gradient-to-r from-slate-900/80 via-slate-900/90 to-slate-800/80 border-l-4 border-l-emerald-500 backdrop-blur-sm hover:border-emerald-500/50 transition-all duration-300">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-start gap-4">
                 {/* Avatar do WhatsApp */}
@@ -125,10 +191,10 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
                       alt="WhatsApp Profile"
                       width={64}
                       height={64}
-                      className="rounded-full border-4 border-white shadow-md object-cover"
+                      className="rounded-full border-4 border-slate-800 shadow-md object-cover"
                       unoptimized
                     />
-                    <div className="absolute bottom-0 right-0 w-5 h-5 bg-green-500 border-2 border-white rounded-full flex items-center justify-center">
+                    <div className="absolute bottom-0 right-0 w-5 h-5 bg-emerald-500 border-2 border-slate-800 rounded-full flex items-center justify-center">
                       <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 text-white">
                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                       </svg>
@@ -138,32 +204,32 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
 
                 <div>
                   <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-2xl font-bold text-slate-900">{user.name}</h1>
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-green-400 to-green-500 text-white shadow-sm">
+                    <h1 className="text-2xl font-bold text-white">{user.name}</h1>
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                       Ativo
                     </span>
                   </div>
                   {/* Pushname do WhatsApp */}
                   {waProfile?.pushname && (
                     <div className="mb-1">
-                      <span className="text-sm font-medium text-slate-700 block">
+                      <span className="text-sm font-medium text-slate-300 block">
                         {waProfile.pushname}
-                        <span className="text-xs font-normal text-slate-400 ml-2">(Nome no WhatsApp)</span>
+                        <span className="text-xs font-normal text-slate-500 ml-2">(Nome no WhatsApp)</span>
                       </span>
                     </div>
                   )}
 
                   {/* Status/About do WhatsApp */}
                   {waProfile?.about && (
-                    <div className="mb-2 text-sm text-slate-500 italic flex items-center gap-1">
+                    <div className="mb-2 text-sm text-slate-400 italic flex items-center gap-1">
                       <span>💬</span>
                       <span>&quot;{waProfile.about}&quot;</span>
                     </div>
                   )}
 
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
-                    <span className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full">
-                      <Phone className="w-4 h-4 text-indigo-500" />
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
+                    <span className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+                      <Phone className="w-4 h-4 text-emerald-500" />
                       <span className="font-medium">{user.phone || 'N/A'}</span>
                     </span>
                   </div>
@@ -175,22 +241,22 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
           {/* Grid 2x2 de Cards de KPI */}
           <div className="grid grid-cols-2 gap-4">
             {/* Card 1 - Taxa de Conclusão */}
-            <Card className="bg-gradient-to-br from-blue-50 to-white hover:shadow-lg transition-all duration-300">
+            <Card className="bg-slate-900/60 backdrop-blur-sm border-slate-800/70 hover:border-emerald-500/40 hover:bg-slate-900/70 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/5">
               <div className="flex justify-between items-start mb-3">
-                <div className="p-2.5 bg-blue-100 rounded-xl">
-                  <PieChart className="w-5 h-5 text-blue-600" />
+                <div className="p-2.5 bg-blue-500/10 rounded-xl">
+                  <PieChart className="w-5 h-5 text-blue-400" />
                 </div>
-                <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                <span className="text-xs font-medium text-blue-400 bg-blue-500/10 px-2 py-1 rounded-full border border-blue-500/20">
                   KPI
                 </span>
               </div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Taxa de Conclusão</p>
-              <h3 className="text-3xl font-bold text-slate-900">{rate}%</h3>
-              <div className="mt-3 h-2 bg-slate-200 rounded-full overflow-hidden">
+              <p className="text-sm font-medium text-slate-400 mb-1">Taxa de Conclusão</p>
+              <h3 className="text-3xl font-bold text-white">{rate}%</h3>
+              <div className="mt-3 h-2 bg-slate-800 rounded-full overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ${progressColor === 'red' ? 'bg-gradient-to-r from-red-400 to-red-500' :
-                    progressColor === 'yellow' ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
-                      'bg-gradient-to-r from-green-400 to-green-500'
+                  className={`h-full rounded-full transition-all duration-500 ${progressColor === 'red' ? 'bg-red-500' :
+                    progressColor === 'yellow' ? 'bg-yellow-500' :
+                      'bg-emerald-500'
                     }`}
                   style={{ width: `${rate}%` }}
                 />
@@ -198,54 +264,54 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
             </Card>
 
             {/* Card 2 - Total de Atividades */}
-            <Card className="bg-gradient-to-br from-indigo-50 to-white hover:shadow-lg transition-all duration-300">
+            <Card className="bg-slate-900/60 backdrop-blur-sm border-slate-800/70 hover:border-emerald-500/40 hover:bg-slate-900/70 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/5">
               <div className="flex justify-between items-start mb-3">
-                <div className="p-2.5 bg-indigo-100 rounded-xl">
-                  <Layers className="w-5 h-5 text-indigo-600" />
+                <div className="p-2.5 bg-emerald-500/10 rounded-xl">
+                  <Layers className="w-5 h-5 text-emerald-500" />
                 </div>
-                <span className="text-xs font-medium text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">
+                <span className="text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
                   Total
                 </span>
               </div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Total de Atividades</p>
-              <h3 className="text-3xl font-bold text-slate-900">{stats.total}</h3>
-              <p className="text-xs text-slate-400 mt-2">Registros no banco</p>
+              <p className="text-sm font-medium text-slate-400 mb-1">Total de Atividades</p>
+              <h3 className="text-3xl font-bold text-white">{stats.total}</h3>
+              <p className="text-xs text-slate-500 mt-2">Registros no banco</p>
             </Card>
 
             {/* Card 3 - Dias Concluídos */}
-            <Card className="bg-gradient-to-br from-green-50 to-white hover:shadow-lg transition-all duration-300">
+            <Card className="bg-slate-900/60 backdrop-blur-sm border-slate-800/70 hover:border-emerald-500/40 hover:bg-slate-900/70 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/5">
               <div className="flex justify-between items-start mb-3">
-                <div className="p-2.5 bg-green-100 rounded-xl">
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <div className="p-2.5 bg-green-500/10 rounded-xl">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
                 </div>
-                <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                <span className="text-xs font-medium text-green-400 bg-green-500/10 px-2 py-1 rounded-full border border-green-500/20">
                   Sucesso
                 </span>
               </div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Dias Concluídos</p>
-              <h3 className="text-3xl font-bold text-slate-900">{stats.completed}</h3>
-              <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+              <p className="text-sm font-medium text-slate-400 mb-1">Dias Concluídos</p>
+              <h3 className="text-3xl font-bold text-white">{stats.completed}</h3>
+              <p className="text-xs text-green-500 mt-2 flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" /> Performance positiva
               </p>
             </Card>
 
             {/* Card 4 - Próximo Envio */}
-            <Card className="bg-gradient-to-br from-purple-50 to-white hover:shadow-lg transition-all duration-300">
+            <Card className="bg-slate-900/60 backdrop-blur-sm border-slate-800/70 hover:border-emerald-500/40 hover:bg-slate-900/70 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/5">
               <div className="flex justify-between items-start mb-3">
-                <div className="p-2.5 bg-purple-100 rounded-xl">
-                  <Calendar className="w-5 h-5 text-purple-600" />
+                <div className="p-2.5 bg-purple-500/10 rounded-xl">
+                  <Calendar className="w-5 h-5 text-purple-400" />
                 </div>
-                <span className="text-xs font-medium text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
+                <span className="text-xs font-medium text-purple-400 bg-purple-500/10 px-2 py-1 rounded-full border border-purple-500/20">
                   Agendado
                 </span>
               </div>
-              <p className="text-sm font-medium text-slate-500 mb-1">Próximo Envio</p>
-              <h3 className="text-3xl font-bold text-slate-900">
+              <p className="text-sm font-medium text-slate-400 mb-1">Próximo Envio</p>
+              <h3 className="text-3xl font-bold text-white">
                 {user.time_to_send !== null && user.time_to_send !== undefined
                   ? `${String(user.time_to_send).padStart(2, '0')}:00`
                   : 'N/A'}
               </h3>
-              <p className="text-xs text-purple-600 mt-2 flex items-center gap-1">
+              <p className="text-xs text-purple-400 mt-2 flex items-center gap-1">
                 🕐 Horário programado
               </p>
             </Card>
@@ -254,9 +320,9 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
 
         {/* Coluna Direita: ENQUETE */}
         <div className="lg:col-span-1">
-          <Card className="overflow-hidden p-0 h-full bg-gradient-to-b from-slate-800 to-slate-900 border-0">
+          <Card className="overflow-hidden p-0 h-full bg-gradient-to-b from-slate-900 to-slate-950 border-0 shadow-lg">
             {/* Header da Enquete */}
-            <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-green-500 to-green-600">
+            <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-emerald-600 to-teal-600">
               <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
                 <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
@@ -320,14 +386,14 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
       </div>
 
       {/* EVOLUÇÃO DAS OPÇÕES - Heatmap/Grid */}
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden bg-slate-900/60 backdrop-blur-sm border-slate-800/70">
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2.5 bg-indigo-100 rounded-xl">
-            <TrendingUp className="w-5 h-5 text-indigo-600" />
+          <div className="p-2.5 bg-emerald-500/10 rounded-xl">
+            <TrendingUp className="w-5 h-5 text-emerald-500" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Evolução das Atividades</h3>
-            <p className="text-sm text-slate-500">Acompanhamento diário dos últimos 14 dias</p>
+            <h3 className="text-lg font-bold text-white">Evolução das Atividades</h3>
+            <p className="text-sm text-slate-400">Acompanhamento diário dos últimos 14 dias</p>
           </div>
         </div>
 
@@ -349,16 +415,16 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
                 <>
                   {/* Header Dates */}
                   <div className="grid grid-cols-[200px_repeat(14,1fr)] gap-2 mb-2">
-                    <div className="font-semibold text-slate-500 text-sm">Opção</div>
+                    <div className="font-semibold text-slate-400 text-sm">Opção</div>
                     {Array.from({ length: 14 }).map((_, i) => {
                       const d = new Date()
                       d.setDate(d.getDate() - (13 - i))
                       return (
                         <div key={i} className="text-center">
-                          <span className="text-xs font-medium text-slate-400 block mb-1">
+                          <span className="text-xs font-medium text-slate-500 block mb-1">
                             {d.toLocaleDateString('pt-BR', { weekday: 'short' }).slice(0, 3)}
                           </span>
-                          <span className="text-xs font-bold text-slate-600">
+                          <span className="text-xs font-bold text-slate-400">
                             {d.getDate()}/{d.getMonth() + 1}
                           </span>
                         </div>
@@ -368,8 +434,8 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
 
                   {/* Rows for each unique option */}
                   {uniqueOptions.map((optionName, idx) => (
-                    <div key={idx} className="grid grid-cols-[200px_repeat(14,1fr)] gap-2 mb-2 items-center hover:bg-slate-50 rounded-lg p-1 transition-colors">
-                      <div className="text-sm font-medium text-slate-700 truncate pr-4" title={optionName ?? undefined}>
+                    <div key={idx} className="grid grid-cols-[200px_repeat(14,1fr)] gap-2 mb-2 items-center hover:bg-slate-800/30 rounded-lg p-1 transition-all duration-200">
+                      <div className="text-sm font-medium text-slate-300 truncate pr-4" title={optionName ?? undefined}>
                         {optionName}
                       </div>
                       {Array.from({ length: 14 }).map((_, i) => {
@@ -390,10 +456,10 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
                           <div key={i} className="flex justify-center">
                             <div
                               className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 ${isCompleted
-                                ? 'bg-green-500 shadow-md shadow-green-200 scale-100'
+                                ? 'bg-emerald-500 shadow-md shadow-emerald-500/20 scale-100'
                                 : exists
-                                  ? 'bg-red-400 shadow-sm shadow-red-200 scale-100'
-                                  : 'bg-slate-100 scale-75 opacity-50'
+                                  ? 'bg-red-500/80 shadow-sm shadow-red-500/20 scale-100'
+                                  : 'bg-slate-800 scale-75 opacity-50'
                                 }`}
                               title={`${optionName} em ${d.toLocaleDateString('pt-BR')}: ${isCompleted ? 'Concluído ✓' : exists ? 'Não concluído ✗' : 'Sem registro'
                                 }`}
@@ -416,14 +482,14 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
           </div>
         </div>
       </Card>
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden bg-slate-900/60 backdrop-blur-sm border-slate-800/70">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2.5 bg-slate-100 rounded-xl">
-            <Layers className="w-5 h-5 text-slate-600" />
+          <div className="p-2.5 bg-slate-800 rounded-xl">
+            <Layers className="w-5 h-5 text-slate-400" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Histórico de Atividades</h3>
-            <p className="text-sm text-slate-500">Registro completo de todas as atividades</p>
+            <h3 className="text-lg font-bold text-white">Histórico de Atividades</h3>
+            <p className="text-sm text-slate-400">Registro completo de todas as atividades</p>
           </div>
         </div>
         <ActivityTable activities={activities} />

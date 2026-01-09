@@ -23,6 +23,9 @@ export interface DailyUser {
   option: string | null  // JSON stringified array de strings: ["⏰ Item 1", "💪 Item 2"] - Enquete WhatsApp
   auth_user_id: string | null  // UUID do Supabase Auth - UNIQUE, nullable
   is_admin: boolean  // Flag de administrador
+  subscription_status?: 'trial' | 'active' | 'cancelled' | 'expired'
+  trial_ends_at?: string
+  subscription_ends_at?: string
 }
 
 // Alias para compatibilidade

@@ -64,21 +64,21 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Se não estiver autenticado e não estiver na página de login, redireciona
-  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/register')) {
+  if (!user && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/register') && request.nextUrl.pathname !== '/') {
     const loginUrl = new URL('/login', request.url)
     return NextResponse.redirect(loginUrl)
   }
 
-  // Se estiver autenticado e tentar acessar /login ou /register, redireciona para home
-  if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
-    const homeUrl = new URL('/', request.url)
-    return NextResponse.redirect(homeUrl)
+  // Se estiver autenticado e tentar acessar /, /login ou /register, redireciona para dashboard
+  if (user && (request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
+    const dashboardUrl = new URL('/dashboard', request.url)
+    return NextResponse.redirect(dashboardUrl)
   }
 
   // Verificação de permissões para a rota /edit
   if (user && request.nextUrl.pathname === '/edit') {
     const targetUserId = request.nextUrl.searchParams.get('id')
-    
+
     if (targetUserId) {
       try {
         // Buscar daily_user do usuário autenticado

@@ -2,9 +2,11 @@
 
 import { useState, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import { LogIn, Mail, Lock, UserPlus } from 'lucide-react'
 import Button from './ui/Button'
 import Card from './ui/Card'
-import { LogIn, Mail, Lock, AlertCircle, UserPlus } from 'lucide-react'
+import Input from './ui/Input'
+import Alert from './ui/Alert'
 
 interface LoginFormProps {
   mode?: 'login' | 'register'
@@ -27,7 +29,7 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
 
     try {
       const endpoint = currentMode === 'login' ? '/api/auth/login' : '/api/auth/register'
-      const body = currentMode === 'login' 
+      const body = currentMode === 'login'
         ? { email, password }
         : { email, password, name, phone }
 
@@ -46,7 +48,7 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
       }
 
       // Redirecionar para a home após login/registro bem-sucedido
-      router.push('/')
+      router.push('/dashboard')
       router.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao processar solicitação')
@@ -61,60 +63,57 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full max-w-md mx-auto" variant="glass">
       <div className="text-center mb-6">
-        <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
           {currentMode === 'login' ? (
-            <LogIn className="text-indigo-600 w-8 h-8" />
+            <LogIn className="text-emerald-500 w-8 h-8" />
           ) : (
-            <UserPlus className="text-indigo-600 w-8 h-8" />
+            <UserPlus className="text-emerald-500 w-8 h-8" />
           )}
         </div>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">
+        <h1 className="text-2xl font-bold text-white mb-2">
           {currentMode === 'login' ? 'Entrar no Sistema' : 'Criar Conta'}
         </h1>
-        <p className="text-slate-600 text-sm">
-          {currentMode === 'login' 
-            ? 'Digite suas credenciais para acessar' 
+        <p className="text-slate-400 text-sm">
+          {currentMode === 'login'
+            ? 'Digite suas credenciais para acessar'
             : 'Preencha os dados para criar sua conta'}
         </p>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-800">{error}</p>
-        </div>
+        <Alert variant="error" className="mb-4">
+          {error}
+        </Alert>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {currentMode === 'register' && (
           <>
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-1">
                 Nome
               </label>
-              <input
+              <Input
                 type="text"
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 placeholder="Seu nome completo"
                 disabled={loading}
               />
             </div>
 
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor="phone" className="block text-sm font-medium text-slate-300 mb-1">
                 Telefone (opcional)
               </label>
-              <input
+              <Input
                 type="tel"
                 id="phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 placeholder="(00) 00000-0000"
                 disabled={loading}
               />
@@ -123,42 +122,36 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
         )}
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
             Email
           </label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-              placeholder="seu@email.com"
-              required
-              disabled={loading}
-            />
-          </div>
+          <Input
+            type="email"
+            id="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="seu@email.com"
+            leftIcon={Mail}
+            required
+            disabled={loading}
+          />
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
+          <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">
             Senha
           </label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-              placeholder="••••••••"
-              required
-              minLength={6}
-              disabled={loading}
-            />
-          </div>
+          <Input
+            type="password"
+            id="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            leftIcon={Lock}
+            required
+            minLength={6}
+            disabled={loading}
+          />
           {currentMode === 'register' && (
             <p className="text-xs text-slate-500 mt-1">Mínimo de 6 caracteres</p>
           )}
@@ -168,23 +161,22 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
           type="submit"
           className="w-full"
           disabled={loading}
+          loading={loading}
           icon={currentMode === 'login' ? LogIn : UserPlus}
         >
-          {loading 
-            ? 'Processando...' 
-            : currentMode === 'login' ? 'Entrar' : 'Criar Conta'}
+          {currentMode === 'login' ? 'Entrar' : 'Criar Conta'}
         </Button>
       </form>
 
-      <div className="mt-6 pt-6 border-t border-slate-200 text-center">
-        <p className="text-sm text-slate-600">
+      <div className="mt-6 pt-6 border-t border-slate-800 text-center">
+        <p className="text-sm text-slate-400">
           {currentMode === 'login' ? (
             <>
               Não tem uma conta?{' '}
               <button
                 type="button"
                 onClick={toggleMode}
-                className="text-indigo-600 font-medium hover:underline"
+                className="text-emerald-400 font-medium hover:underline hover:text-emerald-300 transition-colors"
                 disabled={loading}
               >
                 Criar conta
@@ -196,7 +188,7 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
               <button
                 type="button"
                 onClick={toggleMode}
-                className="text-indigo-600 font-medium hover:underline"
+                className="text-emerald-400 font-medium hover:underline hover:text-emerald-300 transition-colors"
                 disabled={loading}
               >
                 Fazer login

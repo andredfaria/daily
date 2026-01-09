@@ -2,12 +2,74 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: 'Inter', sans-serif;
+@layer base {
+  :root {
+    /* Color tokens */
+    --color-primary: 16 185 129;
+    /* emerald-500 */
+    --color-background: 2 6 23;
+    /* slate-950 */
+    --color-background-secondary: 15 23 42;
+    /* slate-900 */
+    --color-foreground: 248 250 252;
+    /* slate-50 */
+    --color-foreground-secondary: 203 213 225;
+    /* slate-300 */
+    --color-border: 30 41 59;
+    /* slate-800 */
+
+    /* Spacing tokens */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 0.75rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-50 font-sans antialiased selection:bg-emerald-500/30;
+  }
+
+  /* Improved focus styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-emerald-500/50 ring-offset-2 ring-offset-slate-950;
+  }
 }
 
+@layer components {
+
+  /* Glass morphism effects */
+  .glass-panel {
+    @apply bg-slate-950/50 backdrop-blur-md border border-slate-800/50;
+  }
+
+  .glass-card {
+    @apply bg-slate-900/50 backdrop-blur-sm border border-slate-800 hover:border-emerald-500/30 transition-all duration-300;
+  }
+
+  /* Gradient backgrounds */
+  .gradient-emerald {
+    @apply bg-gradient-to-br from-emerald-500/10 to-emerald-600/5;
+  }
+
+  /* Text gradients */
+  .text-gradient-emerald {
+    @apply bg-gradient-to-r from-emerald-400 to-emerald-600 bg-clip-text text-transparent;
+  }
+
+  /* Interactive states */
+  .interactive {
+    @apply transition-all duration-200 hover:scale-[1.02] active:scale-[0.98];
+  }
+}
+
+/* Animations */
 .fade-in {
   animation: fadeIn 0.5s ease-in-out;
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out;
 }
 
 @keyframes fadeIn {
@@ -15,8 +77,51 @@ body {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Loading skeleton shimmer */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
   }
 }

@@ -20,21 +20,29 @@ export function useUser(userId: string | number | null | undefined): UseUserRetu
   const [error, setError] = useState<Error | null>(null)
 
   const fetchUser = useCallback(async () => {
-    if (!userId) {
-      setUser(null)
-      setLoading(false)
-      return
-    }
-
     try {
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await supabase
-        .from('daily_user')
-        .select('*')
-        .eq('id', userId)
-        .single()
+      let query = supabase.from('daily_user').select('*')
+
+      if (userId) {
+        // Se ID fornecido, buscar por ID específico
+        query = query.eq('id', userId)
+      } else {
+        // Se sem ID, buscar usuário autenticado
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+
+        if (authError || !authUser) {
+          // Se não estiver logado e não tem ID, não é erro, apenas sem dados
+          setUser(null)
+          return
+        }
+
+        query = query.eq('auth_user_id', authUser.id)
+      }
+
+      const { data, error: fetchError } = await query.single()
 
       if (fetchError) throw fetchError
       if (!data) throw new Error('Usuário não encontrado')

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { CheckCircle2, XCircle, AlertCircle, Info, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
@@ -41,19 +42,21 @@ function ToastComponent({ toast, onClose }: ToastProps) {
   }
 
   const colors = {
-    success: 'bg-green-50 border-green-200 text-green-800',
-    error: 'bg-red-50 border-red-200 text-red-800',
-    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    info: 'bg-blue-50 border-blue-200 text-blue-800',
+    success: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+    error: 'bg-red-500/10 border-red-500/20 text-red-400',
+    warning: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400',
+    info: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
   }
 
   const Icon = icons[toast.type]
 
   return (
     <div
-      className={`flex items-center gap-3 p-4 rounded-lg border shadow-lg min-w-[300px] max-w-[500px] transition-all duration-300 ${
-        isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full'
-      } ${colors[toast.type]}`}
+      className={cn(
+        'flex items-center gap-3 p-4 rounded-lg border shadow-lg min-w-[300px] max-w-[500px] transition-all duration-300 backdrop-blur-sm',
+        isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full',
+        colors[toast.type]
+      )}
     >
       <Icon className="w-5 h-5 flex-shrink-0" />
       <p className="flex-1 text-sm font-medium">{toast.message}</p>
