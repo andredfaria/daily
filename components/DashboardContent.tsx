@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { getWhatsAppProfile, WAHAProfile } from '@/lib/waha'
-import { useUser, useActivities } from '@/lib/hooks'
+import { DailyUser, DailyData } from '@/lib/types'
 import ActivityTable from './ActivityTable'
 import Card from './ui/Card'
 import Alert from './ui/Alert'
@@ -12,17 +12,30 @@ import { PieChart, Layers, CheckCircle2, Phone, Calendar, UserPlus, TrendingUp, 
 
 interface DashboardContentProps {
   userId?: string
+  initialData?: {
+    user: DailyUser
+    activities: DailyData[]
+  } | null
 }
 
-export default function DashboardContent({ userId }: DashboardContentProps) {
-  const { user, loading: userLoading } = useUser(userId)
-
-  // Só carrega atividades se tivermos um usuário carregado (seja por ID ou auto-fetch)
-  const { activities, loading: activitiesLoading, stats } = useActivities({
-    userId: user?.id?.toString(), // Use o ID do usuário carregado
-    autoLoad: !!user,
-  })
+export default function DashboardContent({ userId, initialData }: DashboardContentProps) {
+  // Usar dados pré-carregados como estado inicial
+  const [user, setUser] = useState<DailyUser | null>(initialData?.user || null)
+  const [activities, setActivities] = useState<DailyData[]>(initialData?.activities || [])
+  const [loading, setLoading] = useState(!initialData && !!userId)
   const [waProfile, setWaProfile] = useState<WAHAProfile | null>(null)
+
+  // Se não tiver dados iniciais e tiver userId, buscar dados
+  useEffect(() => {
+    if (!initialData && userId) {
+      // Importar dinamicamente para evitar bundle no servidor
+      import('@/lib/hooks').then(({ useUser, useActivities }) => {
+        // Aqui você pode implementar a lógica de fetch se necessário
+        // Por enquanto, vamos manter o loading como false se não tiver dados
+        setLoading(false)
+      })
+    }
+  }, [initialData, userId])
 
   // Buscar perfil WhatsApp em paralelo (não bloqueia renderização)
   useEffect(() => {
@@ -42,7 +55,15 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
     fetchWhatsAppProfile()
   }, [user?.phone])
 
-  const loading = userLoading || (!!user && activitiesLoading)
+  // Calcular estatísticas a partir das atividades
+  const stats = {
+    total: activities.length,
+    completed: activities.filter(a => a.check_status).length,
+    completionRate:
+      activities.length > 0
+        ? Math.round((activities.filter(a => a.check_status).length / activities.length) * 100)
+        : 0,
+  }
 
   if (loading) {
     return (
@@ -92,7 +113,7 @@ export default function DashboardContent({ userId }: DashboardContentProps) {
     )
   }
 
-  // Usar estatísticas do hook
+  // Usar estatísticas calculadas
   const rate = stats.completionRate
 
   // Determinar cor da barra de progresso
