@@ -13,6 +13,8 @@ interface AuthContextType {
   refreshUser: () => Promise<void>
   isAdmin: () => boolean
   canEdit: (userId: number) => boolean
+  isSubscriptionActive: () => boolean
+  isTrialExpiringSoon: () => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -55,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setUser(session?.user ?? null)
-        
+
         if (session?.user) {
           // Buscar daily_user quando usuário fizer login
           const { data: dailyUserData } = await supabase
@@ -101,8 +103,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return dailyUser.id === userId
   }, [dailyUser])
 
+  // Verifica se a assinatura está ativa (trial válido ou assinatura paga)
+  const isSubscriptionActive = useCallback((): boolean => {
+    if (!dailyUser) return false
+
+    // Admins sempre têm acesso
+    if (dailyUser.is_admin) return true
+
+    // Verificar assinatura ativa
+    if (dailyUser.subscription_status === 'active') {
+      if (!dailyUser.subscription_ends_at) return true
+      return new Date(dailyUser.subscription_ends_at) > new Date()
+    }
+
+    // Verificar trial ativo
+    if (dailyUser.subscription_status === 'trial') {
+      if (!dailyUser.trial_ends_at) return false
+      return new Date(dailyUser.trial_ends_at) > new Date()
+    }
+
+    return false
+  }, [dailyUser])
+
+  // Verifica se o trial está próximo de expirar (últimos 2 dias)
+  const isTrialExpiringSoon = useCallback((): boolean => {
+    if (!dailyUser || dailyUser.is_admin) return false
+    if (dailyUser.subscription_status !== 'trial') return false
+    if (!dailyUser.trial_ends_at) return false
+
+    const now = new Date()
+    const trialEnd = new Date(dailyUser.trial_ends_at)
+    const daysRemaining = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+    return daysRemaining <= 2 && daysRemaining > 0
+  }, [dailyUser])
+
   return (
-    <AuthContext.Provider value={{ user, dailyUser, loading, signOut, refreshUser, isAdmin, canEdit }}>
+    <AuthContext.Provider value={{
+      user,
+      dailyUser,
+      loading,
+      signOut,
+      refreshUser,
+      isAdmin,
+      canEdit,
+      isSubscriptionActive,
+      isTrialExpiringSoon
+    }}>
       {children}
     </AuthContext.Provider>
   )

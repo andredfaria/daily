@@ -47,9 +47,17 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
         throw new Error(data.error || 'Erro ao autenticar')
       }
 
-      // Redirecionar para a home após login/registro bem-sucedido
-      router.push('/dashboard')
-      router.refresh()
+      // Se for registro, redirecionar para login com mensagem de sucesso
+      if (currentMode === 'register') {
+        // Mostrar mensagem de sucesso
+        alert('Conta criada com sucesso! Faça login para continuar.')
+        router.push('/login')
+        router.refresh()
+      } else {
+        // Login: redirecionar para dashboard
+        router.push('/dashboard')
+        router.refresh()
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao processar solicitação')
     } finally {

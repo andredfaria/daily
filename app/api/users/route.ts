@@ -11,6 +11,11 @@ const rateLimiter = createRateLimiter()
  */
 export async function GET(request: NextRequest) {
   try {
+    // Verificar se usuário é admin
+    const { requireAdmin } = await import('@/lib/middleware/requireAdmin')
+    const adminCheck = await requireAdmin()
+    if (adminCheck) return adminCheck
+
     // Rate limiting
     const rateLimitResult = await rateLimiter(request)
     if (!rateLimitResult.allowed) {
