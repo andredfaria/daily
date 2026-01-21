@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Activity, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
@@ -135,5 +135,25 @@ export default function VerifyEmailPage() {
                 <p>Sistema de Gestão de Atividades Diárias</p>
             </div>
         </div>
+    )
+}
+
+export default function VerifyEmailPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center px-4 py-8">
+                <Card className="w-full max-w-md mx-auto" variant="glass">
+                    <div className="text-center">
+                        <div className="bg-slate-800 w-20 h-20 rounded-full flex items-center justify-center mx-auto animate-pulse mb-6">
+                            <Loader2 className="text-emerald-500 w-10 h-10 animate-spin" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-white mb-3">Carregando...</h2>
+                        <p className="text-slate-400">Aguarde enquanto carregamos a página.</p>
+                    </div>
+                </Card>
+            </div>
+        }>
+            <VerifyEmailContent />
+        </Suspense>
     )
 }

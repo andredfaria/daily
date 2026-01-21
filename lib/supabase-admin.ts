@@ -228,8 +228,8 @@ export async function ensureDailyUserLink(authUserId: string, userMetadata?: Use
     console.log(`[ensureDailyUserLink] Criando daily_user para auth_user_id: ${authUserId}`)
 
     // Extrair dados do user_metadata ou auth.user
-    const name = userMetadata?.name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Usuário'
-    const phone = userMetadata?.phone || authUser.user_metadata?.phone || null
+    const name = userMetadata?.name || authUser.user.user_metadata?.name || authUser.user.email?.split('@')[0] || 'Usuário'
+    const phone = userMetadata?.phone || authUser.user.user_metadata?.phone || null
 
     // Calcular trial_ends_at (7 dias a partir de agora)
     const trialEndsAt = new Date()

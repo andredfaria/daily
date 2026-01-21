@@ -121,7 +121,7 @@ async function handleCheckoutSessionCompleted(
   }
 
   // Buscar subscription para obter detalhes
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+  const subscription: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId)
 
   // Atualizar daily_user
   const updateData: SubscriptionUpdateData = {
@@ -136,9 +136,13 @@ async function handleCheckoutSessionCompleted(
     updateData.subscription_status = subscription.status === 'trialing' ? 'trial' : 'active'
     
     // Calcular data de término
-    const endsAt = new Date(subscription.current_period_end * 1000)
-    updateData.subscription_ends_at = endsAt.toISOString()
-    updateData.next_billing_date = endsAt.toISOString()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const periodEnd = (subscription as any).current_period_end as number | undefined
+    if (periodEnd) {
+      const endsAt = new Date(periodEnd * 1000)
+      updateData.subscription_ends_at = endsAt.toISOString()
+      updateData.next_billing_date = endsAt.toISOString()
+    }
   }
 
   await adminClient
@@ -197,8 +201,10 @@ async function handleSubscriptionUpdated(
   }
 
   // Atualizar datas
-  if (subscription.current_period_end) {
-    const endsAt = new Date(subscription.current_period_end * 1000)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const periodEnd = (subscription as any).current_period_end as number | undefined
+  if (periodEnd) {
+    const endsAt = new Date(periodEnd * 1000)
     updateData.subscription_ends_at = endsAt.toISOString()
     updateData.next_billing_date = endsAt.toISOString()
   }
@@ -249,7 +255,8 @@ async function handleSubscriptionDeleted(
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const adminClient = createAdminClient()
   
-  const subscriptionId = invoice.subscription as string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subscriptionId = (invoice as any).subscription as string | null | undefined
   if (!subscriptionId) return
 
   const { data: dailyUser } = await adminClient
@@ -286,7 +293,8 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const adminClient = createAdminClient()
   
-  const subscriptionId = invoice.subscription as string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subscriptionId = (invoice as any).subscription as string | null | undefined
   if (!subscriptionId) return
 
   const { data: dailyUser } = await adminClient

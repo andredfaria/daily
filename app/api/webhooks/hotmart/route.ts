@@ -193,6 +193,7 @@ async function handlePurchaseApproved(
 async function handleSubscriptionCancelled(
   adminClient: ReturnType<typeof createAdminClient>,
   dailyUser: DailyUser,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _data: { subscriberCode?: string }
 ) {
   try {

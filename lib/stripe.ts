@@ -3,7 +3,7 @@ import Stripe from 'stripe'
 // Inicializar cliente Stripe
 // A versão da API será a mais recente disponível no momento da instalação
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia', // Usar versão estável mais recente
+  apiVersion: '2025-12-15.clover', // Usar versão estável mais recente
   typescript: true,
 })
 
