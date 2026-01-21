@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       email,
       password,
       options: {
-        emailRedirectTo: null, // Desabilita envio de email de confirmação
+        emailRedirectTo: undefined, // Desabilita envio de email de confirmação
         data: {
           name: name || email.split('@')[0],
           phone: phone || null,
