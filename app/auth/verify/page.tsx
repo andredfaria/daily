@@ -1,5 +1,21 @@
 'use client'
 
+/**
+ * Página de Verificação de Email (LEGADO)
+ * 
+ * NOTA: Esta página não é mais usada no fluxo normal de cadastro.
+ * O sistema implementa auto-verify no endpoint /api/auth/register,
+ * confirmando emails automaticamente via Admin API.
+ * 
+ * Esta página é mantida para:
+ * - Casos legados (usuários que receberam links antigos)
+ * - Verificação manual de email (se necessário no futuro)
+ * - Recuperação de contas que precisam re-verificar email
+ * 
+ * Fluxo atual: Cadastro → Auto-verify → Login automático → Dashboard
+ * Fluxo legado: Cadastro → Email enviado → Clique no link → Esta página → Login
+ */
+
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Activity, CheckCircle, XCircle, Loader2 } from 'lucide-react'

@@ -17,10 +17,13 @@ export async function POST(request: NextRequest) {
     console.log('📝 Criando usuário...')
 
     // Criar usuário com signUp
+    // emailRedirectTo: null desabilita o envio de email de confirmação
+    // A confirmação será feita automaticamente via Admin API
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo: null, // Desabilita envio de email de confirmação
         data: {
           name: name || email.split('@')[0],
           phone: phone || null,
@@ -54,6 +57,8 @@ export async function POST(request: NextRequest) {
     const adminClient = createAdminClient()
 
     // Auto-confirmar email usando Admin API
+    // IMPORTANTE: A confirmação deve ser feita ANTES de criar o daily_user
+    let emailConfirmed = false
     try {
       const { error: confirmError } = await adminClient.auth.admin.updateUserById(
         data.user.id,
@@ -62,11 +67,42 @@ export async function POST(request: NextRequest) {
 
       if (confirmError) {
         console.error('⚠️ Erro ao confirmar email:', confirmError)
+        // Se a confirmação falhar, retornar erro pois é crítica para o fluxo
+        return NextResponse.json(
+          { error: 'Erro ao confirmar email. Tente novamente.' },
+          { status: 500 }
+        )
+      }
+
+      // Verificar se a confirmação foi bem-sucedida
+      const { data: updatedUser, error: getUserError } = await adminClient.auth.admin.getUserById(data.user.id)
+      
+      if (getUserError) {
+        console.error('⚠️ Erro ao verificar confirmação de email:', getUserError)
+        return NextResponse.json(
+          { error: 'Erro ao verificar confirmação de email. Tente novamente.' },
+          { status: 500 }
+        )
+      }
+
+      if (updatedUser?.user?.email_confirmed_at) {
+        emailConfirmed = true
+        console.log('✅ Email confirmado automaticamente:', {
+          email_confirmed_at: updatedUser.user.email_confirmed_at,
+        })
       } else {
-        console.log('✅ Email confirmado automaticamente')
+        console.error('⚠️ Email não foi confirmado - email_confirmed_at está null')
+        return NextResponse.json(
+          { error: 'Falha na confirmação automática de email. Tente novamente.' },
+          { status: 500 }
+        )
       }
     } catch (err) {
       console.error('⚠️ Erro no processo de confirmação de email:', err)
+      return NextResponse.json(
+        { error: 'Erro ao processar confirmação de email. Tente novamente.' },
+        { status: 500 }
+      )
     }
 
     let dailyUser = null
@@ -149,9 +185,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fazer login automático após cadastro
+    // Fazer login automático após cadastro e confirmação de email
+    // IMPORTANTE: Só tentar login se o email foi confirmado com sucesso
+    if (!emailConfirmed) {
+      console.error('⚠️ Tentativa de login sem confirmação de email')
+      return NextResponse.json(
+        { error: 'Email não confirmado. Tente novamente.' },
+        { status: 500 }
+      )
+    }
+
     let session = null
     try {
+      console.log('🔄 Tentando login automático após cadastro...')
       const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -160,6 +206,17 @@ export async function POST(request: NextRequest) {
       if (sessionError) {
         console.error('⚠️ Erro ao fazer login automático:', sessionError)
         // Retorna sucesso mas sem sessão - usuário precisa fazer login manual
+        // Isso pode acontecer se houver algum delay na propagação da confirmação
+        return NextResponse.json({
+          user: data.user,
+          message: 'Usuário criado e confirmado com sucesso. Faça login para continuar.',
+          requiresLogin: true,
+          emailConfirmed: true,
+        })
+      }
+
+      if (!sessionData?.session) {
+        console.error('⚠️ Login automático retornou sem sessão')
         return NextResponse.json({
           user: data.user,
           message: 'Usuário criado e confirmado com sucesso. Faça login para continuar.',
@@ -169,7 +226,10 @@ export async function POST(request: NextRequest) {
       }
 
       session = sessionData.session
-      console.log('✅ Login automático realizado com sucesso')
+      console.log('✅ Login automático realizado com sucesso', {
+        user_id: session.user.id,
+        expires_at: session.expires_at,
+      })
     } catch (loginError) {
       console.error('⚠️ Erro no processo de login automático:', loginError)
       // Retorna sucesso mas sem sessão - usuário precisa fazer login manual

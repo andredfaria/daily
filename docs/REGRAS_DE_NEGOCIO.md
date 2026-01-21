@@ -140,15 +140,23 @@ flowchart TD
     C --> D[POST /api/auth/register]
     D --> E{Validação}
     E -->|Erro| F[Retorna erro 400]
-    E -->|Sucesso| G[Cria usuário em auth.users]
-    G --> H[Trigger: Cria daily_user]
-    H --> I[Define is_admin = false]
-    I --> J[Define subscription_status = trial]
-    J --> K[Define trial_ends_at = NOW + 7 days]
-    K --> L[Retorna sucesso]
-    L --> M[Usuário logado automaticamente]
-    M --> N[Redirecionado para /dashboard]
-    N --> O[Vê banner: 7 dias de trial restantes]
+    E -->|Sucesso| G[Cria usuário em auth.users<br/>emailRedirectTo: null]
+    G --> H[Admin API: Auto-confirma email<br/>email_confirm: true]
+    H --> I{Email confirmado?}
+    I -->|Não| J[Retorna erro 500]
+    I -->|Sim| K[Verifica email_confirmed_at]
+    K --> L[Cria daily_user via ensureDailyUserLink]
+    L --> M[Trigger: set_trial_period]
+    M --> N[Define is_admin = false]
+    N --> O[Define subscription_status = trial]
+    O --> P[Define trial_ends_at = NOW + 7 days]
+    P --> Q[Login automático com senha]
+    Q --> R{Sessão criada?}
+    R -->|Sim| S[Retorna sessão + dailyUser]
+    R -->|Não| T[Retorna requiresLogin: true]
+    S --> U[Frontend: Redireciona para /dashboard]
+    T --> V[Frontend: Redireciona para /login]
+    U --> W[Usuário vê banner: 7 dias de trial]
 ```
 
 ### Detalhamento do Fluxo
@@ -162,26 +170,99 @@ flowchart TD
    - Envia POST para `/api/auth/register`
 
 3. **Criação da Conta de Autenticação**
-   - Supabase Auth cria registro em `auth.users`
+   - Supabase Auth cria registro em `auth.users` com `emailRedirectTo: null`
+   - **IMPORTANTE**: `emailRedirectTo: null` desabilita o envio de email de confirmação
    - Gera UUID único para o usuário
+   - Inicialmente, `email_confirmed_at` é `null`
 
-4. **Criação do Perfil Daily**
-   - Endpoint tenta criar registro em `daily_user`
+4. **Auto-Confirmação de Email (Auto-Verify)**
+   - Admin API é utilizada para confirmar email automaticamente
+   - `adminClient.auth.admin.updateUserById(userId, { email_confirm: true })`
+   - Sistema verifica se `email_confirmed_at` foi definido corretamente
+   - **Sem confirmação**: retorna erro 500 e não prossegue
+   - **Com confirmação**: continua para criação do perfil
+
+5. **Criação do Perfil Daily**
+   - Endpoint cria registro em `daily_user` via `ensureDailyUserLink()`
    - Trigger `set_trial_period()` é executado automaticamente
+   - **IMPORTANTE**: Perfil só é criado após confirmação de email bem-sucedida
 
-5. **Configuração Automática**
+6. **Configuração Automática do Perfil**
    - `is_admin` → `false` (sempre)
    - `subscription_status` → `'trial'`
    - `trial_ends_at` → data atual + 7 dias
    - `auth_user_id` → UUID do auth.users
 
-6. **Login Automático**
-   - Sessão criada automaticamente
-   - Redirecionamento para `/dashboard`
+7. **Login Automático**
+   - Sistema tenta fazer login com email e senha fornecidos
+   - **Com sessão**: retorna sessão completa + dailyUser
+   - **Sem sessão**: retorna `requiresLogin: true` (fallback raro)
+   - Frontend redireciona baseado na resposta
 
-7. **Primeira Visualização**
+8. **Primeira Visualização**
+   - Se login automático funcionou: redireciona para `/dashboard`
+   - Se login automático falhou: redireciona para `/login` com mensagem
    - Banner verde exibindo dias restantes de trial
-   - Acesso completo a todas as funcionalidades
+   - Acesso completo a todas as funcionalidades imediatamente
+
+### Notas Importantes sobre Auto-Verify
+
+- **Emails de confirmação NÃO são enviados** no cadastro normal
+- A confirmação é feita automaticamente via Admin API
+- Usuário pode acessar o sistema imediatamente após cadastro
+- A página `/auth/verify` existe apenas para casos legados ou verificação manual
+- Configuração do Supabase Dashboard não afeta o comportamento (código força auto-verify)
+
+### Configuração do Supabase para Auto-Verify
+
+O sistema implementa auto-verify de forma independente das configurações do Supabase Dashboard. No entanto, é importante entender como funciona:
+
+#### Como Funciona
+
+1. **No Código** (`app/api/auth/register/route.ts`):
+   - `signUp` é chamado com `emailRedirectTo: null` para desabilitar envio de email
+   - Admin API (`adminClient.auth.admin.updateUserById`) força confirmação via `email_confirm: true`
+   - Sistema valida que `email_confirmed_at` foi definido antes de prosseguir
+
+2. **No Supabase Dashboard**:
+   - **Authentication → Settings → Email Auth**
+   - A opção "Enable email confirmations" pode estar habilitada ou desabilitada
+   - **Não importa**: O código força auto-verify via Admin API, então a configuração não afeta o comportamento
+
+#### Configuração Necessária
+
+**Variáveis de Ambiente Obrigatórias:**
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...  # ⚠️ Obrigatório para auto-verify
+```
+
+**⚠️ IMPORTANTE:**
+- `SUPABASE_SERVICE_ROLE_KEY` é **obrigatória** para o auto-verify funcionar
+- Esta chave tem acesso total ao banco e **NUNCA** deve ser exposta no client-side
+- Sem esta chave, o sistema não consegue confirmar emails automaticamente
+
+#### Comportamento Esperado
+
+- ✅ Usuário se cadastra → Email confirmado automaticamente → Login automático → Acesso imediato
+- ❌ **NÃO** envia email de confirmação
+- ❌ **NÃO** requer clique em link de verificação
+- ✅ Funciona independente da configuração do Supabase Dashboard
+
+#### Troubleshooting
+
+**Problema**: Usuário criado mas não consegue fazer login
+- **Causa**: `SUPABASE_SERVICE_ROLE_KEY` não configurada ou inválida
+- **Solução**: Verificar variável de ambiente e permissões da chave
+
+**Problema**: Email ainda sendo enviado apesar do auto-verify
+- **Causa**: Configuração do Supabase pode estar sobrescrevendo (raro)
+- **Solução**: Verificar logs do endpoint `/api/auth/register` e confirmar que `emailRedirectTo: null` está sendo usado
+
+**Problema**: `email_confirmed_at` está null após cadastro
+- **Causa**: Erro na chamada da Admin API ou permissões insuficientes
+- **Solução**: Verificar logs do servidor e permissões da Service Role Key
 
 ---
 
