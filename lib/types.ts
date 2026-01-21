@@ -26,6 +26,12 @@ export interface DailyUser {
   subscription_status?: 'trial' | 'active' | 'cancelled' | 'expired'
   trial_ends_at?: string
   subscription_ends_at?: string
+  subscription_plan?: 'basic' | 'premium' | 'enterprise'
+  payment_provider?: 'hotmart' | 'stripe' | 'asaas' | 'mercadopago'
+  payment_customer_id?: string
+  payment_subscription_id?: string
+  payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled'
+  next_billing_date?: string
 }
 
 // Alias para compatibilidade
@@ -51,4 +57,22 @@ export interface UserFormData {
   phone: string | null
   sendTime: string | null
   checklist: string[]
+}
+
+// Interface para metadata do usuário (usado em ensureDailyUserLink)
+export interface UserMetadata {
+  name?: string
+  phone?: string | null
+}
+
+// Interface para dados de atualização de assinatura
+export interface SubscriptionUpdateData {
+  subscription_status?: 'trial' | 'active' | 'cancelled' | 'expired'
+  subscription_ends_at?: string
+  subscription_plan?: 'basic' | 'premium' | 'enterprise'
+  payment_provider?: 'hotmart' | 'stripe' | 'asaas' | 'mercadopago'
+  payment_customer_id?: string
+  payment_subscription_id?: string
+  payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled'
+  next_billing_date?: string
 }

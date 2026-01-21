@@ -51,7 +51,13 @@ function EditPageContent() {
           .eq('id', parseInt(userId))
           .single()
 
-        if (fetchError) throw fetchError
+        if (fetchError) {
+          // Se o erro for de permissão ou usuário não encontrado, tratar adequadamente
+          if (fetchError.code === 'PGRST116') {
+            throw new Error('Usuário não encontrado')
+          }
+          throw fetchError
+        }
 
         if (!data) {
           throw new Error('Usuário não encontrado')
@@ -67,8 +73,16 @@ function EditPageContent() {
 
         setUser(data as DailyUser)
       } catch (err: unknown) {
-        console.error('Erro ao carregar usuário:', err)
-        setError(err instanceof Error ? err.message : 'Erro ao carregar dados do usuário')
+        console.error('[EDIT PAGE] Erro ao carregar usuário:', err)
+        const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar dados do usuário'
+        
+        // Mensagem mais específica se for erro de vinculação
+        if (errorMessage.includes('permission') || errorMessage.includes('vinculação')) {
+          setError('Erro ao verificar permissões. Tente recarregar a página.')
+        } else {
+          setError(errorMessage)
+        }
+        
         setAuthorized(false)
       } finally {
         setLoading(false)
@@ -99,6 +113,14 @@ function EditPageContent() {
             message={error || 'Usuário não encontrado ou acesso negado'}
             showCreateButton={false}
           />
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+            >
+              Recarregar Página
+            </button>
+          </div>
         </main>
       </div>
     )

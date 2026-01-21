@@ -1,6 +1,0 @@
-{"location":"debug-check.js:1","message":"Verificando dependências","data":{"hypothesis":"H1"},"timestamp":1767750953572,"sessionId":"debug-session","runId":"pre-check","hypothesisId":"H1"}
-{"location":"debug-check.js:10","message":"Resultado das verificações","data":{"packageJsonExists":true,"nodeModulesExists":true,"supabaseSSRExists":true,"supabaseSSRPackageJson":true},"timestamp":1767750953619,"sessionId":"debug-session","runId":"pre-check","hypothesisId":"H1"}
-{"location":"debug-check.js:17","message":"Versão do @supabase/ssr encontrada","data":{"version":"0.8.0"},"timestamp":1767750953620,"sessionId":"debug-session","runId":"pre-check","hypothesisId":"H1"}
-{"location":"debug-check.js:1","message":"Verificando dependências","data":{"hypothesis":"H1"},"timestamp":1767750964951,"sessionId":"debug-session","runId":"pre-check","hypothesisId":"H1"}
-{"location":"debug-check.js:10","message":"Resultado das verificações","data":{"packageJsonExists":true,"nodeModulesExists":true,"supabaseSSRExists":true,"supabaseSSRPackageJson":true},"timestamp":1767750964990,"sessionId":"debug-session","runId":"pre-check","hypothesisId":"H1"}
-{"location":"debug-check.js:17","message":"Versão do @supabase/ssr encontrada","data":{"version":"0.8.0"},"timestamp":1767750964992,"sessionId":"debug-session","runId":"pre-check","hypothesisId":"H1"}

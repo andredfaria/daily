@@ -31,11 +31,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (authUser) {
         // Buscar daily_user associado
-        const { data: dailyUserData } = await supabase
-          .from('daily_user')
-          .select('*')
-          .eq('auth_user_id', authUser.id)
-          .single()
+        let dailyUserData = null
+        try {
+          const { data, error } = await supabase
+            .from('daily_user')
+            .select('*')
+            .eq('auth_user_id', authUser.id)
+            .single()
+
+          if (!error && data) {
+            dailyUserData = data
+          } else {
+            // Se não encontrou daily_user, garantir vinculação via API
+            // Usamos API para evitar problemas de CORS e permissões no client
+            console.log('[AuthProvider] daily_user não encontrado, garantindo vinculação...')
+            try {
+              const response = await fetch('/api/auth/me')
+              if (response.ok) {
+                const result = await response.json()
+                dailyUserData = result.dailyUser
+              }
+            } catch (linkError) {
+              console.error('[AuthProvider] Erro ao garantir vinculação:', linkError)
+            }
+          }
+        } catch (error) {
+          console.error('[AuthProvider] Erro ao buscar daily_user:', error)
+          // Tentar garantir vinculação como fallback
+          try {
+            const response = await fetch('/api/auth/me')
+            if (response.ok) {
+              const result = await response.json()
+              dailyUserData = result.dailyUser
+            }
+          } catch (linkError) {
+            console.error('[AuthProvider] Erro ao garantir vinculação no fallback:', linkError)
+          }
+        }
 
         setDailyUser(dailyUserData as DailyUser)
       } else {
@@ -60,11 +92,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (session?.user) {
           // Buscar daily_user quando usuário fizer login
-          const { data: dailyUserData } = await supabase
-            .from('daily_user')
-            .select('*')
-            .eq('auth_user_id', session.user.id)
-            .single()
+          let dailyUserData = null
+          try {
+            const { data, error } = await supabase
+              .from('daily_user')
+              .select('*')
+              .eq('auth_user_id', session.user.id)
+              .single()
+
+            if (!error && data) {
+              dailyUserData = data
+            } else {
+              // Se não encontrou daily_user, garantir vinculação via API
+              console.log('[AuthProvider] daily_user não encontrado no auth state change, garantindo vinculação...')
+              try {
+                const response = await fetch('/api/auth/me')
+                if (response.ok) {
+                  const result = await response.json()
+                  dailyUserData = result.dailyUser
+                }
+              } catch (linkError) {
+                console.error('[AuthProvider] Erro ao garantir vinculação no auth state change:', linkError)
+              }
+            }
+          } catch (error) {
+            console.error('[AuthProvider] Erro ao buscar daily_user no auth state change:', error)
+            // Tentar garantir vinculação como fallback
+            try {
+              const response = await fetch('/api/auth/me')
+              if (response.ok) {
+                const result = await response.json()
+                dailyUserData = result.dailyUser
+              }
+            } catch (linkError) {
+              console.error('[AuthProvider] Erro ao garantir vinculação no fallback:', linkError)
+            }
+          }
 
           setDailyUser(dailyUserData as DailyUser)
         } else {

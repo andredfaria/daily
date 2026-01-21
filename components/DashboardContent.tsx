@@ -8,6 +8,7 @@ import ActivityTable from './ActivityTable'
 import Card from './ui/Card'
 import Alert from './ui/Alert'
 import Skeleton from './ui/Skeleton'
+import TrialBanner from './TrialBanner'
 import { PieChart, Layers, CheckCircle2, Phone, Calendar, UserPlus, TrendingUp, AlertCircle } from 'lucide-react'
 
 interface DashboardContentProps {
@@ -20,8 +21,8 @@ interface DashboardContentProps {
 
 export default function DashboardContent({ userId, initialData }: DashboardContentProps) {
   // Usar dados pré-carregados como estado inicial
-  const [user, setUser] = useState<DailyUser | null>(initialData?.user || null)
-  const [activities, setActivities] = useState<DailyData[]>(initialData?.activities || [])
+  const [user] = useState<DailyUser | null>(initialData?.user || null)
+  const [activities] = useState<DailyData[]>(initialData?.activities || [])
   const [loading, setLoading] = useState(!initialData && !!userId)
   const [waProfile, setWaProfile] = useState<WAHAProfile | null>(null)
 
@@ -29,7 +30,7 @@ export default function DashboardContent({ userId, initialData }: DashboardConte
   useEffect(() => {
     if (!initialData && userId) {
       // Importar dinamicamente para evitar bundle no servidor
-      import('@/lib/hooks').then(({ useUser, useActivities }) => {
+      import('@/lib/hooks').then(() => {
         // Aqui você pode implementar a lógica de fetch se necessário
         // Por enquanto, vamos manter o loading como false se não tiver dados
         setLoading(false)
@@ -93,7 +94,10 @@ export default function DashboardContent({ userId, initialData }: DashboardConte
     if (userId) {
       return (
         <Alert variant="error" title="Usuário não encontrado" className="max-w-2xl mx-auto mt-10">
-          Verifique se o ID na URL está correto.
+          <p>Verifique se o ID na URL está correto.</p>
+          <p className="mt-2 text-sm text-slate-400">
+            Se você acabou de fazer login, aguarde alguns instantes enquanto sua conta é vinculada.
+          </p>
         </Alert>
       )
     }
@@ -109,6 +113,12 @@ export default function DashboardContent({ userId, initialData }: DashboardConte
         <p className="text-slate-400 mb-6">
           Por favor, faça login novamente para acessar seus dados.
         </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+        >
+          Recarregar Página
+        </button>
       </Card>
     )
   }
@@ -177,24 +187,7 @@ export default function DashboardContent({ userId, initialData }: DashboardConte
   return (
     <div className="fade-in space-y-6 pt-8">
       {/* Banner de Trial */}
-      {isTrial && !user.is_admin && (
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl p-4 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 border border-emerald-500/20">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-lg">
-              <Calendar className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="font-bold text-lg">Período de Teste Gratuito</p>
-              <p className="text-emerald-100 text-sm">
-                Você tem <span className="font-bold bg-black/20 px-2 py-0.5 rounded text-white border border-emerald-400/30">{daysInTrial} dias</span> restantes para testar todas as funcionalidades.
-              </p>
-            </div>
-          </div>
-          <button className="bg-white text-emerald-700 font-bold py-2 px-6 rounded-lg hover:bg-emerald-50 transition-colors shadow-sm whitespace-nowrap">
-            Assinar Plano
-          </button>
-        </div>
-      )}
+      {isTrial && !user.is_admin && <TrialBanner />}
 
       {/* Layout Principal: Grid com 2 colunas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
