@@ -41,7 +41,8 @@ export async function POST(request: NextRequest) {
         // Login automático após reset
         const jwtToken = await signToken({
             userId: user.id,
-            email: user.email!,
+            email: user.email || undefined,
+            phone: user.phone || '',
             isAdmin: Boolean(user.is_admin),
         })
         await setSessionCookie(jwtToken)

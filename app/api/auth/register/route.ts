@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
     const token = await signToken({
       userId: user.id,
       phone: user.phone!,
+      email: user.email || undefined,
       isAdmin: false,
     })
 

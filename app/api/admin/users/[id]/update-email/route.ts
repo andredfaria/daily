@@ -30,7 +30,7 @@ export async function POST(
 
     await updateUserEmail(targetUserId, email)
 
-    console.log(`[AUDIT] Admin ${session.email} (${session.userId}) alterou email do usuário ${targetUserId} para ${email}`)
+    console.log(`[AUDIT] Admin ${session.email || 'N/A'} (${session.userId}) alterou email do usuário ${targetUserId} para ${email}`)
 
     return NextResponse.json({ success: true, message: 'Email atualizado com sucesso', new_email: email })
   } catch (error: unknown) {
