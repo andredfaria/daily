@@ -11,6 +11,14 @@ export async function getDailyUserByEmail(email: string): Promise<DailyUser | nu
     return rows[0] || null
 }
 
+export async function getDailyUserByPhone(phone: string): Promise<DailyUser | null> {
+    const rows = await query<DailyUser & { password_hash?: string }>(
+        'SELECT * FROM daily_user WHERE phone = ? LIMIT 1',
+        [phone]
+    )
+    return rows[0] || null
+}
+
 export async function getDailyUserById(id: number): Promise<DailyUser | null> {
     const rows = await query<DailyUser>(
         'SELECT * FROM daily_user WHERE id = ? LIMIT 1',
@@ -72,7 +80,7 @@ export async function updateDailyUser(id: number, data: Partial<DailyUser & { pa
 
     const allowed = [
         'name', 'email', 'password_hash', 'phone', 'title', 'option',
-        'time_to_send', 'is_admin', 'subscription_status', 'trial_ends_at',
+        'time_to_send', 'subscription_status', 'trial_ends_at',
         'subscription_ends_at', 'subscription_plan', 'payment_provider',
         'payment_customer_id', 'payment_subscription_id', 'payment_status',
         'next_billing_date', 'reset_token', 'reset_token_expires_at',
@@ -132,6 +140,68 @@ export async function getUserByResetToken(token: string): Promise<DailyUser | nu
         [token]
     )
     return rows[0] || null
+}
+
+// ─── Buscas por pagamento ─────────────────────────────────────
+
+export async function getDailyUserByPaymentSubscriptionId(subscriptionId: string): Promise<DailyUser | null> {
+    const rows = await query<DailyUser>(
+        'SELECT * FROM daily_user WHERE payment_subscription_id = ? LIMIT 1',
+        [subscriptionId]
+    )
+    return rows[0] || null
+}
+
+export async function getDailyUserByPaymentCustomerOrSubscription(
+    customerId: string,
+    subscriptionId: string
+): Promise<DailyUser | null> {
+    const rows = await query<DailyUser>(
+        'SELECT * FROM daily_user WHERE payment_customer_id = ? OR payment_subscription_id = ? LIMIT 1',
+        [customerId, subscriptionId]
+    )
+    return rows[0] || null
+}
+
+// ─── Exclusão ─────────────────────────────────────────────────
+
+export async function deleteDailyUser(id: number): Promise<void> {
+    await execute('DELETE FROM daily_user WHERE id = ?', [id])
+}
+
+// ─── Inserção simples (admin lead creation, sem senha) ────────
+
+export async function insertDailyUserSimple(data: Record<string, unknown>): Promise<DailyUser> {
+    const fields: string[] = []
+    const placeholders: string[] = []
+    const values: unknown[] = []
+
+    const allowed = [
+        'name', 'email', 'phone', 'title', 'option',
+        'time_to_send', 'subscription_status', 'trial_ends_at',
+    ]
+
+    for (const key of allowed) {
+        if (key in data && data[key] !== undefined) {
+            fields.push(key)
+            placeholders.push('?')
+            const val = data[key]
+            values.push(typeof val === 'boolean' ? (val ? 1 : 0) : val)
+        }
+    }
+
+    if (fields.length === 0) {
+        throw new Error('Nenhum campo fornecido para criação')
+    }
+
+    const result = await execute(
+        `INSERT INTO daily_user (${fields.join(', ')}) VALUES (${placeholders.join(', ')})`,
+        values
+    )
+
+    const user = await getDailyUserById(result.insertId)
+    if (!user) throw new Error('Usuário não encontrado após criação')
+    return user
 }
 
 // ─── Listagem ─────────────────────────────────────────────────

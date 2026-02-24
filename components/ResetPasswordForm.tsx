@@ -8,7 +8,6 @@ import Card from './ui/Card'
 import Input from './ui/Input'
 import Alert from './ui/Alert'
 import { useToast } from './ToastProvider'
-import { supabase } from '@/lib/supabase'
 
 export default function ResetPasswordForm() {
   const router = useRouter()
@@ -20,16 +19,17 @@ export default function ResetPasswordForm() {
   const [passwordTouched, setPasswordTouched] = useState(false)
   const [confirmPasswordTouched, setConfirmPasswordTouched] = useState(false)
   const toast = useToast()
+  const [token, setToken] = useState<string | null>(null)
 
   // Verificar se há token válido na URL
   useEffect(() => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1))
-    const accessToken = hashParams.get('access_token')
-    const type = hashParams.get('type')
+    const searchParams = new URLSearchParams(window.location.search)
+    const urlToken = searchParams.get('token')
 
-    if (!accessToken || type !== 'recovery') {
-      // Token inválido ou ausente
+    if (!urlToken) {
       setError('Link inválido ou expirado. Solicite um novo link de recuperação.')
+    } else {
+      setToken(urlToken)
     }
   }, [])
 
@@ -53,24 +53,24 @@ export default function ResetPasswordForm() {
       return
     }
 
+    if (!token) {
+      setError('Token de recuperação inválido ou expirado')
+      return
+    }
+
     setLoading(true)
 
     try {
-      // Obter token da URL hash
-      const hashParams = new URLSearchParams(window.location.hash.substring(1))
-      const accessToken = hashParams.get('access_token')
-
-      if (!accessToken) {
-        throw new Error('Token de recuperação inválido ou expirado')
-      }
-
-      // Atualizar senha usando o token
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: password,
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
       })
 
-      if (updateError) {
-        throw updateError
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao redefinir senha')
       }
 
       setSuccess(true)

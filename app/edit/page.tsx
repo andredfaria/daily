@@ -6,7 +6,6 @@ import Navbar from '@/components/Navbar'
 import UserForm from '@/components/UserForm'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import ErrorMessage from '@/components/ErrorMessage'
-import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
 import { useAuth } from '@/components/AuthProvider'
 
@@ -17,7 +16,6 @@ function EditPageContent() {
   const [user, setUser] = useState<DailyUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [authorized, setAuthorized] = useState(false)
 
   useEffect(() => {
     const loadUser = async () => {
@@ -31,42 +29,25 @@ function EditPageContent() {
         setLoading(true)
         setError(null)
 
-        // Validar permissões via API
-        const validateResponse = await fetch(`/api/users/${userId}/validate-edit`)
-        const validateData = await validateResponse.json()
+        // Buscar dados do usuário via API protegida
+        const response = await fetch(`/api/users/${userId}`)
+        const data = await response.json()
 
-        if (!validateData.authorized) {
-          setError(validateData.error || 'Você não tem permissão para editar este usuário')
-          setAuthorized(false)
+        if (!response.ok) {
+          if (response.status === 403) {
+            setError('Você não tem permissão para editar este usuário')
+          } else if (response.status === 401) {
+            setError('Não autenticado. Faça login novamente.')
+          } else {
+            setError(data.error || 'Erro ao carregar usuário')
+          }
           setLoading(false)
           return
-        }
-
-        setAuthorized(true)
-
-        // Buscar dados do usuário
-        const { data, error: fetchError } = await supabase
-          .from('daily_user')
-          .select('*')
-          .eq('id', parseInt(userId))
-          .single()
-
-        if (fetchError) {
-          // Se o erro for de permissão ou usuário não encontrado, tratar adequadamente
-          if (fetchError.code === 'PGRST116') {
-            throw new Error('Usuário não encontrado')
-          }
-          throw fetchError
-        }
-
-        if (!data) {
-          throw new Error('Usuário não encontrado')
         }
 
         // Verificação adicional client-side com canEdit
         if (!canEdit(data.id)) {
           setError('Você não tem permissão para editar este usuário')
-          setAuthorized(false)
           setLoading(false)
           return
         }
@@ -75,15 +56,7 @@ function EditPageContent() {
       } catch (err: unknown) {
         console.error('[EDIT PAGE] Erro ao carregar usuário:', err)
         const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar dados do usuário'
-        
-        // Mensagem mais específica se for erro de vinculação
-        if (errorMessage.includes('permission') || errorMessage.includes('vinculação')) {
-          setError('Erro ao verificar permissões. Tente recarregar a página.')
-        } else {
-          setError(errorMessage)
-        }
-        
-        setAuthorized(false)
+        setError(errorMessage)
       } finally {
         setLoading(false)
       }
@@ -104,7 +77,7 @@ function EditPageContent() {
     )
   }
 
-  if (error || !user || !authorized) {
+  if (error || !user) {
     return (
       <div className="min-h-screen bg-slate-950">
         <Navbar title="Editar Usuário" showBack />

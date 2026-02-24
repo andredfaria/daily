@@ -1,25 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { getDailyUserByEmail } from '@/lib/db/daily_user'
+import { getDailyUserByPhone } from '@/lib/db/daily_user'
 import { signToken, setSessionCookie } from '@/lib/auth-jwt'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json()
+    const { phone, password } = await request.json()
 
-    if (!email || !password) {
+    if (!phone || !password) {
       return NextResponse.json(
-        { error: 'Email e senha são obrigatórios' },
+        { error: 'Telefone e senha são obrigatórios' },
         { status: 400 }
       )
     }
 
-    // Buscar usuário pelo email
-    const user = await getDailyUserByEmail(email)
+    // Buscar usuário pelo telefone
+    const user = await getDailyUserByPhone(phone)
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Email ou senha inválidos' },
+        { error: 'Telefone ou senha inválidos' },
         { status: 401 }
       )
     }
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const passwordValid = await bcrypt.compare(password, rawUser.password_hash)
     if (!passwordValid) {
       return NextResponse.json(
-        { error: 'Email ou senha inválidos' },
+        { error: 'Telefone ou senha inválidos' },
         { status: 401 }
       )
     }
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Gerar JWT e setar cookie
     const token = await signToken({
       userId: user.id,
-      email: user.email!,
+      phone: user.phone!,
       isAdmin: Boolean(user.is_admin),
     })
 
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         name: user.name,
-        email: user.email,
+        phone: user.phone,
         is_admin: user.is_admin,
         subscription_status: user.subscription_status,
         trial_ends_at: user.trial_ends_at,

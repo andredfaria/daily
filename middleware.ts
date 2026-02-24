@@ -9,7 +9,7 @@ const COOKIE_NAME = 'daily_session'
 
 interface JWTPayload {
   userId: number
-  email: string
+  phone: string
   isAdmin: boolean
 }
 
@@ -20,7 +20,7 @@ async function getSessionFromRequest(request: NextRequest): Promise<JWTPayload |
     const { payload } = await jwtVerify(token, JWT_SECRET)
     return {
       userId: payload.userId as number,
-      email: payload.email as string,
+      phone: payload.phone as string,
       isAdmin: payload.isAdmin as boolean,
     }
   } catch {
@@ -52,17 +52,13 @@ export async function middleware(request: NextRequest) {
 
   // Usuário autenticado tentando acessar página pública ou raiz → redirecionar
   if (isPublicPath || isRootPath) {
-    if (session.isAdmin) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    } else {
-      return NextResponse.redirect(new URL(`/dashboard?id=${session.userId}`, request.url))
-    }
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   // Proteger rota /users — apenas admins
   if (request.nextUrl.pathname === '/users') {
     if (!session.isAdmin) {
-      return NextResponse.redirect(new URL(`/dashboard?id=${session.userId}`, request.url))
+      return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }
 
@@ -75,7 +71,7 @@ export async function middleware(request: NextRequest) {
         if (session.isAdmin) {
           return NextResponse.redirect(new URL('/users', request.url))
         }
-        return NextResponse.redirect(new URL(`/dashboard?id=${session.userId}`, request.url))
+        return NextResponse.redirect(new URL('/dashboard', request.url))
       }
     }
   }

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Users, UserPlus, RefreshCw } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
 import UserForm from './UserForm'
 import Spinner from './ui/Spinner'
@@ -22,14 +21,12 @@ export default function UserManagement() {
             setLoading(true)
             setError(null)
 
-            const { data, error: fetchError } = await supabase
-                .from('daily_user')
-                .select('*')
-                .order('created_at', { ascending: false })
+            const response = await fetch('/api/users?limit=100&orderBy=created_at&orderDirection=desc')
+            const data = await response.json()
 
-            if (fetchError) throw fetchError
+            if (!response.ok) throw new Error(data.error || 'Erro ao carregar usuários')
 
-            setUsers((data as DailyUser[]) || [])
+            setUsers(data.users || data || [])
         } catch (err: unknown) {
             console.error('Erro ao carregar usuários:', err)
             setError(err instanceof Error ? err.message : 'Erro ao carregar lista de usuários')
@@ -141,8 +138,8 @@ export default function UserManagement() {
                                     key={user.id}
                                     onClick={() => handleUserSelect(user)}
                                     className={`w-full text-left px-4 py-3 hover:bg-slate-800/50 transition-colors ${selectedUser?.id === user.id
-                                            ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
-                                            : ''
+                                        ? 'bg-emerald-500/10 border-l-4 border-emerald-500'
+                                        : ''
                                         }`}
                                 >
                                     <div className="flex items-center justify-between">

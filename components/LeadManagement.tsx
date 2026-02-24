@@ -2,7 +2,7 @@
 
 import { useState, useEffect, FormEvent } from 'react'
 import { Plus, X, UserPlus, Save, AlertCircle, CheckCircle2, Edit, Users, Clock, Trash2, ExternalLink } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+
 import { DailyUser } from '@/lib/types'
 import { validateName, validateTitle, validatePhone, validateSendTime, validateChecklist } from '@/lib/validations'
 import { validatePhoneWithWAHA } from '@/lib/waha'
@@ -54,13 +54,11 @@ export default function LeadManagement() {
     const loadUsers = async () => {
         try {
             setLoadingUsers(true)
-            const { data, error: fetchError } = await supabase
-                .from('daily_user')
-                .select('*')
-                .order('created_at', { ascending: false })
+            const response = await fetch('/api/users?limit=100&orderBy=created_at&orderDirection=desc')
+            const data = await response.json()
 
-            if (fetchError) throw fetchError
-            setUsers((data as DailyUser[]) || [])
+            if (!response.ok) throw new Error(data.error || 'Erro ao carregar usuários')
+            setUsers(data.users || data || [])
         } catch (err: unknown) {
             console.error('Erro ao carregar usuários:', err)
         } finally {
@@ -391,18 +389,21 @@ export default function LeadManagement() {
 
         try {
             if (isEditMode && selectedUser) {
-                const { error: updateError } = await supabase
-                    .from('daily_user')
-                    .update(userData)
-                    .eq('id', selectedUser.id)
-
-                if (updateError) throw updateError
+                const response = await fetch(`/api/users/${selectedUser.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData),
+                })
+                const result = await response.json()
+                if (!response.ok) throw new Error(result.error || 'Erro ao atualizar lead')
             } else {
-                const { error: insertError } = await supabase
-                    .from('daily_user')
-                    .insert([userData])
-
-                if (insertError) throw insertError
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData),
+                })
+                const result = await response.json()
+                if (!response.ok) throw new Error(result.error || 'Erro ao criar lead')
             }
 
             setSuccess(true)
@@ -456,12 +457,14 @@ export default function LeadManagement() {
 
         try {
             setLoading(true)
-            const { error: deleteError } = await supabase
-                .from('daily_user')
-                .delete()
-                .eq('id', userId)
+            const response = await fetch(`/api/users/${userId}`, {
+                method: 'DELETE',
+            })
 
-            if (deleteError) throw deleteError
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(data.error || 'Erro ao excluir lead')
+            }
 
             await loadUsers()
             if (selectedUser?.id === userId) {

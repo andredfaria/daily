@@ -10,7 +10,7 @@ const COOKIE_MAX_AGE = 60 * 60 * 24 * 7 // 7 dias em segundos
 
 export interface JWTPayload {
     userId: number
-    email: string
+    phone: string
     isAdmin: boolean
 }
 
@@ -33,7 +33,7 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
         const { payload } = await jwtVerify(token, JWT_SECRET)
         return {
             userId: payload.userId as number,
-            email: payload.email as string,
+            phone: payload.phone as string,
             isAdmin: payload.isAdmin as boolean,
         }
     } catch {

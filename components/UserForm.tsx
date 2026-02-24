@@ -3,7 +3,6 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { Plus, X, UserPlus, Save, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
 import { validateName, validateTitle, validatePhone, validateSendTime, validateChecklist } from '@/lib/validations'
 import { validatePhoneWithWAHA } from '@/lib/waha'
@@ -403,13 +402,18 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false, 
 
     try {
       if (isEditMode) {
-        // Modo edição: atualizar
-        const { error: updateError } = await supabase
-          .from('daily_user')
-          .update(userData)
-          .eq('id', user.id)
+        // Modo edição: atualizar via API protegida
+        const response = await fetch(`/api/users/${user.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userData),
+        })
 
-        if (updateError) throw updateError
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Erro ao atualizar usuário')
+        }
 
         setSuccess(true)
         setLoading(false)
@@ -424,22 +428,26 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false, 
           }, 1000)
         }
       } else {
-        // Modo criação: inserir
-        const { data, error: insertError } = await supabase
-          .from('daily_user')
-          .insert([userData])
-          .select()
-          .single()
+        // Modo criação: inserir via API protegida
+        const response = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userData),
+        })
 
-        if (insertError) throw insertError
+        const result = await response.json()
 
-        setCreatedUserId(data.id)
+        if (!response.ok) {
+          throw new Error(result.error || 'Erro ao criar usuário')
+        }
+
+        setCreatedUserId(result.user?.id || result.id)
         setSuccess(true)
         setLoading(false)
 
         // Callback de sucesso
         if (onSuccess) {
-          onSuccess(data.id)
+          onSuccess(result.user?.id || result.id)
         }
       }
     } catch (err: unknown) {
@@ -746,7 +754,6 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false, 
         <AdminUserFields
           userId={user.id}
           currentIsAdmin={user.is_admin}
-          currentAuthUserId={user.auth_user_id}
           currentSubscriptionStatus={user.subscription_status}
           currentTrialEndsAt={user.trial_ends_at}
           onSuccess={() => {

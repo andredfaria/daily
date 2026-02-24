@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogIn, Mail, Lock, UserPlus, Gift, CheckCircle2, X } from 'lucide-react'
+import { LogIn, Phone, Lock, UserPlus, Gift, CheckCircle2, X, Mail } from 'lucide-react'
 import Button from './ui/Button'
 import Card from './ui/Card'
 import Input from './ui/Input'
@@ -16,19 +16,19 @@ interface LoginFormProps {
 export default function LoginForm({ mode = 'login' }: LoginFormProps) {
   const router = useRouter()
   const toast = useToast()
+  const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentMode, setCurrentMode] = useState<'login' | 'register'>(mode)
-  const [emailTouched, setEmailTouched] = useState(false)
+  const [phoneTouched, setPhoneTouched] = useState(false)
   const [passwordTouched, setPasswordTouched] = useState(false)
   const [nameTouched, setNameTouched] = useState(false)
 
   // Validações
-  const isEmailValid = email.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  const isPhoneValid = phone.length === 0 || phone.trim().length >= 8
   const isPasswordValid = password.length === 0 || password.length >= 6
   const isNameValid = name.length === 0 || name.trim().length >= 2
 
@@ -40,8 +40,8 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
     try {
       const endpoint = currentMode === 'login' ? '/api/auth/login' : '/api/auth/register'
       const body = currentMode === 'login'
-        ? { email, password }
-        : { email, password, name, phone }
+        ? { phone, password }
+        : { phone, password, name, email }
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -58,30 +58,11 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
       }
 
       if (currentMode === 'register') {
-        // Se registro incluir sessão, fazer login automático
-        if (data.session && data.dailyUser) {
-          toast.success('Conta criada com sucesso! Bem-vindo!')
-          // Login automático bem-sucedido - redirecionar baseado no tipo de usuário
-          // O middleware cuidará do redirecionamento correto baseado no tipo de usuário
-          setTimeout(() => {
-            router.push('/dashboard')
-            router.refresh()
-          }, 500)
-        } else if (data.requiresLogin) {
-          // Registro sem login automático - redirecionar para login com mensagem
-          toast.info('Conta criada com sucesso! Faça login para continuar.')
-          setTimeout(() => {
-            router.push('/login?registered=true')
-            router.refresh()
-          }, 500)
-        } else {
-          // Fallback: redirecionar para login
-          toast.info('Conta criada com sucesso! Faça login para continuar.')
-          setTimeout(() => {
-            router.push('/login')
-            router.refresh()
-          }, 500)
-        }
+        toast.success('Conta criada com sucesso! Bem-vindo!')
+        setTimeout(() => {
+          router.push('/dashboard')
+          router.refresh()
+        }, 500)
       } else {
         // Login normal: redirecionar baseado no tipo de usuário
         toast.success('Login realizado com sucesso!')
@@ -94,7 +75,7 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
           } else {
             // Usuário comum: redirecionar para seu próprio dashboard
             setTimeout(() => {
-              router.push(`/dashboard?id=${data.dailyUser.id}`)
+              router.push('/dashboard')
               router.refresh()
             }, 500)
           }
@@ -199,15 +180,16 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
             </div>
 
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-slate-300 mb-1">
-                Telefone (opcional)
+              <label htmlFor="email-register" className="block text-sm font-medium text-slate-300 mb-1">
+                Email (opcional)
               </label>
               <Input
-                type="tel"
-                id="phone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="(00) 00000-0000"
+                type="email"
+                id="email-register"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                leftIcon={Mail}
                 disabled={loading}
               />
             </div>
@@ -215,34 +197,34 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
         )}
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
-            Email
+          <label htmlFor="phone" className="block text-sm font-medium text-slate-300 mb-1">
+            Telefone
           </label>
           <div className="relative">
             <Input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onBlur={() => setEmailTouched(true)}
-              placeholder="seu@email.com"
-              leftIcon={Mail}
+              type="tel"
+              id="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onBlur={() => setPhoneTouched(true)}
+              placeholder="+55 11 99999-9999"
+              leftIcon={Phone}
               required
               disabled={loading}
-              className={emailTouched && !isEmailValid ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''}
+              className={phoneTouched && !isPhoneValid ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : ''}
             />
-            {emailTouched && (
+            {phoneTouched && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                {isEmailValid && email.length > 0 ? (
+                {isPhoneValid && phone.length > 0 ? (
                   <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                ) : email.length > 0 ? (
+                ) : phone.length > 0 ? (
                   <X className="w-5 h-5 text-red-500" />
                 ) : null}
               </div>
             )}
           </div>
-          {emailTouched && !isEmailValid && email.length > 0 && (
-            <p className="text-xs text-red-400 mt-1">Email inválido</p>
+          {phoneTouched && !isPhoneValid && phone.length > 0 && (
+            <p className="text-xs text-red-400 mt-1">Telefone inválido</p>
           )}
         </div>
 
@@ -297,7 +279,7 @@ export default function LoginForm({ mode = 'login' }: LoginFormProps) {
         <Button
           type="submit"
           className="w-full"
-          disabled={loading || (currentMode === 'register' && (!isEmailValid || !isPasswordValid || !isNameValid))}
+          disabled={loading || (currentMode === 'register' && (!isPhoneValid || !isPasswordValid || !isNameValid))}
           loading={loading}
           icon={currentMode === 'login' ? LogIn : UserPlus}
         >

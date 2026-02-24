@@ -16,12 +16,12 @@ export async function getSession(): Promise<JWTPayload | null> {
 /**
  * Retorna um objeto compatível com o "user" do Supabase para manter compatibilidade
  */
-export async function getUser(): Promise<{ id: number; email: string; isAdmin: boolean } | null> {
+export async function getUser(): Promise<{ id: number; phone: string; isAdmin: boolean } | null> {
     const session = await getSessionFromCookies()
     if (!session) return null
     return {
         id: session.userId,
-        email: session.email,
+        phone: session.phone,
         isAdmin: session.isAdmin,
     }
 }

@@ -4,7 +4,6 @@ import { useState, useEffect, FormEvent } from 'react'
 import { Plus, X, UserPlus, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 import { validateName, validateTitle, validatePhone, validateSendTime, validateChecklist } from '@/lib/validations'
 import { validatePhoneWithWAHA } from '@/lib/waha'
 import { cn } from '@/lib/utils'
@@ -252,15 +251,17 @@ export default function CreateUserForm() {
     }
 
     try {
-      const { data, error: insertError } = await supabase
-        .from('daily_user')
-        .insert([userData])
-        .select()
-        .single()
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      })
 
-      if (insertError) throw insertError
+      const result = await response.json()
 
-      setCreatedUserId(data.id)
+      if (!response.ok) throw new Error(result.error || 'Erro ao criar usuário')
+
+      setCreatedUserId(result.user?.id || result.id)
       setSuccess(true)
       setLoading(false)
     } catch (err: unknown) {

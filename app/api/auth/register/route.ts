@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { getDailyUserByEmail, createDailyUser } from '@/lib/db/daily_user'
+import { getDailyUserByEmail, getDailyUserByPhone, createDailyUser } from '@/lib/db/daily_user'
 import { signToken, setSessionCookie } from '@/lib/auth-jwt'
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password, name, phone } = await request.json()
 
-    if (!email || !password) {
+    if (!phone || !password) {
       return NextResponse.json(
-        { error: 'Email e senha são obrigatórios' },
+        { error: 'Telefone e senha são obrigatórios' },
         { status: 400 }
       )
     }
@@ -21,24 +21,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verificar se email já existe
-    const existing = await getDailyUserByEmail(email)
-    if (existing) {
+    // Verificar se phone já existe
+    const existingByPhone = await getDailyUserByPhone(phone)
+    if (existingByPhone) {
       return NextResponse.json(
-        { error: 'Este email já está cadastrado' },
+        { error: 'Este telefone já está cadastrado' },
         { status: 400 }
       )
+    }
+
+    // Verificar se email já existe (se fornecido)
+    if (email) {
+      const existingByEmail = await getDailyUserByEmail(email)
+      if (existingByEmail) {
+        return NextResponse.json(
+          { error: 'Este email já está cadastrado' },
+          { status: 400 }
+        )
+      }
     }
 
     // Hash da senha
     const password_hash = await bcrypt.hash(password, 12)
 
-    // Criar usuário no MySQL
+    // Criar usuário no MySQL — sempre não-admin
     const user = await createDailyUser({
-      name: name || email.split('@')[0],
-      email,
+      name: name || phone,
+      email: email || null,
       password_hash,
-      phone: phone || null,
+      phone,
       is_admin: false,
       subscription_status: 'trial',
     })
@@ -72,7 +83,7 @@ export async function POST(request: NextRequest) {
     // Login automático após cadastro
     const token = await signToken({
       userId: user.id,
-      email: user.email!,
+      phone: user.phone!,
       isAdmin: false,
     })
 
@@ -82,7 +93,7 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         name: user.name,
-        email: user.email,
+        phone: user.phone,
         is_admin: user.is_admin,
         subscription_status: user.subscription_status,
         trial_ends_at: user.trial_ends_at,

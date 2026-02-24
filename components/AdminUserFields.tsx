@@ -1,25 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Shield, ShieldAlert, Link as LinkIcon, Unlink, Mail, Key, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { Shield, ShieldAlert, Mail, Key, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import Button from './ui/Button'
 import Card from './ui/Card'
 import FormField from './ui/FormField'
 import Input from './ui/Input'
 
-interface AuthUser {
-  id: string
-  email: string
-  created_at: string
-  is_linked: boolean
-  email_confirmed_at: string | null
-  last_sign_in_at: string | null
-}
-
 interface AdminUserFieldsProps {
   userId: number
   currentIsAdmin: boolean
-  currentAuthUserId: string | null
   currentSubscriptionStatus?: string
   currentTrialEndsAt?: string
   onSuccess: () => void
@@ -28,7 +18,6 @@ interface AdminUserFieldsProps {
 export default function AdminUserFields({
   userId,
   currentIsAdmin,
-  currentAuthUserId,
   currentSubscriptionStatus,
   currentTrialEndsAt,
   onSuccess,
@@ -39,16 +28,26 @@ export default function AdminUserFields({
   const [roleMessage, setRoleMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [showRoleConfirm, setShowRoleConfirm] = useState(false)
 
-  // Estados para vinculação auth
-  const [authUserId, setAuthUserId] = useState(currentAuthUserId)
-
   // Estados para assinatura
   const [subStatus, setSubStatus] = useState<string>(currentSubscriptionStatus || 'trial')
   const [trialEnds, setTrialEnds] = useState<string>(currentTrialEndsAt ? currentTrialEndsAt.split('T')[0] : '')
   const [updatingSub, setUpdatingSub] = useState(false)
   const [subMessage, setSubMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  const [authUsers, setAuthUsers] = useState<AuthUser[]>([])
+  // Estados para credenciais
+  const [newEmail, setNewEmail] = useState('')
+  const [updatingEmail, setUpdatingEmail] = useState(false)
+  const [emailMessage, setEmailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [updatingPassword, setUpdatingPassword] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Atualizar estados quando props mudarem
+  useEffect(() => {
+    setIsAdmin(currentIsAdmin)
+  }, [currentIsAdmin])
 
   const handleUpdateSubscription = async () => {
     try {
@@ -76,50 +75,6 @@ export default function AdminUserFields({
       setSubMessage({ type: 'error', text: 'Erro ao atualizar assinatura' })
     } finally {
       setUpdatingSub(false)
-    }
-  }
-  const [loadingAuthUsers, setLoadingAuthUsers] = useState(false)
-  const [linkingAuth, setLinkingAuth] = useState(false)
-  const [linkMessage, setLinkMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [selectedAuthUserId, setSelectedAuthUserId] = useState<string>('')
-  const [showLinkConfirm, setShowLinkConfirm] = useState(false)
-
-  // Estados para credenciais
-  const [newEmail, setNewEmail] = useState('')
-  const [updatingEmail, setUpdatingEmail] = useState(false)
-  const [emailMessage, setEmailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [updatingPassword, setUpdatingPassword] = useState(false)
-  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  // Buscar usuários auth disponíveis quando o componente montar
-  useEffect(() => {
-    loadAuthUsers()
-  }, [])
-
-  // Atualizar estados quando props mudarem
-  useEffect(() => {
-    setIsAdmin(currentIsAdmin)
-    setAuthUserId(currentAuthUserId)
-  }, [currentIsAdmin, currentAuthUserId])
-
-  const loadAuthUsers = async () => {
-    try {
-      setLoadingAuthUsers(true)
-      const response = await fetch('/api/admin/auth-users')
-      const data = await response.json()
-
-      if (response.ok) {
-        setAuthUsers(data.users)
-      } else {
-        console.error('Erro ao carregar usuários auth:', data.error)
-      }
-    } catch {
-      console.error('Erro ao carregar usuários auth')
-    } finally {
-      setLoadingAuthUsers(false)
     }
   }
 
@@ -154,78 +109,6 @@ export default function AdminUserFields({
     } finally {
       setUpdatingRole(false)
       setShowRoleConfirm(false)
-    }
-  }
-
-  const handleLinkAuth = async () => {
-    if (!selectedAuthUserId) {
-      setLinkMessage({ type: 'error', text: 'Selecione um usuário de autenticação' })
-      return
-    }
-
-    if (!showLinkConfirm) {
-      setShowLinkConfirm(true)
-      return
-    }
-
-    try {
-      setLinkingAuth(true)
-      setLinkMessage(null)
-
-      const response = await fetch(`/api/admin/users/${userId}/link-auth`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_user_id: selectedAuthUserId }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        setAuthUserId(selectedAuthUserId)
-        setLinkMessage({ type: 'success', text: data.message })
-        setSelectedAuthUserId('')
-        await loadAuthUsers() // Recarregar lista
-        onSuccess()
-      } else {
-        setLinkMessage({ type: 'error', text: data.error })
-      }
-    } catch {
-      setLinkMessage({ type: 'error', text: 'Erro ao vincular usuário de autenticação' })
-    } finally {
-      setLinkingAuth(false)
-      setShowLinkConfirm(false)
-    }
-  }
-
-  const handleUnlinkAuth = async () => {
-    if (!confirm('Tem certeza que deseja desvincular este usuário de autenticação?')) {
-      return
-    }
-
-    try {
-      setLinkingAuth(true)
-      setLinkMessage(null)
-
-      const response = await fetch(`/api/admin/users/${userId}/link-auth`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_user_id: null }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        setAuthUserId(null)
-        setLinkMessage({ type: 'success', text: data.message })
-        await loadAuthUsers() // Recarregar lista
-        onSuccess()
-      } else {
-        setLinkMessage({ type: 'error', text: data.error })
-      }
-    } catch {
-      setLinkMessage({ type: 'error', text: 'Erro ao desvincular usuário de autenticação' })
-    } finally {
-      setLinkingAuth(false)
     }
   }
 
@@ -312,9 +195,6 @@ export default function AdminUserFields({
     }
   }
 
-  // Encontrar email do auth_user vinculado
-  const linkedAuthUser = authUsers.find(u => u.id === authUserId)
-
   return (
     <div className="space-y-6 mt-8">
       <div className="border-t border-slate-800 pt-6">
@@ -323,7 +203,7 @@ export default function AdminUserFields({
           Configurações Administrativas
         </h3>
         <p className="text-sm text-slate-400 mb-6">
-          Esta seção é visível apenas para administradores e permite gerenciar permissões e credenciais de autenticação.
+          Esta seção é visível apenas para administradores e permite gerenciar permissões e credenciais.
         </p>
       </div>
 
@@ -402,213 +282,100 @@ export default function AdminUserFields({
         </div>
       </Card>
 
-      {/* Seção 2: Vinculação Auth */}
-      <Card title="Vinculação com Autenticação" icon={LinkIcon}>
+      {/* Seção 2: Credenciais */}
+      <Card title="Alterar Email" icon={Mail}>
         <div className="space-y-4">
-          {authUserId ? (
-            <>
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="font-medium text-emerald-400">Conta Vinculada</p>
-                    <p className="text-sm text-emerald-600/80 mt-1">
-                      Email: <span className="font-mono text-emerald-300">{linkedAuthUser?.email || authUserId}</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <Button
-                variant="danger"
-                onClick={handleUnlinkAuth}
-                disabled={linkingAuth}
-                icon={Unlink}
-                size="sm"
-              >
-                {linkingAuth ? 'Desvinculando...' : 'Desvincular Conta'}
-              </Button>
-            </>
-          ) : (
-            <>
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
-                <p className="text-sm text-amber-400">
-                  Este usuário não possui uma conta de autenticação vinculada. Vincule uma conta existente para permitir login no sistema.
-                </p>
-              </div>
+          <p className="text-sm text-slate-400">
+            Altere o endereço de email do usuário.
+          </p>
+          <FormField label="Novo Email">
+            <Input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="novo-email@exemplo.com"
+              disabled={updatingEmail}
+              className="bg-slate-950/50 border-slate-700 focus:ring-emerald-500/50 focus:border-emerald-500 text-white placeholder:text-slate-600"
+            />
+          </FormField>
+          <Button
+            variant="primary"
+            onClick={handleUpdateEmail}
+            disabled={!newEmail.trim() || updatingEmail}
+            icon={updatingEmail ? Loader2 : Mail}
+            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
+          >
+            {updatingEmail ? 'Atualizando...' : 'Atualizar Email'}
+          </Button>
 
-              <FormField label="Selecionar Usuário de Autenticação" required>
-                <select
-                  value={selectedAuthUserId}
-                  onChange={(e) => setSelectedAuthUserId(e.target.value)}
-                  disabled={loadingAuthUsers || linkingAuth}
-                  className="w-full px-4 py-2 bg-slate-950/50 border border-slate-700 rounded-lg focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 text-white"
-                >
-                  <option value="" className="bg-slate-900">
-                    {loadingAuthUsers ? 'Carregando...' : 'Selecione um usuário'}
-                  </option>
-                  {authUsers
-                    .filter(u => !u.is_linked)
-                    .map(user => (
-                      <option key={user.id} value={user.id} className="bg-slate-900">
-                        {user.email}
-                        {user.email_confirmed_at ? ' ✓' : ' (não confirmado)'}
-                      </option>
-                    ))}
-                </select>
-              </FormField>
-
-              {!showLinkConfirm ? (
-                <Button
-                  variant="primary"
-                  onClick={handleLinkAuth}
-                  disabled={!selectedAuthUserId || linkingAuth}
-                  icon={LinkIcon}
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
-                >
-                  Vincular Conta Selecionada
-                </Button>
-              ) : (
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-3">
-                  <p className="text-sm text-blue-400 font-medium">
-                    Confirmar vinculação com: <span className="font-mono text-blue-300">{authUsers.find(u => u.id === selectedAuthUserId)?.email}</span>
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="primary"
-                      onClick={handleLinkAuth}
-                      disabled={linkingAuth}
-                      size="sm"
-                      className="bg-emerald-600 hover:bg-emerald-700"
-                    >
-                      {linkingAuth ? 'Vinculando...' : 'Sim, Vincular'}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => setShowLinkConfirm(false)}
-                      size="sm"
-                      className="bg-transparent border-slate-700 text-slate-300 hover:bg-slate-800"
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {linkMessage && (
-            <div className={`flex items-center gap-2 p-3 rounded-lg ${linkMessage.type === 'success'
+          {emailMessage && (
+            <div className={`flex items-center gap-2 p-3 rounded-lg ${emailMessage.type === 'success'
               ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
               : 'bg-red-500/10 text-red-400 border border-red-500/20'
               }`}>
-              {linkMessage.type === 'success' ? (
+              {emailMessage.type === 'success' ? (
                 <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
               ) : (
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
               )}
-              <span className="text-sm">{linkMessage.text}</span>
+              <span className="text-sm">{emailMessage.text}</span>
             </div>
           )}
         </div>
       </Card>
 
-      {/* Seção 3: Credenciais (só aparece se vinculado) */}
-      {authUserId && (
-        <>
-          <Card title="Alterar Email" icon={Mail}>
-            <div className="space-y-4">
-              <p className="text-sm text-slate-400">
-                Altere o endereço de email usado para fazer login no sistema.
-              </p>
-              <FormField label="Novo Email">
-                <Input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="novo-email@exemplo.com"
-                  disabled={updatingEmail}
-                  className="bg-slate-950/50 border-slate-700 focus:ring-emerald-500/50 focus:border-emerald-500 text-white placeholder:text-slate-600"
-                />
-              </FormField>
-              <Button
-                variant="primary"
-                onClick={handleUpdateEmail}
-                disabled={!newEmail.trim() || updatingEmail}
-                icon={updatingEmail ? Loader2 : Mail}
-                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
-              >
-                {updatingEmail ? 'Atualizando...' : 'Atualizar Email'}
-              </Button>
+      <Card title="Alterar Senha" icon={Key}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-400">
+            Defina uma nova senha para este usuário. Não é necessário informar a senha atual.
+          </p>
+          <FormField label="Nova Senha">
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Mínimo 8 caracteres"
+              disabled={updatingPassword}
+              className="bg-slate-950/50 border-slate-700 focus:ring-emerald-500/50 focus:border-emerald-500 text-white placeholder:text-slate-600"
+            />
+          </FormField>
+          <FormField label="Confirmar Nova Senha">
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Digite a senha novamente"
+              disabled={updatingPassword}
+              className="bg-slate-950/50 border-slate-700 focus:ring-emerald-500/50 focus:border-emerald-500 text-white placeholder:text-slate-600"
+            />
+          </FormField>
+          <Button
+            variant="primary"
+            onClick={handleUpdatePassword}
+            disabled={!newPassword.trim() || !confirmPassword.trim() || updatingPassword}
+            icon={updatingPassword ? Loader2 : Key}
+            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
+          >
+            {updatingPassword ? 'Atualizando...' : 'Atualizar Senha'}
+          </Button>
 
-              {emailMessage && (
-                <div className={`flex items-center gap-2 p-3 rounded-lg ${emailMessage.type === 'success'
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                  }`}>
-                  {emailMessage.type === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  )}
-                  <span className="text-sm">{emailMessage.text}</span>
-                </div>
+          {passwordMessage && (
+            <div className={`flex items-center gap-2 p-3 rounded-lg ${passwordMessage.type === 'success'
+              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+              : 'bg-red-500/10 text-red-400 border border-red-500/20'
+              }`}>
+              {passwordMessage.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
               )}
+              <span className="text-sm">{passwordMessage.text}</span>
             </div>
-          </Card>
+          )}
+        </div>
+      </Card>
 
-          <Card title="Alterar Senha" icon={Key}>
-            <div className="space-y-4">
-              <p className="text-sm text-slate-400">
-                Defina uma nova senha para este usuário. Não é necessário informar a senha atual.
-              </p>
-              <FormField label="Nova Senha">
-                <Input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Mínimo 8 caracteres"
-                  disabled={updatingPassword}
-                  className="bg-slate-950/50 border-slate-700 focus:ring-emerald-500/50 focus:border-emerald-500 text-white placeholder:text-slate-600"
-                />
-              </FormField>
-              <FormField label="Confirmar Nova Senha">
-                <Input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Digite a senha novamente"
-                  disabled={updatingPassword}
-                  className="bg-slate-950/50 border-slate-700 focus:ring-emerald-500/50 focus:border-emerald-500 text-white placeholder:text-slate-600"
-                />
-              </FormField>
-              <Button
-                variant="primary"
-                onClick={handleUpdatePassword}
-                disabled={!newPassword.trim() || !confirmPassword.trim() || updatingPassword}
-                icon={updatingPassword ? Loader2 : Key}
-                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
-              >
-                {updatingPassword ? 'Atualizando...' : 'Atualizar Senha'}
-              </Button>
-
-              {passwordMessage && (
-                <div className={`flex items-center gap-2 p-3 rounded-lg ${passwordMessage.type === 'success'
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                  }`}>
-                  {passwordMessage.type === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  )}
-                  <span className="text-sm">{passwordMessage.text}</span>
-                </div>
-              )}
-            </div>
-          </Card>
-        </>
-      )}
-      {/* Seção 4: Assinatura */}
+      {/* Seção 3: Assinatura */}
       <Card title="Gerenciar Assinatura" icon={CheckCircle2}>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

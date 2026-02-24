@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
-import { createAdminClient } from '@/lib/supabase-admin'
 import Stripe from 'stripe'
 import { SubscriptionUpdateData } from '@/lib/types'
+import {
+  getDailyUserById,
+  getDailyUserByPaymentSubscriptionId,
+  getDailyUserByPaymentCustomerOrSubscription,
+  updateDailyUser
+} from '@/lib/db/daily_user'
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
@@ -20,7 +25,7 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 export async function POST(request: NextRequest) {
   // Obter assinatura do header
   const signature = request.headers.get('stripe-signature')
-  
+
   if (!signature) {
     return NextResponse.json(
       { error: 'Missing signature' },
@@ -88,8 +93,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true })
   } catch (error) {
     console.error('[STRIPE WEBHOOK] Erro ao processar:', error)
-    // Retornar 200 mesmo com erro para evitar retries desnecessários
-    // mas logar para investigação
     return NextResponse.json(
       { error: 'Erro ao processar webhook' },
       { status: 200 }
@@ -103,9 +106,6 @@ export async function POST(request: NextRequest) {
 async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session
 ) {
-  const adminClient = createAdminClient()
-  
-  // Obter subscription ID e customer ID
   const subscriptionId = session.subscription as string
   const customerId = session.customer as string
   const dailyUserId = session.metadata?.daily_user_id
@@ -120,10 +120,8 @@ async function handleCheckoutSessionCompleted(
     return
   }
 
-  // Buscar subscription para obter detalhes
   const subscription: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId)
 
-  // Atualizar daily_user
   const updateData: SubscriptionUpdateData = {
     payment_provider: 'stripe',
     payment_customer_id: customerId,
@@ -131,11 +129,9 @@ async function handleCheckoutSessionCompleted(
     payment_status: subscription.status === 'active' || subscription.status === 'trialing' ? 'paid' : 'pending',
   }
 
-  // Se subscription está ativa ou em trial
   if (subscription.status === 'active' || subscription.status === 'trialing') {
     updateData.subscription_status = subscription.status === 'trialing' ? 'trial' : 'active'
-    
-    // Calcular data de término
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const periodEnd = (subscription as any).current_period_end as number | undefined
     if (periodEnd) {
@@ -145,10 +141,7 @@ async function handleCheckoutSessionCompleted(
     }
   }
 
-  await adminClient
-    .from('daily_user')
-    .update(updateData)
-    .eq('id', parseInt(dailyUserId))
+  await updateDailyUser(parseInt(dailyUserId), updateData as Record<string, unknown>)
 
   console.log('[STRIPE WEBHOOK] Checkout concluído para usuário:', dailyUserId)
 }
@@ -159,17 +152,10 @@ async function handleCheckoutSessionCompleted(
 async function handleSubscriptionUpdated(
   subscription: Stripe.Subscription
 ) {
-  const adminClient = createAdminClient()
-  
   const customerId = subscription.customer as string
   const subscriptionId = subscription.id
-  
-  // Buscar usuário pelo customer_id ou subscription_id
-  const { data: dailyUser } = await adminClient
-    .from('daily_user')
-    .select('*')
-    .or(`payment_customer_id.eq.${customerId},payment_subscription_id.eq.${subscriptionId}`)
-    .single()
+
+  const dailyUser = await getDailyUserByPaymentCustomerOrSubscription(customerId, subscriptionId)
 
   if (!dailyUser) {
     console.warn('[STRIPE WEBHOOK] Usuário não encontrado para subscription:', subscriptionId)
@@ -180,7 +166,6 @@ async function handleSubscriptionUpdated(
     payment_status: subscription.status === 'active' ? 'paid' : 'pending',
   }
 
-  // Mapear status do Stripe para o sistema
   switch (subscription.status) {
     case 'active':
       updateData.subscription_status = 'active'
@@ -200,7 +185,6 @@ async function handleSubscriptionUpdated(
       break
   }
 
-  // Atualizar datas
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const periodEnd = (subscription as any).current_period_end as number | undefined
   if (periodEnd) {
@@ -209,10 +193,7 @@ async function handleSubscriptionUpdated(
     updateData.next_billing_date = endsAt.toISOString()
   }
 
-  await adminClient
-    .from('daily_user')
-    .update(updateData)
-    .eq('id', dailyUser.id)
+  await updateDailyUser(dailyUser.id, updateData as Record<string, unknown>)
 
   console.log('[STRIPE WEBHOOK] Assinatura atualizada:', subscriptionId)
 }
@@ -223,28 +204,19 @@ async function handleSubscriptionUpdated(
 async function handleSubscriptionDeleted(
   subscription: Stripe.Subscription
 ) {
-  const adminClient = createAdminClient()
-  
   const subscriptionId = subscription.id
-  
-  const { data: dailyUser } = await adminClient
-    .from('daily_user')
-    .select('*')
-    .eq('payment_subscription_id', subscriptionId)
-    .single()
+
+  const dailyUser = await getDailyUserByPaymentSubscriptionId(subscriptionId)
 
   if (!dailyUser) {
     console.warn('[STRIPE WEBHOOK] Usuário não encontrado para subscription cancelada:', subscriptionId)
     return
   }
 
-  await adminClient
-    .from('daily_user')
-    .update({
-      subscription_status: 'cancelled',
-      payment_status: 'cancelled',
-    })
-    .eq('id', dailyUser.id)
+  await updateDailyUser(dailyUser.id, {
+    subscription_status: 'cancelled',
+    payment_status: 'cancelled',
+  })
 
   console.log('[STRIPE WEBHOOK] Assinatura cancelada:', subscriptionId)
 }
@@ -253,35 +225,25 @@ async function handleSubscriptionDeleted(
  * Handler para invoice pago
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  const adminClient = createAdminClient()
-  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscriptionId = (invoice as any).subscription as string | null | undefined
   if (!subscriptionId) return
 
-  const { data: dailyUser } = await adminClient
-    .from('daily_user')
-    .select('*')
-    .eq('payment_subscription_id', subscriptionId)
-    .single()
+  const dailyUser = await getDailyUserByPaymentSubscriptionId(subscriptionId)
 
   if (!dailyUser) {
     console.warn('[STRIPE WEBHOOK] Usuário não encontrado para invoice pago:', invoice.id)
     return
   }
 
-  // Atualizar próxima data de cobrança
   if (invoice.period_end) {
     const nextBilling = new Date(invoice.period_end * 1000)
-    await adminClient
-      .from('daily_user')
-      .update({
-        payment_status: 'paid',
-        subscription_status: 'active',
-        subscription_ends_at: nextBilling.toISOString(),
-        next_billing_date: nextBilling.toISOString(),
-      })
-      .eq('id', dailyUser.id)
+    await updateDailyUser(dailyUser.id, {
+      payment_status: 'paid',
+      subscription_status: 'active',
+      subscription_ends_at: nextBilling.toISOString(),
+      next_billing_date: nextBilling.toISOString(),
+    })
   }
 
   console.log('[STRIPE WEBHOOK] Invoice pago:', invoice.id)
@@ -291,29 +253,20 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
  * Handler para falha no pagamento
  */
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
-  const adminClient = createAdminClient()
-  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscriptionId = (invoice as any).subscription as string | null | undefined
   if (!subscriptionId) return
 
-  const { data: dailyUser } = await adminClient
-    .from('daily_user')
-    .select('*')
-    .eq('payment_subscription_id', subscriptionId)
-    .single()
+  const dailyUser = await getDailyUserByPaymentSubscriptionId(subscriptionId)
 
   if (!dailyUser) {
     console.warn('[STRIPE WEBHOOK] Usuário não encontrado para invoice com falha:', invoice.id)
     return
   }
 
-  await adminClient
-    .from('daily_user')
-    .update({
-      payment_status: 'failed',
-    })
-    .eq('id', dailyUser.id)
+  await updateDailyUser(dailyUser.id, {
+    payment_status: 'failed',
+  })
 
   console.log('[STRIPE WEBHOOK] Falha no pagamento:', invoice.id)
 }

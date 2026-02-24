@@ -6,7 +6,7 @@ import { DailyUser } from '@/lib/types'
 // Tipo simplificado de usuário (sem Supabase Auth)
 interface AuthUser {
   id: number
-  email: string
+  phone: string
   isAdmin: boolean
 }
 
@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const result = await response.json()
         setUser(result.user ? {
           id: result.user.id,
-          email: result.user.email,
+          phone: result.user.phone,
           isAdmin: result.user.is_admin,
         } : null)
         setDailyUser(result.dailyUser || null)
