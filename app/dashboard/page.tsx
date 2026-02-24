@@ -4,9 +4,6 @@ import DashboardContent from '@/components/DashboardContent'
 import DashboardSkeleton from '@/components/DashboardSkeleton'
 import { getDashboardData } from '@/lib/server/queries'
 
-interface PageProps {
-  searchParams: Promise<{ id?: string }>
-}
 
 import { getSession } from '@/lib/server-auth'
 

@@ -6,7 +6,6 @@ import { getWhatsAppProfile, WAHAProfile } from '@/lib/waha'
 import { DailyUser, DailyData } from '@/lib/types'
 import ActivityTable from './ActivityTable'
 import Card from './ui/Card'
-import Alert from './ui/Alert'
 import Skeleton from './ui/Skeleton'
 import TrialBanner from './TrialBanner'
 import { PieChart, Layers, CheckCircle2, Phone, Calendar, UserPlus, TrendingUp, AlertCircle } from 'lucide-react'
@@ -22,7 +21,7 @@ export default function DashboardContent({ initialData }: DashboardContentProps)
   // Usar dados pré-carregados como estado inicial
   const [user] = useState<DailyUser | null>(initialData?.user || null)
   const [activities] = useState<DailyData[]>(initialData?.activities || [])
-  const [loading, setLoading] = useState(!initialData)
+  const [loading] = useState(!initialData)
   const [waProfile, setWaProfile] = useState<WAHAProfile | null>(null)
 
 

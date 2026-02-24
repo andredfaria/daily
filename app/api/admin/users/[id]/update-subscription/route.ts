@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionFromCookies } from '@/lib/auth-jwt'
-import { getDailyUserById, updateSubscription } from '@/lib/db/daily_user'
+import { updateSubscription } from '@/lib/db/daily_user'
 
 export async function POST(
     request: NextRequest,

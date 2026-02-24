@@ -19,6 +19,6 @@ export function createAdminClient(): never {
   )
 }
 
-export async function isUserAdmin(_authUserId: string): Promise<boolean> {
+export async function isUserAdmin(): Promise<boolean> {
   throw new Error('isUserAdmin foi removido. Use getDailyUserById de lib/db/daily_user.ts')
 }

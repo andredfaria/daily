@@ -3,7 +3,6 @@ import { stripe } from '@/lib/stripe'
 import Stripe from 'stripe'
 import { SubscriptionUpdateData } from '@/lib/types'
 import {
-  getDailyUserById,
   getDailyUserByPaymentSubscriptionId,
   getDailyUserByPaymentCustomerOrSubscription,
   updateDailyUser
