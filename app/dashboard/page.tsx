@@ -8,9 +8,11 @@ interface PageProps {
   searchParams: Promise<{ id?: string }>
 }
 
-export default async function DashboardPage({ searchParams }: PageProps) {
-  const params = await searchParams
-  const userId = params.id
+import { getSession } from '@/lib/server-auth'
+
+export default async function DashboardPage() {
+  const session = await getSession()
+  const userId = session?.userId
 
   // Pré-carregar dados no servidor se tiver userId
   let initialData = null
@@ -27,7 +29,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       <Navbar title="Dashboard" />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
         <Suspense fallback={<DashboardSkeleton />}>
-          <DashboardContent userId={userId} initialData={initialData} />
+          <DashboardContent initialData={initialData} />
         </Suspense>
       </main>
     </div>

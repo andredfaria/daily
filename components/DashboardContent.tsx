@@ -12,31 +12,19 @@ import TrialBanner from './TrialBanner'
 import { PieChart, Layers, CheckCircle2, Phone, Calendar, UserPlus, TrendingUp, AlertCircle } from 'lucide-react'
 
 interface DashboardContentProps {
-  userId?: string
   initialData?: {
     user: DailyUser
     activities: DailyData[]
   } | null
 }
 
-export default function DashboardContent({ userId, initialData }: DashboardContentProps) {
+export default function DashboardContent({ initialData }: DashboardContentProps) {
   // Usar dados pré-carregados como estado inicial
   const [user] = useState<DailyUser | null>(initialData?.user || null)
   const [activities] = useState<DailyData[]>(initialData?.activities || [])
-  const [loading, setLoading] = useState(!initialData && !!userId)
+  const [loading, setLoading] = useState(!initialData)
   const [waProfile, setWaProfile] = useState<WAHAProfile | null>(null)
 
-  // Se não tiver dados iniciais e tiver userId, buscar dados
-  useEffect(() => {
-    if (!initialData && userId) {
-      // Importar dinamicamente para evitar bundle no servidor
-      import('@/lib/hooks').then(() => {
-        // Aqui você pode implementar a lógica de fetch se necessário
-        // Por enquanto, vamos manter o loading como false se não tiver dados
-        setLoading(false)
-      })
-    }
-  }, [initialData, userId])
 
   // Buscar perfil WhatsApp em paralelo (não bloqueia renderização)
   useEffect(() => {
@@ -91,18 +79,7 @@ export default function DashboardContent({ userId, initialData }: DashboardConte
 
   // Se não carregou usuário e não está carregando, mostra erro ou empty state
   if (!user) {
-    if (userId) {
-      return (
-        <Alert variant="error" title="Usuário não encontrado" className="max-w-2xl mx-auto mt-10">
-          <p>Verifique se o ID na URL está correto.</p>
-          <p className="mt-2 text-sm text-slate-400">
-            Se você acabou de fazer login, aguarde alguns instantes enquanto sua conta é vinculada.
-          </p>
-        </Alert>
-      )
-    }
-
-    // Se não tem userId e não achou usuário (não logado?)
+    // Se não achou usuário (não logado?)
     // O middleware deve tratar redirecionamento, mas por segurança:
     return (
       <Card className="text-center py-20 bg-slate-900/50 border-slate-800">

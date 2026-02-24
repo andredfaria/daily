@@ -39,7 +39,7 @@ export default function Navbar({ title, showBack = false }: NavbarProps) {
                 {title}
               </div>
             )}
-            {!showBack && (
+            {isAdmin() && !showBack && (
               <Link
                 href="/users"
                 className={cn(
@@ -49,6 +49,19 @@ export default function Navbar({ title, showBack = false }: NavbarProps) {
               >
                 <Users className="w-4 h-4" />
                 <span className="hidden sm:inline">Usuários</span>
+              </Link>
+            )}
+
+            {user && (
+              <Link
+                href="/user"
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium',
+                  'text-slate-300 hover:text-white hover:bg-slate-800'
+                )}
+              >
+                <UserIcon className="w-4 h-4" />
+                <span className="hidden sm:inline">Minha Conta</span>
               </Link>
             )}
 
