@@ -21,11 +21,13 @@ export function getPool(): mysql.Pool {
   return pool
 }
 
+export type DBValue = string | number | boolean | Date | null
+
 /**
  * Executa uma query e retorna as linhas resultantes.
  * Uso: const rows = await query('SELECT * FROM daily_user WHERE id = ?', [id])
  */
-export async function query<T>(sql: string, values: (string | number | boolean | Date | null)[] = []): Promise<T[]> {
+export async function query<T>(sql: string, values: DBValue[] = []): Promise<T[]> {
   const pool = getPool()
   const [rows] = await pool.execute(sql, values)
   return rows as T[]
@@ -35,8 +37,9 @@ export async function query<T>(sql: string, values: (string | number | boolean |
  * Executa uma query de mutação (INSERT, UPDATE, DELETE).
  * Retorna o ResultSetHeader com insertId, affectedRows, etc.
  */
-export async function execute(sql: string, values: (string | number | boolean | Date | null)[] = []): Promise<mysql.ResultSetHeader> {
+export async function execute(sql: string, values: DBValue[] = []): Promise<mysql.ResultSetHeader> {
   const pool = getPool()
   const [result] = await pool.execute(sql, values)
   return result as mysql.ResultSetHeader
 }
+

@@ -1,4 +1,4 @@
-import { query, execute } from '@/lib/mysql'
+import { query, execute, DBValue } from '@/lib/mysql'
 import { DailyUser, SubscriptionUpdateData } from '@/lib/types'
 
 // ─── Busca por auth ───────────────────────────────────────────
@@ -76,7 +76,7 @@ export async function createDailyUser(data: CreateUserData): Promise<DailyUser> 
 
 export async function updateDailyUser(id: number, data: Partial<DailyUser & { password_hash?: string }>): Promise<void> {
     const fields: string[] = []
-    const values: unknown[] = []
+    const values: DBValue[] = []
 
     const allowed = [
         'name', 'email', 'password_hash', 'phone', 'title', 'option',
@@ -91,7 +91,7 @@ export async function updateDailyUser(id: number, data: Partial<DailyUser & { pa
             fields.push(`${key} = ?`)
             const val = (data as Record<string, unknown>)[key]
             // Converte boolean para tinyint
-            values.push(typeof val === 'boolean' ? (val ? 1 : 0) : val)
+            values.push((typeof val === 'boolean' ? (val ? 1 : 0) : val) as DBValue)
         }
     }
 
@@ -174,7 +174,7 @@ export async function deleteDailyUser(id: number): Promise<void> {
 export async function insertDailyUserSimple(data: Record<string, unknown>): Promise<DailyUser> {
     const fields: string[] = []
     const placeholders: string[] = []
-    const values: unknown[] = []
+    const values: DBValue[] = []
 
     const allowed = [
         'name', 'email', 'phone', 'title', 'option',
@@ -186,7 +186,7 @@ export async function insertDailyUserSimple(data: Record<string, unknown>): Prom
             fields.push(key)
             placeholders.push('?')
             const val = data[key]
-            values.push(typeof val === 'boolean' ? (val ? 1 : 0) : val)
+            values.push((typeof val === 'boolean' ? (val ? 1 : 0) : val) as DBValue)
         }
     }
 
