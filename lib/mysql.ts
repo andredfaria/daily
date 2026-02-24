@@ -1,4 +1,4 @@
-import mysql from 'mysql2/promise'
+import * as mysql from 'mysql2/promise'
 
 // Pool de conexões MySQL reutilizável
 let pool: mysql.Pool | null = null
@@ -25,7 +25,7 @@ export function getPool(): mysql.Pool {
  * Executa uma query e retorna as linhas resultantes.
  * Uso: const rows = await query('SELECT * FROM daily_user WHERE id = ?', [id])
  */
-export async function query<T>(sql: string, values: unknown[] = []): Promise<T[]> {
+export async function query<T>(sql: string, values: (string | number | boolean | Date | null)[] = []): Promise<T[]> {
   const pool = getPool()
   const [rows] = await pool.execute(sql, values)
   return rows as T[]
@@ -35,7 +35,7 @@ export async function query<T>(sql: string, values: unknown[] = []): Promise<T[]
  * Executa uma query de mutação (INSERT, UPDATE, DELETE).
  * Retorna o ResultSetHeader com insertId, affectedRows, etc.
  */
-export async function execute(sql: string, values: unknown[] = []): Promise<mysql.ResultSetHeader> {
+export async function execute(sql: string, values: (string | number | boolean | Date | null)[] = []): Promise<mysql.ResultSetHeader> {
   const pool = getPool()
   const [result] = await pool.execute(sql, values)
   return result as mysql.ResultSetHeader
