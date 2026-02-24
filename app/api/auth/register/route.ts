@@ -1,5 +1,7 @@
-import { createClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+import bcrypt from 'bcryptjs'
+import { getDailyUserByEmail, createDailyUser } from '@/lib/db/daily_user'
+import { signToken, setSessionCookie } from '@/lib/auth-jwt'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,246 +14,84 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
-
-    console.log('📝 Criando usuário...')
-
-    // Criar usuário com signUp
-    // emailRedirectTo: null desabilita o envio de email de confirmação
-    // A confirmação será feita automaticamente via Admin API
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: undefined, // Desabilita envio de email de confirmação
-        data: {
-          name: name || email.split('@')[0],
-          phone: phone || null,
-        },
-      },
-    })
-
-    if (error) {
-      console.error('❌ Erro ao criar usuário:', error)
+    if (password.length < 6) {
       return NextResponse.json(
-        { error: error.message },
+        { error: 'A senha deve ter no mínimo 6 caracteres' },
         { status: 400 }
       )
     }
 
-    if (!data.user) {
+    // Verificar se email já existe
+    const existing = await getDailyUserByEmail(email)
+    if (existing) {
       return NextResponse.json(
-        { error: 'Erro ao criar usuário' },
-        { status: 500 }
+        { error: 'Este email já está cadastrado' },
+        { status: 400 }
       )
     }
 
-    console.log('✅ Usuário criado:', {
-      id: data.user.id,
-      email: data.user.email,
-      email_confirmed_at: data.user.email_confirmed_at,
+    // Hash da senha
+    const password_hash = await bcrypt.hash(password, 12)
+
+    // Criar usuário no MySQL
+    const user = await createDailyUser({
+      name: name || email.split('@')[0],
+      email,
+      password_hash,
+      phone: phone || null,
+      is_admin: false,
+      subscription_status: 'trial',
     })
 
-    // Usar Admin Client para confirmar email automaticamente e criar daily_user
-    const { createAdminClient } = await import('@/lib/supabase-admin')
-    const adminClient = createAdminClient()
-
-    // Auto-confirmar email usando Admin API
-    // IMPORTANTE: A confirmação deve ser feita ANTES de criar o daily_user
-    let emailConfirmed = false
-    try {
-      const { error: confirmError } = await adminClient.auth.admin.updateUserById(
-        data.user.id,
-        { email_confirm: true }
-      )
-
-      if (confirmError) {
-        console.error('⚠️ Erro ao confirmar email:', confirmError)
-        // Se a confirmação falhar, retornar erro pois é crítica para o fluxo
-        return NextResponse.json(
-          { error: 'Erro ao confirmar email. Tente novamente.' },
-          { status: 500 }
-        )
-      }
-
-      // Verificar se a confirmação foi bem-sucedida
-      const { data: updatedUser, error: getUserError } = await adminClient.auth.admin.getUserById(data.user.id)
-      
-      if (getUserError) {
-        console.error('⚠️ Erro ao verificar confirmação de email:', getUserError)
-        return NextResponse.json(
-          { error: 'Erro ao verificar confirmação de email. Tente novamente.' },
-          { status: 500 }
-        )
-      }
-
-      if (updatedUser?.user?.email_confirmed_at) {
-        emailConfirmed = true
-        console.log('✅ Email confirmado automaticamente:', {
-          email_confirmed_at: updatedUser.user.email_confirmed_at,
-        })
-      } else {
-        console.error('⚠️ Email não foi confirmado - email_confirmed_at está null')
-        return NextResponse.json(
-          { error: 'Falha na confirmação automática de email. Tente novamente.' },
-          { status: 500 }
-        )
-      }
-    } catch (err) {
-      console.error('⚠️ Erro no processo de confirmação de email:', err)
-      return NextResponse.json(
-        { error: 'Erro ao processar confirmação de email. Tente novamente.' },
-        { status: 500 }
-      )
-    }
-
-    let dailyUser = null
-    try {
-      // Tentar garantir vinculação usando a função ensureDailyUserLink
-      // Esta função cria o daily_user se não existir
-      const { ensureDailyUserLink } = await import('@/lib/supabase-admin')
-      try {
-        dailyUser = await ensureDailyUserLink(data.user.id, {
-          name: name || email.split('@')[0],
-          phone: phone || null,
-        })
-        console.log('✅ daily_user garantido/criado com sucesso')
-      } catch (linkError) {
-        console.error('[REGISTER] Erro ao garantir vinculação via ensureDailyUserLink:', linkError)
-        
-        // Fallback: tentar criar diretamente via upsert
-        try {
-          const { data: createdDailyUser, error: dbError } = await adminClient
-            .from('daily_user')
-            .upsert({
-              auth_user_id: data.user.id,
-              name: name || email.split('@')[0],
-              phone: phone || null,
-            }, {
-              onConflict: 'auth_user_id',
-              ignoreDuplicates: false
-            })
-            .select()
-            .single()
-
-          if (dbError) {
-            console.error('[REGISTER] Erro ao criar daily_user via upsert:', dbError)
-            // Não retornamos erro para o usuário pois o Auth foi criado
-            // O usuário poderá completar o cadastro depois ou o suporte resolver
-          } else {
-            dailyUser = createdDailyUser
-            console.log('✅ daily_user criado via upsert com sucesso')
-          }
-        } catch (upsertError) {
-          console.error('[REGISTER] Erro no processo de criação do daily_user via upsert:', upsertError)
-          // Não falha o registro, mas loga o erro para debug
-        }
-      }
-    } catch (err) {
-      console.error('[REGISTER] Erro geral no processo de criação do daily_user:', err)
-      // Não falha o registro, mas loga o erro
-    }
-
-    // Enviar webhook após criação do usuário (se configurado)
+    // Enviar webhook após criação (se configurado)
     const webhookUrl = process.env.USER_CREATED_WEBHOOK_URL
-    if (webhookUrl && dailyUser) {
+    if (webhookUrl) {
       try {
         await fetch(webhookUrl, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'DailySync/1.0',
-          },
+          headers: { 'Content-Type': 'application/json', 'User-Agent': 'DailySync/1.0' },
           body: JSON.stringify({
             event: 'user.created',
             timestamp: new Date().toISOString(),
             user: {
-              id: data.user.id,
-              email: data.user.email,
-              name: name || email.split('@')[0],
-              phone: phone || null,
-              daily_user_id: dailyUser.id,
-              created_at: new Date().toISOString(),
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              phone: user.phone,
               subscription_status: 'trial',
-              trial_ends_at: dailyUser.trial_ends_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              trial_ends_at: user.trial_ends_at,
               is_admin: false,
             },
           }),
         })
-        console.log('✅ Webhook enviado com sucesso')
-      } catch (webhookError) {
-        // Log error mas não falha o cadastro
-        console.error('⚠️ Erro ao enviar webhook:', webhookError)
+      } catch (err) {
+        console.error('[REGISTER] Erro ao enviar webhook:', err)
       }
     }
 
-    // Fazer login automático após cadastro e confirmação de email
-    // IMPORTANTE: Só tentar login se o email foi confirmado com sucesso
-    if (!emailConfirmed) {
-      console.error('⚠️ Tentativa de login sem confirmação de email')
-      return NextResponse.json(
-        { error: 'Email não confirmado. Tente novamente.' },
-        { status: 500 }
-      )
-    }
+    // Login automático após cadastro
+    const token = await signToken({
+      userId: user.id,
+      email: user.email!,
+      isAdmin: false,
+    })
 
-    let session = null
-    try {
-      console.log('🔄 Tentando login automático após cadastro...')
-      const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+    await setSessionCookie(token)
 
-      if (sessionError) {
-        console.error('⚠️ Erro ao fazer login automático:', sessionError)
-        // Retorna sucesso mas sem sessão - usuário precisa fazer login manual
-        // Isso pode acontecer se houver algum delay na propagação da confirmação
-        return NextResponse.json({
-          user: data.user,
-          message: 'Usuário criado e confirmado com sucesso. Faça login para continuar.',
-          requiresLogin: true,
-          emailConfirmed: true,
-        })
-      }
-
-      if (!sessionData?.session) {
-        console.error('⚠️ Login automático retornou sem sessão')
-        return NextResponse.json({
-          user: data.user,
-          message: 'Usuário criado e confirmado com sucesso. Faça login para continuar.',
-          requiresLogin: true,
-          emailConfirmed: true,
-        })
-      }
-
-      session = sessionData.session
-      console.log('✅ Login automático realizado com sucesso', {
-        user_id: session.user.id,
-        expires_at: session.expires_at,
-      })
-    } catch (loginError) {
-      console.error('⚠️ Erro no processo de login automático:', loginError)
-      // Retorna sucesso mas sem sessão - usuário precisa fazer login manual
-      return NextResponse.json({
-        user: data.user,
-        message: 'Usuário criado e confirmado com sucesso. Faça login para continuar.',
-        requiresLogin: true,
-        emailConfirmed: true,
-      })
-    }
-
-    // Retornar sessão para o frontend fazer o redirecionamento
     return NextResponse.json({
-      user: data.user,
-      session: session,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        is_admin: user.is_admin,
+        subscription_status: user.subscription_status,
+        trial_ends_at: user.trial_ends_at,
+      },
       message: 'Conta criada com sucesso!',
       requiresLogin: false,
-      emailConfirmed: true,
-      dailyUser: dailyUser,
     })
   } catch (err) {
-    console.error('Erro no registro:', err)
+    console.error('[REGISTER] Erro:', err)
     return NextResponse.json(
       { error: 'Erro ao criar usuário' },
       { status: 500 }

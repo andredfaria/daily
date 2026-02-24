@@ -16,12 +16,12 @@ export interface UserOptions {
 export interface DailyUser {
   id: number
   created_at: string
+  name: string | null
+  email: string | null           // email do usuário (login)
   phone: string | null
   title: string | null
-  name: string | null
   time_to_send: number | null
-  option: string | null  // JSON stringified array de strings: ["⏰ Item 1", "💪 Item 2"] - Enquete WhatsApp
-  auth_user_id: string | null  // UUID do Supabase Auth - UNIQUE, nullable
+  option: string | null  // JSON stringified array de strings: ["⏰ Item 1", "💪 Item 2"]
   is_admin: boolean  // Flag de administrador
   subscription_status?: 'trial' | 'active' | 'cancelled' | 'expired'
   trial_ends_at?: string
@@ -32,6 +32,8 @@ export interface DailyUser {
   payment_subscription_id?: string
   payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled'
   next_billing_date?: string
+  reset_token?: string | null
+  reset_token_expires_at?: string | null
 }
 
 // Alias para compatibilidade

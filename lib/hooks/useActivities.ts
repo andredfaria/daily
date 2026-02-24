@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
 import { DailyData } from '@/lib/types'
 
 interface UseActivitiesOptions {
@@ -24,7 +23,7 @@ interface UseActivitiesReturn {
 }
 
 /**
- * Hook para buscar atividades de um usuário com estatísticas
+ * Hook para buscar atividades de um usuário via /api/daily-data
  */
 export function useActivities(options: UseActivitiesOptions): UseActivitiesReturn {
   const {
@@ -49,15 +48,17 @@ export function useActivities(options: UseActivitiesOptions): UseActivitiesRetur
       setLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await supabase
-        .from('daily_data')
-        .select('*')
-        .eq('id_user', userId)
-        .order(orderBy, { ascending: orderDirection === 'asc' })
+      const params = new URLSearchParams({
+        userId: String(userId),
+        orderBy,
+        orderDirection,
+      })
 
-      if (fetchError) throw fetchError
+      const response = await fetch(`/api/daily-data?${params}`)
+      if (!response.ok) throw new Error(`Erro ao buscar atividades: ${response.status}`)
 
-      setActivities((data as DailyData[]) || [])
+      const data = await response.json()
+      setActivities(data.activities || [])
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err))
       setError(error)
@@ -74,7 +75,6 @@ export function useActivities(options: UseActivitiesOptions): UseActivitiesRetur
     }
   }, [autoLoad, fetchActivities])
 
-  // Calcular estatísticas
   const stats = {
     total: activities.length,
     completed: activities.filter(a => a.check_status).length,
@@ -84,11 +84,5 @@ export function useActivities(options: UseActivitiesOptions): UseActivitiesRetur
         : 0,
   }
 
-  return {
-    activities,
-    loading,
-    error,
-    refetch: fetchActivities,
-    stats,
-  }
+  return { activities, loading, error, refetch: fetchActivities, stats }
 }

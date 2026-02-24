@@ -1,60 +1,59 @@
-import { createClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+import bcrypt from 'bcryptjs'
+import { getUserByResetToken, updateUserPassword, clearResetToken } from '@/lib/db/daily_user'
+import { signToken, setSessionCookie } from '@/lib/auth-jwt'
 
+// POST /api/auth/verify — redefinir senha com token
 export async function POST(request: NextRequest) {
     try {
-        const { token, type } = await request.json()
+        const body = await request.json()
+        const { token, password } = body
 
-        if (!token || !type) {
+        if (!token || !password) {
             return NextResponse.json(
-                { error: 'Token e tipo são obrigatórios' },
+                { error: 'Token e nova senha são obrigatórios' },
                 { status: 400 }
             )
         }
 
-        const supabase = await createClient()
-
-        console.log('🔍 Verificando email com token...')
-
-        // Verificar o token usando o método verifyOtp
-        const { data, error } = await supabase.auth.verifyOtp({
-            token_hash: token,
-            type: type as 'signup' | 'email',
-        })
-
-        if (error) {
-            console.error('❌ Erro ao verificar email:', error)
+        if (password.length < 6) {
             return NextResponse.json(
-                { error: error.message || 'Erro ao verificar email' },
+                { error: 'A senha deve ter no mínimo 6 caracteres' },
                 { status: 400 }
             )
         }
 
-        if (!data.user) {
+        // Buscar usuário pelo token
+        const user = await getUserByResetToken(token)
+
+        if (!user) {
             return NextResponse.json(
-                { error: 'Usuário não encontrado' },
-                { status: 404 }
+                { error: 'Token inválido ou expirado' },
+                { status: 400 }
             )
         }
 
-        console.log('✅ Email verificado com sucesso:', {
-            id: data.user.id,
-            email: data.user.email,
-            email_confirmed_at: data.user.email_confirmed_at,
+        // Atualizar senha
+        const passwordHash = await bcrypt.hash(password, 12)
+        await updateUserPassword(user.id, passwordHash)
+        await clearResetToken(user.id)
+
+        // Login automático após reset
+        const jwtToken = await signToken({
+            userId: user.id,
+            email: user.email!,
+            isAdmin: Boolean(user.is_admin),
         })
+        await setSessionCookie(jwtToken)
 
         return NextResponse.json({
-            message: 'Email verificado com sucesso',
-            user: {
-                id: data.user.id,
-                email: data.user.email,
-                email_confirmed_at: data.user.email_confirmed_at,
-            },
+            message: 'Senha redefinida com sucesso',
+            user: { id: user.id, email: user.email },
         })
     } catch (err) {
-        console.error('❌ Erro no processo de verificação:', err)
+        console.error('[VERIFY/RESET] Erro:', err)
         return NextResponse.json(
-            { error: 'Erro ao verificar email' },
+            { error: 'Erro ao redefinir senha' },
             { status: 500 }
         )
     }

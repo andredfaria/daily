@@ -1,6 +1,6 @@
-import { createAdminClient } from '@/lib/supabase-admin'
-import { createClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getSessionFromCookies } from '@/lib/auth-jwt'
+import { getDailyUserById, updateSubscription } from '@/lib/db/daily_user'
 
 export async function POST(
     request: NextRequest,
@@ -10,38 +10,19 @@ export async function POST(
         const { id } = await params
         const { subscription_status, trial_ends_at } = await request.json()
 
-        // Verificar se quem está chamando é admin
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const session = await getSessionFromCookies()
+        if (!session) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+        if (!session.isAdmin) return NextResponse.json({ error: 'Permissões insuficientes' }, { status: 403 })
 
-        if (!user) {
-            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+        const targetUserId = parseInt(id)
+        if (isNaN(targetUserId)) {
+            return NextResponse.json({ error: 'ID de usuário inválido' }, { status: 400 })
         }
 
-        // Usar Admin Client para verificar permissão do autor
-        const adminClient = createAdminClient()
-        const { data: authorUser, error: authorError } = await adminClient
-            .from('daily_user')
-            .select('is_admin')
-            .eq('auth_user_id', user.id)
-            .single()
-
-        if (authorError || !authorUser?.is_admin) {
-            return NextResponse.json({ error: 'Permissões insuficientes' }, { status: 403 })
-        }
-
-        // Atualizar daily_user alvo
-        const { error: updateError } = await adminClient
-            .from('daily_user')
-            .update({
-                subscription_status,
-                trial_ends_at: trial_ends_at || null,
-            })
-            .eq('id', parseInt(id))
-
-        if (updateError) {
-            throw updateError
-        }
+        await updateSubscription(targetUserId, {
+            subscription_status,
+            ...(trial_ends_at !== undefined ? { trial_ends_at } : {}),
+        })
 
         return NextResponse.json({ message: 'Assinatura atualizada com sucesso' })
     } catch (error) {

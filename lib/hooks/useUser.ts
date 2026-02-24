@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
 
 interface UseUserReturn {
@@ -12,11 +11,12 @@ interface UseUserReturn {
 }
 
 /**
- * Hook para buscar e gerenciar um usuário específico
+ * Hook para buscar um usuário específico pelo ID via /api/users/[id]
+ * Se userId não for fornecido, busca o usuário autenticado via /api/auth/me
  */
 export function useUser(userId: string | number | null | undefined): UseUserReturn {
   const [user, setUser] = useState<DailyUser | null>(null)
-  const [loading, setLoading] = useState(!!userId)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
   const fetchUser = useCallback(async () => {
@@ -24,30 +24,29 @@ export function useUser(userId: string | number | null | undefined): UseUserRetu
       setLoading(true)
       setError(null)
 
-      let query = supabase.from('daily_user').select('*')
+      let response: Response
 
       if (userId) {
-        // Se ID fornecido, buscar por ID específico
-        query = query.eq('id', userId)
+        response = await fetch(`/api/users/${userId}`)
       } else {
-        // Se sem ID, buscar usuário autenticado
-        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+        response = await fetch('/api/auth/me')
+      }
 
-        if (authError || !authUser) {
-          // Se não estiver logado e não tem ID, não é erro, apenas sem dados
+      if (!response.ok) {
+        if (response.status === 404) {
           setUser(null)
           return
         }
-
-        query = query.eq('auth_user_id', authUser.id)
+        if (response.status === 401) {
+          setUser(null)
+          return
+        }
+        throw new Error(`Erro ao buscar usuário: ${response.status}`)
       }
 
-      const { data, error: fetchError } = await query.single()
-
-      if (fetchError) throw fetchError
-      if (!data) throw new Error('Usuário não encontrado')
-
-      setUser(data as DailyUser)
+      const data = await response.json()
+      // /api/auth/me retorna { user, dailyUser }, /api/users/[id] retorna o user diretamente
+      setUser(data.dailyUser || data || null)
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err))
       setError(error)
@@ -62,10 +61,5 @@ export function useUser(userId: string | number | null | undefined): UseUserRetu
     fetchUser()
   }, [fetchUser])
 
-  return {
-    user,
-    loading,
-    error,
-    refetch: fetchUser,
-  }
+  return { user, loading, error, refetch: fetchUser }
 }

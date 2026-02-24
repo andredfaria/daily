@@ -1,5 +1,7 @@
-import { createClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+import bcrypt from 'bcryptjs'
+import { getDailyUserByEmail } from '@/lib/db/daily_user'
+import { signToken, setSessionCookie } from '@/lib/auth-jwt'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,63 +14,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    // Buscar usuário pelo email
+    const user = await getDailyUserByEmail(email)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
+    if (!user) {
       return NextResponse.json(
-        { error: error.message },
+        { error: 'Email ou senha inválidos' },
         { status: 401 }
       )
     }
 
-    // Buscar informações do daily_user para redirecionamento inteligente
-    let dailyUser = null
-    if (data.user) {
-      try {
-        const { data: userData, error: userError } = await supabase
-          .from('daily_user')
-          .select('id, is_admin, subscription_status, trial_ends_at, subscription_ends_at')
-          .eq('auth_user_id', data.user.id)
-          .single()
-
-        if (!userError && userData) {
-          dailyUser = userData
-        } else {
-          // Se não encontrou daily_user, garantir vinculação
-          console.log('[LOGIN] daily_user não encontrado, garantindo vinculação...')
-          const { ensureDailyUserLink } = await import('@/lib/supabase-admin')
-          try {
-            const createdDailyUser = await ensureDailyUserLink(data.user.id, data.user.user_metadata)
-            dailyUser = {
-              id: createdDailyUser.id,
-              is_admin: createdDailyUser.is_admin,
-              subscription_status: createdDailyUser.subscription_status,
-              trial_ends_at: createdDailyUser.trial_ends_at,
-              subscription_ends_at: createdDailyUser.subscription_ends_at,
-            }
-            console.log('[LOGIN] daily_user criado/vinculado com sucesso')
-          } catch (linkError) {
-            console.error('[LOGIN] Erro ao garantir vinculação:', linkError)
-            // Não falha o login, mas loga o erro
-          }
-        }
-      } catch (err) {
-        // Log mas não falha o login
-        console.error('[LOGIN] Erro ao buscar daily_user:', err)
-      }
+    // Verificar senha
+    const rawUser = user as typeof user & { password_hash?: string }
+    if (!rawUser.password_hash) {
+      return NextResponse.json(
+        { error: 'Conta sem senha configurada. Use o reset de senha.' },
+        { status: 401 }
+      )
     }
 
-    return NextResponse.json({
-      user: data.user,
-      session: data.session,
-      dailyUser: dailyUser,
+    const passwordValid = await bcrypt.compare(password, rawUser.password_hash)
+    if (!passwordValid) {
+      return NextResponse.json(
+        { error: 'Email ou senha inválidos' },
+        { status: 401 }
+      )
+    }
+
+    // Gerar JWT e setar cookie
+    const token = await signToken({
+      userId: user.id,
+      email: user.email!,
+      isAdmin: Boolean(user.is_admin),
     })
-  } catch {
+
+    await setSessionCookie(token)
+
+    return NextResponse.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        is_admin: user.is_admin,
+        subscription_status: user.subscription_status,
+        trial_ends_at: user.trial_ends_at,
+      },
+      dailyUser: user,
+    })
+  } catch (err) {
+    console.error('[LOGIN] Erro:', err)
     return NextResponse.json(
       { error: 'Erro ao fazer login' },
       { status: 500 }

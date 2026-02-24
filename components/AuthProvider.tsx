@@ -1,12 +1,17 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
 import { DailyUser } from '@/lib/types'
 
+// Tipo simplificado de usuário (sem Supabase Auth)
+interface AuthUser {
+  id: number
+  email: string
+  isAdmin: boolean
+}
+
 interface AuthContextType {
-  user: User | null
+  user: AuthUser | null
   dailyUser: DailyUser | null
   loading: boolean
   signOut: () => Promise<void>
@@ -20,128 +25,37 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [dailyUser, setDailyUser] = useState<DailyUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      setUser(authUser)
-
-      if (authUser) {
-        // Buscar daily_user associado
-        let dailyUserData = null
-        try {
-          const { data, error } = await supabase
-            .from('daily_user')
-            .select('*')
-            .eq('auth_user_id', authUser.id)
-            .single()
-
-          if (!error && data) {
-            dailyUserData = data
-          } else {
-            // Se não encontrou daily_user, garantir vinculação via API
-            // Usamos API para evitar problemas de CORS e permissões no client
-            console.log('[AuthProvider] daily_user não encontrado, garantindo vinculação...')
-            try {
-              const response = await fetch('/api/auth/me')
-              if (response.ok) {
-                const result = await response.json()
-                dailyUserData = result.dailyUser
-              }
-            } catch (linkError) {
-              console.error('[AuthProvider] Erro ao garantir vinculação:', linkError)
-            }
-          }
-        } catch (error) {
-          console.error('[AuthProvider] Erro ao buscar daily_user:', error)
-          // Tentar garantir vinculação como fallback
-          try {
-            const response = await fetch('/api/auth/me')
-            if (response.ok) {
-              const result = await response.json()
-              dailyUserData = result.dailyUser
-            }
-          } catch (linkError) {
-            console.error('[AuthProvider] Erro ao garantir vinculação no fallback:', linkError)
-          }
-        }
-
-        setDailyUser(dailyUserData as DailyUser)
+      const response = await fetch('/api/auth/me')
+      if (response.ok) {
+        const result = await response.json()
+        setUser(result.user ? {
+          id: result.user.id,
+          email: result.user.email,
+          isAdmin: result.user.is_admin,
+        } : null)
+        setDailyUser(result.dailyUser || null)
       } else {
+        setUser(null)
         setDailyUser(null)
       }
     } catch (error) {
-      console.error('Erro ao carregar usuário:', error)
+      console.error('[AuthProvider] Erro ao carregar usuário:', error)
       setUser(null)
       setDailyUser(null)
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadUser()
-
-    // Escutar mudanças no estado de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setUser(session?.user ?? null)
-
-        if (session?.user) {
-          // Buscar daily_user quando usuário fizer login
-          let dailyUserData = null
-          try {
-            const { data, error } = await supabase
-              .from('daily_user')
-              .select('*')
-              .eq('auth_user_id', session.user.id)
-              .single()
-
-            if (!error && data) {
-              dailyUserData = data
-            } else {
-              // Se não encontrou daily_user, garantir vinculação via API
-              console.log('[AuthProvider] daily_user não encontrado no auth state change, garantindo vinculação...')
-              try {
-                const response = await fetch('/api/auth/me')
-                if (response.ok) {
-                  const result = await response.json()
-                  dailyUserData = result.dailyUser
-                }
-              } catch (linkError) {
-                console.error('[AuthProvider] Erro ao garantir vinculação no auth state change:', linkError)
-              }
-            }
-          } catch (error) {
-            console.error('[AuthProvider] Erro ao buscar daily_user no auth state change:', error)
-            // Tentar garantir vinculação como fallback
-            try {
-              const response = await fetch('/api/auth/me')
-              if (response.ok) {
-                const result = await response.json()
-                dailyUserData = result.dailyUser
-              }
-            } catch (linkError) {
-              console.error('[AuthProvider] Erro ao garantir vinculação no fallback:', linkError)
-            }
-          }
-
-          setDailyUser(dailyUserData as DailyUser)
-        } else {
-          setDailyUser(null)
-        }
-
-        setLoading(false)
-      }
-    )
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
+  }, [loadUser])
 
   const signOut = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -149,55 +63,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setDailyUser(null)
   }
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     await loadUser()
-  }
+  }, [loadUser])
 
-  // Verifica se o usuário atual é administrador
   const isAdmin = useCallback((): boolean => {
     return dailyUser?.is_admin === true
   }, [dailyUser?.is_admin])
 
-  // Verifica se o usuário atual pode editar um determinado usuário
-  // Admin pode editar todos, não-admin pode editar apenas seus próprios dados
   const canEdit = useCallback((userId: number): boolean => {
     if (!dailyUser) return false
     if (dailyUser.is_admin) return true
     return dailyUser.id === userId
   }, [dailyUser])
 
-  // Verifica se a assinatura está ativa (trial válido ou assinatura paga)
   const isSubscriptionActive = useCallback((): boolean => {
     if (!dailyUser) return false
-
-    // Admins sempre têm acesso
     if (dailyUser.is_admin) return true
-
-    // Verificar assinatura ativa
     if (dailyUser.subscription_status === 'active') {
       if (!dailyUser.subscription_ends_at) return true
       return new Date(dailyUser.subscription_ends_at) > new Date()
     }
-
-    // Verificar trial ativo
     if (dailyUser.subscription_status === 'trial') {
       if (!dailyUser.trial_ends_at) return false
       return new Date(dailyUser.trial_ends_at) > new Date()
     }
-
     return false
   }, [dailyUser])
 
-  // Verifica se o trial está próximo de expirar (últimos 2 dias)
   const isTrialExpiringSoon = useCallback((): boolean => {
     if (!dailyUser || dailyUser.is_admin) return false
     if (dailyUser.subscription_status !== 'trial') return false
     if (!dailyUser.trial_ends_at) return false
-
     const now = new Date()
     const trialEnd = new Date(dailyUser.trial_ends_at)
     const daysRemaining = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-
     return daysRemaining <= 2 && daysRemaining > 0
   }, [dailyUser])
 

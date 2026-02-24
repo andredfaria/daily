@@ -1,41 +1,20 @@
 import { Suspense } from 'react'
 import Navbar from '@/components/Navbar'
 import SubscriptionPlans from '@/components/SubscriptionPlans'
-import { getUser } from '@/lib/supabase-server'
-import { createAdminClient } from '@/lib/supabase-admin'
+import { getCurrentDailyUser } from '@/lib/server-auth'
 import { getDaysRemaining } from '@/lib/utils/subscription'
 import Card from '@/components/ui/Card'
 import Skeleton from '@/components/ui/Skeleton'
 
 async function SubscriptionContent() {
-  const user = await getUser()
-
-  if (!user) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <Card>
-          <p className="text-center text-slate-400">
-            Você precisa estar logado para visualizar os planos.
-          </p>
-        </Card>
-      </div>
-    )
-  }
-
-  // Buscar daily_user
-  const adminClient = createAdminClient()
-  const { data: dailyUser } = await adminClient
-    .from('daily_user')
-    .select('*')
-    .eq('auth_user_id', user.id)
-    .single()
+  const dailyUser = await getCurrentDailyUser()
 
   if (!dailyUser) {
     return (
       <div className="max-w-4xl mx-auto">
         <Card>
           <p className="text-center text-slate-400">
-            Erro ao carregar informações da assinatura.
+            Você precisa estar logado para visualizar os planos.
           </p>
         </Card>
       </div>
