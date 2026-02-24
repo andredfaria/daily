@@ -12,7 +12,7 @@ interface NavbarProps {
 }
 
 export default function Navbar({ title, showBack = false }: NavbarProps) {
-  const { user, dailyUser, signOut } = useAuth()
+  const { user, dailyUser, signOut, isAdmin } = useAuth()
   const router = useRouter()
 
   const handleLogout = async () => {
