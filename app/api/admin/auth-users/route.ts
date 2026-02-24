@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getSessionFromCookies } from '@/lib/auth-jwt'
 import { listDailyUsers } from '@/lib/db/daily_user'
 

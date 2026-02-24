@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionFromCookies } from '@/lib/auth-jwt'
-import { getDailyUserById, updateDailyUser } from '@/lib/db/daily_user'
+import { getDailyUserById } from '@/lib/db/daily_user'
 
 // Vinculação de auth_user agora é o próprio ID do usuário MySQL
 // Este endpoint foi simplificado — mantido para compatibilidade
