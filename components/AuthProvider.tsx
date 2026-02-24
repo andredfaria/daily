@@ -7,6 +7,7 @@ import { DailyUser } from '@/lib/types'
 interface AuthUser {
   id: number
   phone: string
+  email?: string
   isAdmin: boolean
 }
 
@@ -37,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(result.user ? {
           id: result.user.id,
           phone: result.user.phone,
+          email: result.user.email,
           isAdmin: result.user.is_admin,
         } : null)
         setDailyUser(result.dailyUser || null)

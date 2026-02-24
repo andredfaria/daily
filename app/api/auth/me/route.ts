@@ -26,6 +26,7 @@ export async function GET() {
       user: {
         id: user.id,
         phone: user.phone,
+        email: user.email,
         is_admin: user.is_admin,
       },
       dailyUser: user,
