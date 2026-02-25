@@ -29,7 +29,7 @@ export type DBValue = string | number | boolean | Date | null
  */
 export async function query<T>(sql: string, values: DBValue[] = []): Promise<T[]> {
   const pool = getPool()
-  const [rows] = await pool.execute(sql, values)
+  const [rows] = await pool.query(sql, values)
   return rows as T[]
 }
 

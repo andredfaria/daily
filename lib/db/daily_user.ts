@@ -88,7 +88,7 @@ export async function updateDailyUser(id: number, data: Partial<DailyUser & { pa
 
     for (const key of allowed) {
         if (key in data) {
-            fields.push(`${key} = ?`)
+            fields.push(`\`${key}\` = ?`)
             const val = (data as Record<string, unknown>)[key]
             // Converte boolean para tinyint
             values.push((typeof val === 'boolean' ? (val ? 1 : 0) : val) as DBValue)

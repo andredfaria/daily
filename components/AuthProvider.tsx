@@ -33,6 +33,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadUser = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
+
+      if (response.status === 401 || response.status === 403) {
+        setUser(null)
+        setDailyUser(null)
+        // Redireciona para /login se não estiver em rota pública
+        const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password', '/']
+        const isPublic = publicPaths.some(p => window.location.pathname === p || window.location.pathname.startsWith(p + '/'))
+        if (!isPublic) {
+          window.location.href = '/login'
+        }
+        return
+      }
+
       if (response.ok) {
         const result = await response.json()
         setUser(result.user ? {
@@ -43,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } : null)
         setDailyUser(result.dailyUser || null)
       } else {
+        console.error('[AuthProvider] Erro inesperado ao buscar usuário:', response.status)
         setUser(null)
         setDailyUser(null)
       }

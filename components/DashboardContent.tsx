@@ -435,8 +435,16 @@ export default function DashboardContent({ initialData }: DashboardContentProps)
 
                         // Find activity for this option on this day
                         const dayActivity = activities.find(a => {
-                          const actDate = new Date(a.activity_date)
-                          return actDate.toISOString().split('T')[0] === dateStr && a.option === optionName
+                          const rawActDate = a.activity_date
+                          let actDateStr = ''
+
+                          if (rawActDate instanceof Date) {
+                            actDateStr = rawActDate.toISOString().split('T')[0]
+                          } else if (typeof rawActDate === 'string') {
+                            actDateStr = rawActDate.split('T')[0]
+                          }
+
+                          return actDateStr === dateStr && a.option === optionName
                         })
 
                         const isCompleted = dayActivity?.check_status === true

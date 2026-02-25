@@ -1,7 +1,9 @@
-import { createBrowserClient } from '@supabase/ssr'
+/**
+ * lib/supabase.ts — STUB DE COMPATIBILIDADE
+ *
+ * O sistema agora usa MySQL + JWT em vez do Supabase.
+ * Este arquivo não é mais utilizado em nenhuma parte ativa do sistema.
+ * Mantido apenas para evitar erros de importação caso haja referências residuais.
+ */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-// Client for use in browser (Client Components)
-export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
+export const supabase = null

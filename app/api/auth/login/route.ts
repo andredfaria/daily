@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { getDailyUserByPhone } from '@/lib/db/daily_user'
 import { signToken, setSessionCookie } from '@/lib/auth-jwt'
+import { normalizePhoneForDB, formatPhoneDisplay } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,8 +15,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Buscar usuário pelo telefone
-    const user = await getDailyUserByPhone(phone)
+    // Normalizar o número para o formato do banco: dígitos + @c.us
+    // Ex: "+55 11 99999-9999" → "5511999999999@c.us"
+    const normalizedPhone = normalizePhoneForDB(phone.trim())
+
+    // Buscar usuário pelo telefone normalizado
+    const user = await getDailyUserByPhone(normalizedPhone)
 
     if (!user) {
       return NextResponse.json(
@@ -55,7 +60,7 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         name: user.name,
-        phone: user.phone,
+        phone: formatPhoneDisplay(user.phone),
         is_admin: user.is_admin,
         subscription_status: user.subscription_status,
         trial_ends_at: user.trial_ends_at,

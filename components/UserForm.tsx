@@ -7,6 +7,7 @@ import { DailyUser } from '@/lib/types'
 import { validateName, validateTitle, validatePhone, validateSendTime, validateChecklist } from '@/lib/validations'
 import { validatePhoneWithWAHA } from '@/lib/waha'
 import { useDebounce } from '@/lib/hooks'
+import { formatPhoneDisplay } from '@/lib/utils'
 import LoadingOverlay from './LoadingOverlay'
 import SuccessMessage from './SuccessMessage'
 import AdminUserFields from './AdminUserFields'
@@ -82,15 +83,13 @@ export default function UserForm({ user, onSuccess, onCancel, embedded = false, 
   // phone: número para exibição no frontend (sem @c.us)
   // phoneChatId: chatId completo para salvar no backend (com @c.us)
   const [phone, setPhone] = useState(() => {
-    // Se user.phone contém @c.us, extrair apenas o número
-    const userPhone = user?.phone || ''
-    return userPhone.includes('@') ? userPhone.split('@')[0] : userPhone
+    // Exibir o número formatado para o usuário (+55 11 99999-9999)
+    return formatPhoneDisplay(user?.phone)
   })
   const [originalPhone, setOriginalPhone] = useState(() => {
-    const userPhone = user?.phone || ''
-    return userPhone.includes('@') ? userPhone.split('@')[0] : userPhone
+    return formatPhoneDisplay(user?.phone)
   })
-  const [phoneChatId, setPhoneChatId] = useState(user?.phone || '') // Valor original do banco
+  const [phoneChatId, setPhoneChatId] = useState(user?.phone || '') // chatId completo para salvar no banco
   const [sendTime, setSendTime] = useState(
     isEditMode ? getSendTimeFromHour(user?.time_to_send) : ''
   )

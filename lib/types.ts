@@ -44,7 +44,7 @@ export interface DailyData {
   id: number
   id_user: number
   created_at: string
-  activity_date: string
+  activity_date: string | Date
   check_status: boolean
   option?: string | null  // Campo existe no schema do banco
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionFromCookies } from '@/lib/auth-jwt'
 import { getDailyUserById, getDailyUserByPhone, updateDailyUser, deleteDailyUser } from '@/lib/db/daily_user'
+import { validatePhoneWithWAHAServer } from '@/lib/waha'
 
 /**
  * GET /api/users/[id]
@@ -44,6 +45,7 @@ export async function GET(
  * - Admin: pode editar qualquer usuário (campos seguros)
  * - Non-admin: pode editar apenas seus próprios dados (campos limitados)
  * - is_admin nunca pode ser alterado por esta rota
+ * - phone: validado com Waha quando alterado; salvo como chatId (XXXXXXXXXXX@c.us)
  */
 export async function PUT(
     request: NextRequest,
@@ -97,9 +99,25 @@ export async function PUT(
             return NextResponse.json({ error: 'Nenhum campo válido para atualizar' }, { status: 400 })
         }
 
-        // Se phone foi alterado, verificar unicidade
+        // Se phone foi alterado, validar com Waha e normalizar para chatId
         if (updateData.phone && updateData.phone !== existingUser.phone) {
-            const phoneExists = await getDailyUserByPhone(updateData.phone as string)
+            const incomingPhone = updateData.phone as string
+
+            // Validar com Waha para confirmar que o número existe no WhatsApp
+            const wahaResult = await validatePhoneWithWAHAServer(incomingPhone)
+            if (!wahaResult.isValid || !wahaResult.exists) {
+                return NextResponse.json(
+                    { error: wahaResult.error || 'Número não encontrado no WhatsApp. Verifique se o número está correto.' },
+                    { status: 400 }
+                )
+            }
+
+            // Salvar o chatId normalizado (ex: "5511999999999@c.us")
+            const normalizedChatId = wahaResult.chatId || (incomingPhone.replace(/\D/g, '') + '@c.us')
+            updateData.phone = normalizedChatId
+
+            // Verificar unicidade com o chatId normalizado
+            const phoneExists = await getDailyUserByPhone(normalizedChatId)
             if (phoneExists && phoneExists.id !== targetUserId) {
                 return NextResponse.json({ error: 'Este telefone já está em uso' }, { status: 400 })
             }

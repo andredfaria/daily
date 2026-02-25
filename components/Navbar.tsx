@@ -52,18 +52,16 @@ export default function Navbar({ title, showBack = false }: NavbarProps) {
               </Link>
             )}
 
-            {user && (
-              <Link
-                href="/user"
-                className={cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium',
-                  'text-slate-300 hover:text-white hover:bg-slate-800'
-                )}
-              >
-                <UserIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">Minha Conta</span>
-              </Link>
-            )}
+            <Link
+              href="/user"
+              className={cn(
+                'flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium',
+                'text-slate-300 hover:text-white hover:bg-slate-800'
+              )}
+            >
+              <UserIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Minha Conta</span>
+            </Link>
 
             {/* User Info and Logout */}
             {user && (

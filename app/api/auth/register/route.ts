@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { getDailyUserByEmail, getDailyUserByPhone, createDailyUser } from '@/lib/db/daily_user'
 import { signToken, setSessionCookie } from '@/lib/auth-jwt'
+import { validatePhoneWithWAHAServer } from '@/lib/waha'
+import { normalizePhoneForDB } from '@/lib/utils'
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,8 +23,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verificar se phone já existe
-    const existingByPhone = await getDailyUserByPhone(phone)
+    // Validar o número com a API do Waha antes de criar o usuário
+    const wahaResult = await validatePhoneWithWAHAServer(phone.trim())
+    if (!wahaResult.isValid || !wahaResult.exists) {
+      return NextResponse.json(
+        { error: wahaResult.error || 'Número não encontrado no WhatsApp. Verifique se o número está correto.' },
+        { status: 400 }
+      )
+    }
+
+    // Usar o chatId retornado pelo Waha (ex: "5511999999999@c.us")
+    // Fallback: normalizar o número caso o Waha não retorne chatId
+    const phoneToSave = wahaResult.chatId || normalizePhoneForDB(phone.trim())
+
+    // Verificar se phone já existe no banco
+    const existingByPhone = await getDailyUserByPhone(phoneToSave)
     if (existingByPhone) {
       return NextResponse.json(
         { error: 'Este telefone já está cadastrado' },
@@ -44,12 +59,12 @@ export async function POST(request: NextRequest) {
     // Hash da senha
     const password_hash = await bcrypt.hash(password, 12)
 
-    // Criar usuário no MySQL — sempre não-admin
+    // Criar usuário no MySQL com o chatId normalizado
     const user = await createDailyUser({
       name: name || phone,
       email: email || null,
       password_hash,
-      phone,
+      phone: phoneToSave,
       is_admin: false,
       subscription_status: 'trial',
     })

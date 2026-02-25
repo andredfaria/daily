@@ -40,7 +40,17 @@ export default function ActivityTable({ activities }: ActivityTableProps) {
           </thead>
           <tbody className="divide-y divide-slate-800/50">
             {activities.map((item) => {
-              const date = new Date(item.activity_date + 'T00:00:00')
+              // Garante que temos uma string no formato YYYY-MM-DD para evitar RangeError
+              const rawDate = item.activity_date
+              let dateStr = ''
+
+              if (rawDate instanceof Date) {
+                dateStr = rawDate.toISOString().split('T')[0]
+              } else if (typeof rawDate === 'string') {
+                dateStr = rawDate.split('T')[0]
+              }
+
+              const date = dateStr ? new Date(dateStr + 'T00:00:00') : new Date()
               const formattedDate = new Intl.DateTimeFormat('pt-BR', {
                 day: 'numeric',
                 month: 'long',

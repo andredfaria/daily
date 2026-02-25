@@ -37,8 +37,14 @@ export function useUser(userId: string | number | null | undefined): UseUserRetu
           setUser(null)
           return
         }
-        if (response.status === 401) {
+        if (response.status === 401 || response.status === 403) {
           setUser(null)
+          // Redireciona para /login se não estiver em rota pública
+          const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password', '/']
+          const isPublic = publicPaths.some(p => window.location.pathname === p || window.location.pathname.startsWith(p + '/'))
+          if (!isPublic) {
+            window.location.href = '/login'
+          }
           return
         }
         throw new Error(`Erro ao buscar usuário: ${response.status}`)
