@@ -6,7 +6,7 @@ import { Plus, X, UserPlus, Save, AlertCircle, CheckCircle2, Edit, Users, Clock,
 import { DailyUser } from '@/lib/types'
 import { validateName, validateTitle, validatePhone, validateSendTime, validateChecklist } from '@/lib/validations'
 import { validatePhoneWithWAHA } from '@/lib/waha'
-import { useAuth } from './AuthProvider'
+import { useAuth } from '@/components/AuthProvider'
 import LoadingOverlay from './LoadingOverlay'
 import LoadingSpinner from './LoadingSpinner'
 import Button from './ui/Button'

@@ -1,5 +1,7 @@
-import LoginForm from '@/components/LoginForm'
+'use client'
+
 import { Activity } from 'lucide-react'
+import LoginForm from '@/components/LoginForm'
 
 export default function RegisterPage() {
   return (
@@ -17,16 +19,11 @@ export default function RegisterPage() {
             Daily<span className="text-emerald-500">Sync</span>
           </h1>
         </div>
-        <p className="text-slate-400">Crie sua conta para começar</p>
+        <p className="text-slate-400">Crie sua conta e comece o teste grátis</p>
       </div>
 
-      {/* Register Form */}
+      {/* Register Form (reusing LoginForm in register mode) */}
       <LoginForm mode="register" />
-
-      {/* Footer */}
-      <div className="mt-8 text-center text-sm text-slate-500">
-        <p>Dashboard e status diário</p>
-      </div>
     </div>
   )
 }

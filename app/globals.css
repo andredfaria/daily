@@ -3,29 +3,6 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    /* Color tokens */
-    --color-primary: 16 185 129;
-    /* emerald-500 */
-    --color-background: 2 6 23;
-    /* slate-950 */
-    --color-background-secondary: 15 23 42;
-    /* slate-900 */
-    --color-foreground: 248 250 252;
-    /* slate-50 */
-    --color-foreground-secondary: 203 213 225;
-    /* slate-300 */
-    --color-border: 30 41 59;
-    /* slate-800 */
-
-    /* Spacing tokens */
-    --spacing-xs: 0.5rem;
-    --spacing-sm: 0.75rem;
-    --spacing-md: 1rem;
-    --spacing-lg: 1.5rem;
-    --spacing-xl: 2rem;
-  }
-
   body {
     @apply bg-slate-950 text-slate-50 font-sans antialiased selection:bg-emerald-500/30;
   }

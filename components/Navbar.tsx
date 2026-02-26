@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Activity, Users, LogOut, User as UserIcon } from 'lucide-react'
-import { useAuth } from './AuthProvider'
+import { useAuth } from '@/components/AuthProvider'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 

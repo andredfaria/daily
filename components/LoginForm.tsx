@@ -7,7 +7,7 @@ import Button from './ui/Button'
 import Card from './ui/Card'
 import Input from './ui/Input'
 import Alert from './ui/Alert'
-import { useToast } from './ToastProvider'
+import { useToast } from '@/components/ToastProvider'
 
 interface LoginFormProps {
   mode?: 'login' | 'register'

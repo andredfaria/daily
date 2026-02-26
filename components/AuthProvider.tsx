@@ -37,11 +37,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.status === 401 || response.status === 403) {
         setUser(null)
         setDailyUser(null)
-        // Redireciona para /login se não estiver em rota pública
-        const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password', '/']
-        const isPublic = publicPaths.some(p => window.location.pathname === p || window.location.pathname.startsWith(p + '/'))
-        if (!isPublic) {
-          window.location.href = '/login'
+        
+        if (typeof window !== 'undefined') {
+          // Redireciona para /login se não estiver em rota pública
+          const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password', '/']
+          const isPublic = publicPaths.some(p => window.location.pathname === p || window.location.pathname.startsWith(p + '/'))
+          if (!isPublic) {
+            window.location.href = '/login'
+          }
         }
         return
       }
@@ -137,7 +140,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    // Retornar um fallback seguro para pre-rendering
+    return {
+      user: null,
+      dailyUser: null,
+      loading: true,
+      error: null,
+      signOut: async () => {},
+      refreshUser: async () => {},
+      isAdmin: () => false,
+      canEdit: () => false,
+      isSubscriptionActive: () => false,
+      isTrialExpiringSoon: () => false,
+    }
   }
   return context
 }

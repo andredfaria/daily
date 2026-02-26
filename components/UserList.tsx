@@ -2,7 +2,7 @@
 
 import { Edit, Users, ExternalLink, Clock, CheckSquare, UserPlus } from 'lucide-react'
 import Link from 'next/link'
-import { useAuth } from './AuthProvider'
+import { useAuth } from '@/components/AuthProvider'
 import { useUsers } from '@/lib/hooks'
 import Alert from './ui/Alert'
 import Skeleton from './ui/Skeleton'

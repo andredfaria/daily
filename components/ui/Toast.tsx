@@ -87,28 +87,3 @@ export function ToastContainer({ toasts, onClose }: { toasts: Toast[]; onClose: 
     </div>
   )
 }
-
-// Hook para usar toasts
-export function useToast() {
-  const [toasts, setToasts] = useState<Toast[]>([])
-
-  const showToast = (message: string, type: ToastType = 'info', duration?: number) => {
-    const id = Math.random().toString(36).substring(7)
-    const newToast: Toast = { id, message, type, duration }
-    setToasts(prev => [...prev, newToast])
-  }
-
-  const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id))
-  }
-
-  return {
-    toasts,
-    showToast,
-    success: (message: string, duration?: number) => showToast(message, 'success', duration),
-    error: (message: string, duration?: number) => showToast(message, 'error', duration),
-    warning: (message: string, duration?: number) => showToast(message, 'warning', duration),
-    info: (message: string, duration?: number) => showToast(message, 'info', duration),
-    ToastContainer: () => <ToastContainer toasts={toasts} onClose={removeToast} />,
-  }
-}

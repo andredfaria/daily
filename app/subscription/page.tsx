@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import Navbar from '@/components/Navbar'
 import SubscriptionPlans from '@/components/SubscriptionPlans'
 import { getCurrentDailyUser } from '@/lib/server-auth'
-import { getDaysRemaining } from '@/lib/utils/subscription'
+import { getDaysRemaining } from '@/lib/utils/subscription-utils'
 import Card from '@/components/ui/Card'
 import Skeleton from '@/components/ui/Skeleton'
 

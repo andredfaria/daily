@@ -1,67 +1,29 @@
-import { DailyUser } from '@/lib/types'
+import { SubscriptionUpdateData } from '@/lib/types'
+import { updateDailyUser } from '@/lib/db/daily_user'
 
 /**
- * Verifica se a assinatura do usuário está ativa
- * Admins sempre têm acesso ativo
- * 
- * @param user - Usuário DailyUser
- * @returns true se a assinatura está ativa, false caso contrário
+ * Lógica de assinatura que depende de bibliotecas de servidor (MySQL).
+ * Este arquivo DEVE ser usado apenas em Server Components ou API Routes.
  */
-export function isSubscriptionActive(user: DailyUser): boolean {
-  // Admins sempre têm acesso
-  if (user.is_admin) return true
-  
-  // Verificar assinatura ativa
-  if (user.subscription_status === 'active') {
-    if (!user.subscription_ends_at) return true
-    return new Date(user.subscription_ends_at) > new Date()
-  }
-  
-  // Verificar trial ativo
-  if (user.subscription_status === 'trial') {
-    if (!user.trial_ends_at) return false
-    return new Date(user.trial_ends_at) > new Date()
-  }
-  
-  // Status 'cancelled' ou 'expired' = sem acesso
-  return false
-}
+
+// Re-exporta utilitários que não dependem de DB para conveniência no server
+export * from './subscription-utils'
 
 /**
- * Calcula os dias restantes do trial ou assinatura
+ * Centraliza a lógica de atualização de assinatura para webhooks
  * 
- * @param user - Usuário DailyUser
- * @returns Número de dias restantes, 0 se não houver período ativo
+ * @param userId - ID do usuário no MySQL
+ * @param data - Dados parciais de assinatura vindos do provedor
  */
-export function getDaysRemaining(user: DailyUser): number {
-  if (user.subscription_status === 'trial' && user.trial_ends_at) {
-    const now = new Date()
-    const end = new Date(user.trial_ends_at)
-    const diff = end.getTime() - now.getTime()
-    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
-  }
+export async function updateSubscriptionStatus(
+  userId: number,
+  data: SubscriptionUpdateData
+): Promise<void> {
+  // Garante que o objeto de dados está limpo para o banco (MySQL)
+  const updateData: Record<string, unknown> = { ...data as unknown as Record<string, unknown> }
   
-  if (user.subscription_status === 'active' && user.subscription_ends_at) {
-    const now = new Date()
-    const end = new Date(user.subscription_ends_at)
-    const diff = end.getTime() - now.getTime()
-    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
-  }
+  // Realiza a atualização no banco de dados
+  await updateDailyUser(userId, updateData)
   
-  return 0
-}
-
-/**
- * Verifica se o trial está próximo de expirar (últimos 2 dias)
- * 
- * @param user - Usuário DailyUser
- * @returns true se faltam 2 dias ou menos para expirar o trial
- */
-export function isTrialExpiringSoon(user: DailyUser): boolean {
-  if (user.is_admin) return false
-  if (user.subscription_status !== 'trial') return false
-  if (!user.trial_ends_at) return false
-
-  const daysRemaining = getDaysRemaining(user)
-  return daysRemaining <= 2 && daysRemaining > 0
+  console.log(`[SUBSCRIPTION SERVICE] Usuário ${userId} atualizado:`, JSON.stringify(data))
 }

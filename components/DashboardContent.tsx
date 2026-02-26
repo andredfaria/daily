@@ -90,7 +90,11 @@ export default function DashboardContent({ initialData }: DashboardContentProps)
           Por favor, faça login novamente para acessar seus dados.
         </p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.location.reload()
+            }
+          }}
           className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
         >
           Recarregar Página

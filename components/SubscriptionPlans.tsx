@@ -3,8 +3,8 @@
 import { Check, ArrowRight, Sparkles } from 'lucide-react'
 import Button from './ui/Button'
 import Card from './ui/Card'
-import { useAuth } from './AuthProvider'
-import { useToast } from './ToastProvider'
+import { useAuth } from '@/components/AuthProvider'
+import { useToast } from '@/components/ToastProvider'
 
 const BASIC_PLAN = {
   name: 'Básico',

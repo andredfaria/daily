@@ -1,7 +1,7 @@
 'use client'
 
-import { useAuth } from './AuthProvider'
-import { getDaysRemaining } from '@/lib/utils/subscription'
+import { useAuth } from '@/components/AuthProvider'
+import { getDaysRemaining } from '@/lib/utils/subscription-utils'
 import { AlertCircle, Clock } from 'lucide-react'
 import Alert from './ui/Alert'
 import Button from './ui/Button'

@@ -157,6 +157,16 @@ export function validateChecklist(items: string[]): ValidationResult {
 }
 
 /**
+ * Valida o formato de um email
+ * @param email - Email a ser validado
+ * @returns boolean indicando se o formato é válido
+ */
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+/**
  * Valida todos os campos do formulário de uma vez
  */
 export interface UserFormValidation {

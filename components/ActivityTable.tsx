@@ -1,3 +1,5 @@
+'use client'
+
 import { Check, X, Inbox } from 'lucide-react'
 import { DailyData } from '@/lib/types'
 

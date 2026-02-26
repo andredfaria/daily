@@ -54,19 +54,21 @@ export default function AdminUserFields({
       setUpdatingSub(true)
       setSubMessage(null)
 
-      const response = await fetch(`/api/admin/users/${userId}/update-subscription`, {
-        method: 'POST',
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          subscription_status: subStatus,
-          trial_ends_at: trialEnds ? new Date(trialEnds).toISOString() : null
+          subscription: {
+            subscription_status: subStatus,
+            trial_ends_at: trialEnds ? new Date(trialEnds).toISOString() : null
+          }
         }),
       })
 
       const data = await response.json()
 
       if (response.ok) {
-        setSubMessage({ type: 'success', text: data.message })
+        setSubMessage({ type: 'success', text: 'Assinatura atualizada com sucesso' })
         onSuccess()
       } else {
         setSubMessage({ type: 'error', text: data.error })
@@ -89,8 +91,8 @@ export default function AdminUserFields({
       setRoleMessage(null)
       const newIsAdmin = !isAdmin
 
-      const response = await fetch(`/api/admin/users/${userId}/update-role`, {
-        method: 'POST',
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_admin: newIsAdmin }),
       })
@@ -99,7 +101,7 @@ export default function AdminUserFields({
 
       if (response.ok) {
         setIsAdmin(newIsAdmin)
-        setRoleMessage({ type: 'success', text: data.message })
+        setRoleMessage({ type: 'success', text: 'Permissões atualizadas com sucesso' })
         onSuccess()
       } else {
         setRoleMessage({ type: 'error', text: data.error })
@@ -126,8 +128,8 @@ export default function AdminUserFields({
       setUpdatingEmail(true)
       setEmailMessage(null)
 
-      const response = await fetch(`/api/admin/users/${userId}/update-email`, {
-        method: 'POST',
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: newEmail }),
       })
@@ -135,7 +137,7 @@ export default function AdminUserFields({
       const data = await response.json()
 
       if (response.ok) {
-        setEmailMessage({ type: 'success', text: data.message })
+        setEmailMessage({ type: 'success', text: 'Email atualizado com sucesso' })
         setNewEmail('')
         onSuccess()
       } else {
@@ -154,8 +156,8 @@ export default function AdminUserFields({
       return
     }
 
-    if (newPassword.length < 8) {
-      setPasswordMessage({ type: 'error', text: 'A senha deve ter no mínimo 8 caracteres' })
+    if (newPassword.length < 6) {
+      setPasswordMessage({ type: 'error', text: 'A senha deve ter no mínimo 6 caracteres' })
       return
     }
 
@@ -172,8 +174,8 @@ export default function AdminUserFields({
       setUpdatingPassword(true)
       setPasswordMessage(null)
 
-      const response = await fetch(`/api/admin/users/${userId}/update-password`, {
-        method: 'POST',
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: newPassword }),
       })
@@ -181,7 +183,7 @@ export default function AdminUserFields({
       const data = await response.json()
 
       if (response.ok) {
-        setPasswordMessage({ type: 'success', text: data.message })
+        setPasswordMessage({ type: 'success', text: 'Senha atualizada com sucesso' })
         setNewPassword('')
         setConfirmPassword('')
         onSuccess()

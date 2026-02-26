@@ -1,22 +1,13 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { AuthProvider } from '@/components/AuthProvider'
-import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { ToastProvider } from '@/components/ToastProvider'
+import { ClientProviders } from '@/components/ClientProviders'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Daily Status - Gestão Inteligente via WhatsApp',
-  description: 'Automatize seus dailies, acompanhe métricas de equipe e gerencie status report diretamente pelo WhatsApp. Teste grátis por 7 dias.',
-  openGraph: {
-    type: 'website',
-    locale: 'pt_BR',
-    title: 'Daily Status - Gestão Inteligente via WhatsApp',
-    description: 'Automatize seus dailies e acompanhe métricas de equipe diretamente pelo WhatsApp.',
-    siteName: 'Daily Status',
-  },
+  title: 'Daily Status - Gerenciamento de Atividades',
+  description: 'Acompanhe seu progresso diário de forma simples e eficiente.',
 }
 
 export default function RootLayout({
@@ -25,15 +16,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className="dark">
       <body className={`${inter.className} bg-slate-950 text-slate-50 min-h-screen`}>
-        <ErrorBoundary>
-          <ToastProvider>
-            <AuthProvider>
-              {children}
-            </AuthProvider>
-          </ToastProvider>
-        </ErrorBoundary>
+        <ClientProviders>
+          {children}
+        </ClientProviders>
       </body>
     </html>
   )

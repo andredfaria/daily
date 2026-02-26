@@ -1,3 +1,5 @@
+'use client'
+
 import { Activity, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import ForgotPasswordForm from '@/components/ForgotPasswordForm'

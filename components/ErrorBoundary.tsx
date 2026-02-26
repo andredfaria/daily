@@ -69,7 +69,11 @@ export class ErrorBoundary extends Component<Props, State> {
               <Button onClick={this.handleReset}>Tentar Novamente</Button>
               <Button
                 variant="secondary"
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.location.reload()
+                  }
+                }}
               >
                 Recarregar Página
               </Button>
