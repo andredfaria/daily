@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe, validateStripeEnvironment } from '@/lib/stripe'
+import { getStripeClient, validateStripeEnvironment } from '@/lib/stripe'
 import { getSessionFromCookies } from '@/lib/auth-jwt'
 import { getDailyUserById, updateDailyUser } from '@/lib/db/daily_user'
 
@@ -52,6 +52,8 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    const stripe = getStripeClient()
 
     // Criar ou buscar Customer no Stripe
     let customerId = dailyUser.payment_customer_id

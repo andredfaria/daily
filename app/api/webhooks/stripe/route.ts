@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { getStripeClient } from '@/lib/stripe'
 import Stripe from 'stripe'
 import { SubscriptionUpdateData } from '@/lib/types'
 import {
@@ -22,6 +22,8 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
  * - invoice.payment_failed: Falha no pagamento
  */
 export async function POST(request: NextRequest) {
+  const stripe = getStripeClient()
+
   // Obter assinatura do header
   const signature = request.headers.get('stripe-signature')
 
@@ -105,6 +107,8 @@ export async function POST(request: NextRequest) {
 async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session
 ) {
+  const stripe = getStripeClient()
+
   const subscriptionId = session.subscription as string
   const customerId = session.customer as string
   const dailyUserId = session.metadata?.daily_user_id
