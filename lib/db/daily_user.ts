@@ -3,16 +3,30 @@ import { DailyUser, SubscriptionUpdateData } from '@/lib/types'
 
 // ─── Busca por auth ───────────────────────────────────────────
 
+const SAFE_USER_FIELDS = `id, created_at, name, email, phone, title, option, time_to_send,
+    is_admin, subscription_status, trial_ends_at, subscription_ends_at,
+    subscription_plan, payment_provider, payment_customer_id,
+    payment_subscription_id, payment_status, next_billing_date`
+
 export async function getDailyUserByEmail(email: string): Promise<DailyUser | null> {
-    const rows = await query<DailyUser & { password_hash?: string }>(
-        'SELECT * FROM daily_user WHERE email = ? LIMIT 1',
+    const rows = await query<DailyUser>(
+        `SELECT ${SAFE_USER_FIELDS} FROM daily_user WHERE email = ? LIMIT 1`,
         [email]
     )
     return rows[0] || null
 }
 
 export async function getDailyUserByPhone(phone: string): Promise<DailyUser | null> {
-    const rows = await query<DailyUser & { password_hash?: string }>(
+    const rows = await query<DailyUser>(
+        `SELECT ${SAFE_USER_FIELDS} FROM daily_user WHERE phone = ? LIMIT 1`,
+        [phone]
+    )
+    return rows[0] || null
+}
+
+/** Busca usuário por telefone incluindo password_hash — usar apenas para autenticação */
+export async function getDailyUserByPhoneForAuth(phone: string): Promise<(DailyUser & { password_hash: string | null }) | null> {
+    const rows = await query<DailyUser & { password_hash: string | null }>(
         'SELECT * FROM daily_user WHERE phone = ? LIMIT 1',
         [phone]
     )
@@ -21,7 +35,7 @@ export async function getDailyUserByPhone(phone: string): Promise<DailyUser | nu
 
 export async function getDailyUserById(id: number): Promise<DailyUser | null> {
     const rows = await query<DailyUser>(
-        'SELECT * FROM daily_user WHERE id = ? LIMIT 1',
+        `SELECT ${SAFE_USER_FIELDS} FROM daily_user WHERE id = ? LIMIT 1`,
         [id]
     )
     return rows[0] || null
@@ -223,7 +237,7 @@ export async function listDailyUsers(opts: ListUsersOptions = {}): Promise<{ dat
 
     const [data, countRows] = await Promise.all([
         query<DailyUser>(
-            `SELECT * FROM daily_user ORDER BY ${orderBy} ${dir} LIMIT ? OFFSET ?`,
+            `SELECT ${SAFE_USER_FIELDS} FROM daily_user ORDER BY ${orderBy} ${dir} LIMIT ? OFFSET ?`,
             [limit, offset]
         ),
         query<{ total: number }>('SELECT COUNT(*) as total FROM daily_user'),

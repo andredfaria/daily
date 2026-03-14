@@ -58,10 +58,19 @@ export async function POST(request: NextRequest) {
     const dailyUser = await getDailyUserByEmail(buyerEmail)
 
     if (!dailyUser) {
-      console.warn('[HOTMART WEBHOOK] Usuário não encontrado para email:', buyerEmail)
+      // Usuário pode ter se cadastrado apenas com telefone (email opcional).
+      // Registrar o evento para resolução manual e retornar 200 para evitar
+      // retentativas infinitas da Hotmart.
+      console.error(
+        '[HOTMART WEBHOOK] Usuário não encontrado para email:', buyerEmail,
+        '| Evento:', event,
+        '| subscriberCode:', subscriberCode,
+        '| Ação: verificar cadastro e vincular manualmente se necessário.'
+      )
       return NextResponse.json({
-        message: 'Usuário não encontrado, mas webhook processado',
-        note: 'Criar usuário se necessário ou verificar email'
+        message: 'Usuário não encontrado. Evento registrado para revisão manual.',
+        buyerEmail,
+        event,
       })
     }
 
@@ -107,7 +116,7 @@ export async function POST(request: NextRequest) {
         error: 'Erro ao processar webhook',
         message: error instanceof Error ? error.message : 'Erro desconhecido'
       },
-      { status: 200 }
+      { status: 500 }
     )
   }
 }

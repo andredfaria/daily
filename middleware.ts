@@ -40,8 +40,9 @@ export async function middleware(request: NextRequest) {
 
   // Se não estiver autenticado e não estiver nas páginas públicas → redirecionar para login
   const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password']
-  const isPublicPath = publicPaths.some(p => request.nextUrl.pathname.startsWith(p))
-  const isRootPath = request.nextUrl.pathname === '/'
+  const pathname = request.nextUrl.pathname
+  const isPublicPath = publicPaths.some(p => pathname === p || pathname.startsWith(p + '/'))
+  const isRootPath = pathname === '/'
 
   if (!session) {
     if (!isPublicPath && !isRootPath) {

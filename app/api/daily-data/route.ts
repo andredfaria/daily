@@ -36,12 +36,24 @@ export async function GET(request: NextRequest) {
         const orderBy = allowedOrder[searchParams.get('orderBy') ?? ''] ?? 'activity_date'
         const orderDir = searchParams.get('orderDirection') === 'asc' ? 'ASC' : 'DESC'
 
-        const activities = await query<DailyData>(
-            `SELECT * FROM daily_data WHERE id_user = ? ORDER BY ${orderBy} ${orderDir}`,
-            [targetUserId]
-        )
+        const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
+        const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') ?? '90')), 365)
+        const offset = (page - 1) * limit
 
-        return NextResponse.json({ activities })
+        const [activities, countRows] = await Promise.all([
+            query<DailyData>(
+                `SELECT * FROM daily_data WHERE id_user = ? ORDER BY ${orderBy} ${orderDir} LIMIT ? OFFSET ?`,
+                [targetUserId, limit, offset]
+            ),
+            query<{ total: number }>(
+                'SELECT COUNT(*) as total FROM daily_data WHERE id_user = ?',
+                [targetUserId]
+            ),
+        ])
+
+        const total = countRows[0]?.total ?? 0
+
+        return NextResponse.json({ activities, total, page, limit })
     } catch (error) {
         console.error('[daily-data GET] Erro:', error)
         return NextResponse.json({ error: 'Erro ao buscar atividades' }, { status: 500 })

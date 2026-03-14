@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { getDailyUserByPhone } from '@/lib/db/daily_user'
+import { getDailyUserByPhoneForAuth } from '@/lib/db/daily_user'
 import { signToken, setSessionCookie } from '@/lib/auth-jwt'
 import { normalizePhoneForDB, formatPhoneDisplay } from '@/lib/utils'
 
@@ -19,8 +19,8 @@ export async function POST(request: NextRequest) {
     // Ex: "+55 11 99999-9999" → "5511999999999@c.us"
     const normalizedPhone = normalizePhoneForDB(phone.trim())
 
-    // Buscar usuário pelo telefone normalizado
-    const user = await getDailyUserByPhone(normalizedPhone)
+    // Buscar usuário pelo telefone normalizado (inclui password_hash para autenticação)
+    const user = await getDailyUserByPhoneForAuth(normalizedPhone)
 
     if (!user) {
       return NextResponse.json(
@@ -30,15 +30,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar senha
-    const rawUser = user as typeof user & { password_hash?: string }
-    if (!rawUser.password_hash) {
+    if (!user.password_hash) {
       return NextResponse.json(
         { error: 'Conta sem senha configurada. Use o reset de senha.' },
         { status: 401 }
       )
     }
 
-    const passwordValid = await bcrypt.compare(password, rawUser.password_hash)
+    const passwordValid = await bcrypt.compare(password, user.password_hash)
     if (!passwordValid) {
       return NextResponse.json(
         { error: 'Telefone ou senha inválidos' },
@@ -56,6 +55,9 @@ export async function POST(request: NextRequest) {
 
     await setSessionCookie(token)
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password_hash: _pw, ...safeUser } = user
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -65,7 +67,7 @@ export async function POST(request: NextRequest) {
         subscription_status: user.subscription_status,
         trial_ends_at: user.trial_ends_at,
       },
-      dailyUser: user,
+      dailyUser: safeUser,
     })
   } catch (err) {
     console.error('[LOGIN] Erro:', err)

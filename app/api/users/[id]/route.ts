@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSessionFromCookies } from '@/lib/auth-jwt'
+import { getSessionFromCookies, signToken, setSessionCookie } from '@/lib/auth-jwt'
 import { getDailyUserById, getDailyUserByPhone, updateDailyUser, deleteDailyUser } from '@/lib/db/daily_user'
 import { validatePhoneWithWAHAServer } from '@/lib/waha'
 
@@ -126,6 +126,17 @@ export async function PUT(
         await updateDailyUser(targetUserId, updateData)
 
         const updatedUser = await getDailyUserById(targetUserId)
+
+        // Renovar JWT se o próprio usuário alterou o telefone (mantém sessão consistente)
+        if (updateData.phone && session.userId === targetUserId && updatedUser) {
+            const newToken = await signToken({
+                userId: session.userId,
+                phone: updatedUser.phone!,
+                email: session.email,
+                isAdmin: session.isAdmin,
+            })
+            await setSessionCookie(newToken)
+        }
 
         return NextResponse.json({
             success: true,

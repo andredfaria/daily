@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     console.error('[STRIPE WEBHOOK] Erro ao processar:', error)
     return NextResponse.json(
       { error: 'Erro ao processar webhook' },
-      { status: 200 }
+      { status: 500 }
     )
   }
 }
