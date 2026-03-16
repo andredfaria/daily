@@ -24,40 +24,67 @@ export interface WAHAProfile {
 // ============================================
 
 /**
- * Valida um número de telefone chamando a API route segura
+ * Valida um número de telefone chamando o WAHA diretamente via NEXT_PUBLIC_WAHA_BASE_URL
  * USO: Componentes React no frontend
  */
 export async function validatePhoneWithWAHA(phone: string): Promise<WAHAValidationResult> {
   if (!phone || phone.trim() === '') {
-    return {
-      isValid: false,
-      exists: false,
-      error: 'Telefone não pode estar vazio'
+    return { isValid: false, exists: false, error: 'Telefone não pode estar vazio' }
+  }
+
+  const wahaUrl = process.env.NEXT_PUBLIC_WAHA_BASE_URL
+
+  if (!wahaUrl) {
+    console.warn('[WAHA] NEXT_PUBLIC_WAHA_BASE_URL não configurado — usando rota interna')
+    // Fallback para a rota Next.js se a variável pública não estiver definida
+    try {
+      const response = await fetch('/api/waha/validate-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone.trim() }),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      return await response.json()
+    } catch (error: unknown) {
+      return {
+        isValid: false,
+        exists: false,
+        error: error instanceof Error ? error.message : 'Erro de conexão',
+      }
     }
   }
 
   try {
-    const response = await fetch('/api/waha/validate-phone', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ phone: phone.trim() }),
+    const normalizedPhone = phone.trim().replace(/\D/g, '')
+    const endpoint = `${wahaUrl.replace(/\/$/, '')}/api/contacts/check-exists?phone=${normalizedPhone}&session=default`
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: { accept: 'application/json' },
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`WAHA respondeu com status ${response.status}`)
     }
 
-    const result: WAHAValidationResult = await response.json()
-    return result
+    const data = await response.json()
+    const exists = data.numberExists === true
+    const chatId = data.chatId || null
+    const validatedPhone = chatId ? String(chatId).split('@')[0] : undefined
 
+    return {
+      isValid: true,
+      exists,
+      validatedPhone: exists ? validatedPhone : undefined,
+      chatId: exists ? chatId : undefined,
+      error: exists ? undefined : 'Número não encontrado no WhatsApp.',
+    }
   } catch (error: unknown) {
-    console.error('Erro ao validar telefone:', error)
+    console.error('[WAHA] Erro ao validar telefone:', error)
     return {
       isValid: false,
       exists: false,
-      error: error instanceof Error ? error.message : 'Erro de conexão ao validar telefone'
+      error: error instanceof Error ? error.message : 'Erro de conexão ao validar telefone',
     }
   }
 }
@@ -210,6 +237,50 @@ export async function validatePhoneWithWAHAServer(phone: string): Promise<WAHAVa
     }
   }
 
+}
+
+// ============================================
+// SEND MESSAGE (Server-side only)
+// ============================================
+
+/**
+ * Envia uma mensagem de texto via WhatsApp usando WAHA
+ * USO: Apenas em API routes ou Server Components
+ */
+export async function sendWhatsAppMessage(chatId: string, text: string): Promise<boolean> {
+  const env = validateWAHAEnvironment()
+  if (env.error) {
+    console.error('Erro de configuração WAHA:', env.error)
+    return false
+  }
+
+  try {
+    const endpoint = `${env.wahaUrl.replace(/\/$/, '')}/api/sendText`
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+        ...(env.wahaApiKey && { 'X-Api-Key': env.wahaApiKey }),
+      },
+      body: JSON.stringify({
+        chatId,
+        text,
+        session: 'default',
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`Erro ao enviar mensagem WAHA: ${response.status} ${errorText}`)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Erro ao enviar mensagem WhatsApp:', error)
+    return false
+  }
 }
 
 /**

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { Resend } from 'resend'
-import { getDailyUserByEmail, setResetToken } from '@/lib/db/daily_user'
+import { getDailyUserByPhone, setOTPForPhone } from '@/lib/db/daily_user'
+import { validatePhoneWithWAHAServer, sendWhatsAppMessage } from '@/lib/waha'
+import { normalizePhoneForDB } from '@/lib/utils'
 import { createStrictRateLimiter } from '@/lib/middleware/rateLimit'
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const rateLimiter = createStrictRateLimiter()
+
+function generateOTP(): string {
+  return crypto.randomInt(100000, 999999).toString()
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,59 +24,53 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { email } = await request.json()
+    const { phone } = await request.json()
 
-    if (!email) {
+    if (!phone) {
       return NextResponse.json(
-        { error: 'Email é obrigatório' },
+        { error: 'Número de WhatsApp é obrigatório' },
         { status: 400 }
       )
     }
 
-    const user = await getDailyUserByEmail(email)
+    // Validar número no WhatsApp via WAHA
+    const wahaResult = await validatePhoneWithWAHAServer(phone)
+    if (!wahaResult.exists || !wahaResult.chatId) {
+      return NextResponse.json(
+        { error: 'Número não encontrado no WhatsApp. Verifique o número e tente novamente.' },
+        { status: 400 }
+      )
+    }
 
-    // Por segurança, sempre retornar sucesso (não revelar se email existe)
+    // Normalizar telefone para busca no DB
+    const normalizedPhone = normalizePhoneForDB(phone)
+    const user = await getDailyUserByPhone(normalizedPhone)
+
+    // Por segurança, retornar sucesso mesmo que o usuário não exista
     if (!user) {
       return NextResponse.json({
-        message: 'Se o email existir, você receberá um link para redefinir sua senha.',
+        message: 'Se o número estiver cadastrado, você receberá um código no WhatsApp.',
       })
     }
 
-    // Gerar token de reset
-    const token = crypto.randomBytes(32).toString('hex')
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hora
+    // Gerar OTP de 6 dígitos (válido por 15 minutos)
+    const otp = generateOTP()
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
 
-    await setResetToken(email, token, expiresAt)
+    await setOTPForPhone(normalizedPhone, otp, expiresAt)
 
-    // Montar link de reset
-    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const resetLink = `${origin}/reset-password?token=${token}`
+    // Enviar OTP via WhatsApp
+    const message =
+      `🔐 *Código de verificação DailySync*\n\n` +
+      `Seu código é: *${otp}*\n\n` +
+      `Válido por 15 minutos. Não compartilhe este código com ninguém.`
 
-    if (resend) {
-      await resend.emails.send({
-        from: process.env.EMAIL_FROM || 'DailySync <noreply@dailysync.app>',
-        to: email,
-        subject: 'Redefinição de senha — DailySync',
-        html: `
-          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #10b981;">Redefinição de senha</h2>
-            <p>Recebemos uma solicitação para redefinir a senha da sua conta DailySync.</p>
-            <p>Clique no botão abaixo para criar uma nova senha. O link é válido por <strong>1 hora</strong>.</p>
-            <a href="${resetLink}" style="display:inline-block;background:#10b981;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0;">
-              Redefinir senha
-            </a>
-            <p style="color:#888;font-size:13px;">Se você não solicitou isso, ignore este email.</p>
-            <p style="color:#888;font-size:12px;">Ou copie este link: ${resetLink}</p>
-          </div>
-        `,
-      })
-    } else {
-      // Fallback para desenvolvimento sem RESEND_API_KEY configurado
-      console.log(`[RESET PASSWORD] Link para ${email}: ${resetLink}`)
-    }
+    await sendWhatsAppMessage(wahaResult.chatId, message)
 
     return NextResponse.json({
-      message: 'Se o email existir, você receberá um link para redefinir sua senha.',
+      message: 'Código enviado para seu WhatsApp!',
+      // Retorna o chatId formatado para o frontend (sem @c.us)
+      phone: wahaResult.validatedPhone,
     })
   } catch (err) {
     console.error('[FORGOT PASSWORD] Erro:', err)

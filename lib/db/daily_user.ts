@@ -141,6 +141,28 @@ export async function setResetToken(email: string, token: string, expiresAt: Dat
     )
 }
 
+export async function setOTPForPhone(phone: string, otp: string, expiresAt: Date): Promise<void> {
+    await execute(
+        'UPDATE daily_user SET reset_token = ?, reset_token_expires_at = ? WHERE phone = ?',
+        [otp, expiresAt, phone]
+    )
+}
+
+export async function getUserByPhoneAndOTP(phone: string, otp: string): Promise<DailyUser | null> {
+    const rows = await query<DailyUser>(
+        `SELECT ${SAFE_USER_FIELDS} FROM daily_user WHERE phone = ? AND reset_token = ? AND reset_token_expires_at > NOW() LIMIT 1`,
+        [phone, otp]
+    )
+    return rows[0] || null
+}
+
+export async function setResetTokenForUser(id: number, token: string, expiresAt: Date): Promise<void> {
+    await execute(
+        'UPDATE daily_user SET reset_token = ?, reset_token_expires_at = ? WHERE id = ?',
+        [token, expiresAt, id]
+    )
+}
+
 export async function clearResetToken(id: number): Promise<void> {
     await execute(
         'UPDATE daily_user SET reset_token = NULL, reset_token_expires_at = NULL WHERE id = ?',
