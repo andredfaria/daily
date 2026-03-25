@@ -1,0 +1,154 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  body {
+    background-color: #131318;
+    color: #e4e1e9;
+    margin: 0;
+    padding: 0;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #1f1f25;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #464554;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #908fa0;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .glass-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(45deg, #c0c1ff1a, #8083ff1a);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .glass-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .shimmer-bg {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 25%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.03) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+  }
+
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high;
+  }
+
+  .nav-link.active {
+    @apply text-primary bg-surface-container-high;
+  }
+
+  .btn-primary {
+    @apply flex items-center gap-2 px-4 py-2.5 bg-primary text-on-primary-fixed rounded-xl font-semibold text-sm transition-all duration-200 hover:brightness-110 active:scale-95;
+  }
+
+  .btn-ghost {
+    @apply flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high active:scale-95;
+  }
+
+  .btn-danger {
+    @apply flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 bg-error-container text-on-error-container hover:brightness-110 active:scale-95;
+  }
+
+  .input-field {
+    @apply w-full bg-surface-container border border-outline-variant rounded-xl px-4 py-3 text-on-surface text-sm placeholder:text-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors duration-200;
+  }
+
+  .input-field.error {
+    @apply border-error focus:border-error focus:ring-error;
+  }
+
+  .label {
+    @apply block text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wide;
+  }
+
+  .section-card {
+    @apply glass-card rounded-2xl border border-outline-variant/50 p-6;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  0% { opacity: 0; transform: translateX(20px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes badgeGreen {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+@keyframes toastIn {
+  0% { opacity: 0; transform: translateX(100%); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastOut {
+  0% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(100%); }
+}
+
+.animate-toast-in {
+  animation: toastIn 0.3s ease-out forwards;
+}
+
+.animate-toast-out {
+  animation: toastOut 0.3s ease-in forwards;
+}
