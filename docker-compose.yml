@@ -16,10 +16,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "4000:4000"
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: 4000
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT:-3306}
