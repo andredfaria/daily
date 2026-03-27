@@ -1,4 +1,4 @@
-import client from './client'
+import { supabase } from '../lib/supabase'
 import type { Bill, PaymentMethod } from '../types'
 
 export interface CreateBillPayload {
@@ -26,46 +26,84 @@ export interface CreatePaymentMethodPayload {
 
 export const billsApi = {
   list: async (): Promise<Bill[]> => {
-    const res = await client.get<Bill[]>('/bills')
-    return res.data
+    const { data, error } = await supabase
+      .from('bills')
+      .select('*, payment_methods(*)')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data as Bill[]
   },
 
   get: async (id: string): Promise<Bill> => {
-    const res = await client.get<Bill>(`/bills/${id}`)
-    return res.data
+    const { data, error } = await supabase
+      .from('bills')
+      .select('*, payment_methods(*)')
+      .eq('id', id)
+      .single()
+    if (error) throw error
+    return data as Bill
   },
 
   create: async (payload: CreateBillPayload): Promise<Bill> => {
-    const res = await client.post<Bill>('/bills', payload)
-    return res.data
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data, error } = await supabase
+      .from('bills')
+      .insert({ ...payload, user_id: user!.id })
+      .select()
+      .single()
+    if (error) throw error
+    return data as Bill
   },
 
   update: async (id: string, payload: UpdateBillPayload): Promise<Bill> => {
-    const res = await client.patch<Bill>(`/bills/${id}`, payload)
-    return res.data
+    const { data, error } = await supabase
+      .from('bills')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data as Bill
   },
 
   delete: async (id: string): Promise<void> => {
-    await client.delete(`/bills/${id}`)
+    const { error } = await supabase.from('bills').delete().eq('id', id)
+    if (error) throw error
   },
 
   toggle: async (id: string, is_active: boolean): Promise<Bill> => {
-    const res = await client.patch<Bill>(`/bills/${id}`, { is_active })
-    return res.data
+    const { data, error } = await supabase
+      .from('bills')
+      .update({ is_active })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data as Bill
   },
 
   // Payment Methods
   getPaymentMethods: async (billId: string): Promise<PaymentMethod[]> => {
-    const res = await client.get<PaymentMethod[]>(`/bills/${billId}/payment-methods`)
-    return res.data
+    const { data, error } = await supabase
+      .from('payment_methods')
+      .select('*')
+      .eq('bill_id', billId)
+      .order('is_primary', { ascending: false })
+    if (error) throw error
+    return data as PaymentMethod[]
   },
 
   addPaymentMethod: async (
     billId: string,
     payload: CreatePaymentMethodPayload,
   ): Promise<PaymentMethod> => {
-    const res = await client.post<PaymentMethod>(`/bills/${billId}/payment-methods`, payload)
-    return res.data
+    const { data, error } = await supabase
+      .from('payment_methods')
+      .insert({ ...payload, bill_id: billId })
+      .select()
+      .single()
+    if (error) throw error
+    return data as PaymentMethod
   },
 
   updatePaymentMethod: async (
@@ -73,14 +111,23 @@ export const billsApi = {
     methodId: string,
     payload: Partial<CreatePaymentMethodPayload>,
   ): Promise<PaymentMethod> => {
-    const res = await client.patch<PaymentMethod>(
-      `/bills/${billId}/payment-methods/${methodId}`,
-      payload,
-    )
-    return res.data
+    const { data, error } = await supabase
+      .from('payment_methods')
+      .update(payload)
+      .eq('id', methodId)
+      .eq('bill_id', billId)
+      .select()
+      .single()
+    if (error) throw error
+    return data as PaymentMethod
   },
 
   deletePaymentMethod: async (billId: string, methodId: string): Promise<void> => {
-    await client.delete(`/bills/${billId}/payment-methods/${methodId}`)
+    const { error } = await supabase
+      .from('payment_methods')
+      .delete()
+      .eq('id', methodId)
+      .eq('bill_id', billId)
+    if (error) throw error
   },
 }
