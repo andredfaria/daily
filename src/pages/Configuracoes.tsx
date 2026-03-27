@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import client from '../api/client'
+import { supabase } from '../lib/supabase'
 import type { User } from '../types'
 import { useToast } from '../context/ToastContext'
 
@@ -30,10 +30,17 @@ const Configuracoes: React.FC = () => {
   const fetchUser = useCallback(async () => {
     try {
       setLoadingUser(true)
-      const res = await client.get<User>('/users/me')
-      setUser(res.data)
-      setProfileName(res.data.name ?? '')
-      setProfileWhatsapp(res.data.whatsapp_number)
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      const { data } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authUser!.id)
+        .single()
+      if (data) {
+        setUser(data as User)
+        setProfileName(data.name ?? '')
+        setProfileWhatsapp(data.whatsapp_number)
+      }
     } catch {
       // Use placeholder user
       const placeholder: User = {
@@ -61,10 +68,11 @@ const Configuracoes: React.FC = () => {
     if (!profileName.trim()) return
     setSavingProfile(true)
     try {
-      await client.patch('/users/me', {
-        name: profileName.trim(),
-        whatsapp_number: profileWhatsapp.trim(),
-      })
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      await supabase
+        .from('users')
+        .update({ name: profileName.trim(), whatsapp_number: profileWhatsapp.trim() })
+        .eq('id', authUser!.id)
       setUser((prev) => prev ? { ...prev, name: profileName.trim(), whatsapp_number: profileWhatsapp.trim() } : prev)
       setEditingProfile(false)
       success('Perfil atualizado!')
