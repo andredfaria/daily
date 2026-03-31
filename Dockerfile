@@ -11,6 +11,6 @@ FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 # Template processado com envsubst no startup — substitui ${BACKEND_HOST} e ${BACKEND_PORT}
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
-ENV BACKEND_HOST=eficienciia
+ENV BACKEND_HOST=backend
 ENV BACKEND_PORT=4000
 EXPOSE 80

@@ -1,6 +1,16 @@
 server {
   listen 80;
 
+  # API proxy para backend na rede interna Docker/EasyPanel
+  location /api/ {
+    proxy_pass http://${BACKEND_HOST}:${BACKEND_PORT}/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
   # SPA routing — todas as rotas desconhecidas → index.html
   location / {
     root /usr/share/nginx/html;

@@ -1,0 +1,31 @@
+project_id = "billsync"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[functions.generate-occurrences]
+verify_jwt = false
+
+[functions.mark-overdue]
+verify_jwt = false
+
+[functions.notification-dispatch]
+verify_jwt = false
+
+[functions.waha-status]
+verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
