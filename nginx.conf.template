@@ -1,6 +1,21 @@
 server {
   listen 80;
 
+  # Resolve de DNS dinâmico para ambiente Docker/EasyPanel.
+  # Evita falha de startup quando o upstream ainda não está registrado no boot do nginx.
+  resolver 127.0.0.11 valid=10s ipv6=off;
+  set $backend_upstream http://${BACKEND_HOST}:${BACKEND_PORT};
+
+  # API proxy para backend na rede interna Docker/EasyPanel
+  location /api/ {
+    proxy_pass $backend_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
   # SPA routing — todas as rotas desconhecidas → index.html
   location / {
     root /usr/share/nginx/html;
