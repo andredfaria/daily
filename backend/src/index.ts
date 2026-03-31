@@ -1,4 +1,9 @@
 import express from 'express'
+import * as dotenv from 'dotenv'
+import path from 'path'
+
+// Carrega o .env da raiz do projeto
+dotenv.config({ path: path.join(__dirname, '../../.env') })
 
 const app = express()
 const PORT = Number(process.env.PORT) || 4000
@@ -16,4 +21,5 @@ app.get('/api/health', (_req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[backend] running on port ${PORT}`)
+  console.log(`[backend] using database: ${process.env.DB_NAME} at ${process.env.DB_HOST}`)
 })
