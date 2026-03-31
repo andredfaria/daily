@@ -193,8 +193,3 @@ Se usar confirmação por WhatsApp:
 - **Edge Function falha em produção:** conferir secrets no Supabase.
 - **Erro de CORS:** priorize chamadas via mesmo domínio (`/api`) e mantenha Supabase URL correta.
 - **Função WAHA status offline:** validar `WAHA_URL`, sessão e `WAHA_API_KEY`.
-- **`host not found in upstream "backend"` no nginx:**
-  1) confirme `BACKEND_HOST` no EasyPanel (em stacks pode ser o domínio interno do serviço, não necessariamente `backend`);
-  2) garanta que frontend e backend estão na mesma stack/rede;
-  3) valide logs do backend para confirmar que subiu e está ouvindo em `BACKEND_PORT` (padrão 4000).
-
