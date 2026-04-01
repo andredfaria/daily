@@ -16,7 +16,7 @@ RUN npm run build
 FROM node:20-alpine AS backend-builder
 WORKDIR /app
 COPY backend/package*.json ./
-RUN npm ci
+RUN npm install
 COPY backend/tsconfig.json ./
 COPY backend/src ./src
 RUN npm run build
