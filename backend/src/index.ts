@@ -2,8 +2,9 @@ import express from 'express'
 import * as dotenv from 'dotenv'
 import path from 'path'
 
-// Carrega o .env da raiz do projeto
+// Carrega o .env — tenta raiz do projeto (dev local) e raiz do container
 dotenv.config({ path: path.join(__dirname, '../../.env') })
+dotenv.config({ path: '/.env' })
 
 const app = express()
 const PORT = Number(process.env.PORT) || 4000

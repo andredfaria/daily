@@ -42,4 +42,9 @@ COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
 EXPOSE 80
+
+# EasyPanel aguarda o health check antes de direcionar tráfego
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost/api/health || exit 1
+
 CMD ["/start.sh"]
