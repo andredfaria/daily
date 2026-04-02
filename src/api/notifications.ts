@@ -39,4 +39,9 @@ export const notificationsApi = {
   disconnectWaha: async (): Promise<void> => {
     await client.post('/waha/disconnect')
   },
+
+  testMessage: async (): Promise<{ success: boolean; to?: string; message_id?: string; error?: string }> => {
+    const res = await client.post('/waha/test-message')
+    return res.data
+  },
 }

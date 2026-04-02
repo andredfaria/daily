@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import client from '../api/client'
+import { notificationsApi } from '../api/notifications'
 import type { User } from '../types'
 import { useToast } from '../context/ToastContext'
 
@@ -24,6 +25,9 @@ const Configuracoes: React.FC = () => {
     weekly_summary: false,
     days_before: 3,
   })
+
+  const [testingMessage, setTestingMessage] = useState(false)
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const { success, error: showError } = useToast()
 
@@ -72,6 +76,24 @@ const Configuracoes: React.FC = () => {
       showError('Erro ao atualizar perfil.')
     } finally {
       setSavingProfile(false)
+    }
+  }
+
+  const handleTestMessage = async () => {
+    setTestingMessage(true)
+    setTestResult(null)
+    try {
+      const result = await notificationsApi.testMessage()
+      if (result.success) {
+        setTestResult({ success: true, message: `Mensagem enviada com sucesso para ${result.to}!` })
+      } else {
+        setTestResult({ success: false, message: result.error ?? 'Erro desconhecido.' })
+      }
+    } catch (err: any) {
+      const detail = err.response?.data?.error ?? err.message ?? 'Erro de conexão.'
+      setTestResult({ success: false, message: detail })
+    } finally {
+      setTestingMessage(false)
     }
   }
 
@@ -202,6 +224,53 @@ const Configuracoes: React.FC = () => {
                 Salvar
               </button>
             </div>
+          </div>
+
+          {/* Test Message Card */}
+          <div className="section-card">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="material-symbols-outlined text-primary">send</span>
+              <h3 className="text-base font-semibold text-on-surface">Testar Envio</h3>
+            </div>
+
+            <p className="text-xs text-on-surface-variant mb-4 leading-relaxed">
+              Envia uma mensagem de teste para o número WhatsApp configurado no seu perfil, validando se a integração está funcionando corretamente.
+            </p>
+
+            <button
+              onClick={handleTestMessage}
+              disabled={testingMessage}
+              className="btn-primary w-full justify-center"
+            >
+              {testingMessage ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-on-primary-fixed border-t-transparent rounded-full animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-lg">send</span>
+                  Enviar Mensagem de Teste
+                </>
+              )}
+            </button>
+
+            {testResult && (
+              <div
+                className={`
+                  mt-4 p-3 rounded-xl flex items-start gap-2.5 text-sm
+                  ${testResult.success
+                    ? 'bg-tertiary/10 border border-tertiary/30 text-tertiary'
+                    : 'bg-error-container/30 border border-error/30 text-error'
+                  }
+                `}
+              >
+                <span className="material-symbols-outlined text-base flex-shrink-0 mt-0.5">
+                  {testResult.success ? 'check_circle' : 'error'}
+                </span>
+                <p className="leading-relaxed">{testResult.message}</p>
+              </div>
+            )}
           </div>
 
         </div>
