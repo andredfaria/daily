@@ -45,6 +45,6 @@ EXPOSE 80
 
 # EasyPanel aguarda o health check antes de direcionar tráfego
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost/api/health || exit 1
+  CMD wget -qO- http://127.0.0.1/api/health || exit 1
 
 CMD ["/start.sh"]
