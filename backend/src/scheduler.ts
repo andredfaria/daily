@@ -4,6 +4,7 @@ import pool from './db'
 import { runDispatch } from './dispatcher'
 
 let activeTask: ScheduledTask | null = null
+let reloading = false
 
 async function loadConfig(): Promise<{ notificationTime: number; alertsEnabled: boolean }> {
   const [rows]: any = await pool.query(
@@ -25,6 +26,10 @@ function cancelActive() {
 }
 
 function scheduleJob(hour: number) {
+  if (hour < 0 || hour > 23) {
+    console.error(`[scheduler] hora inválida: ${hour} — job não agendado`)
+    return
+  }
   const expression = `0 ${hour} * * *`
   activeTask = cron.schedule(expression, async () => {
     console.log(`[scheduler] disparando envio de notificações (${hour}h)`)
@@ -51,6 +56,8 @@ export async function initScheduler(): Promise<void> {
 }
 
 export async function reloadSchedule(): Promise<void> {
+  if (reloading) return
+  reloading = true
   cancelActive()
   try {
     const { notificationTime, alertsEnabled } = await loadConfig()
@@ -61,5 +68,7 @@ export async function reloadSchedule(): Promise<void> {
     scheduleJob(notificationTime)
   } catch (err: any) {
     console.error('[scheduler] erro ao recarregar schedule:', err.message)
+  } finally {
+    reloading = false
   }
 }
