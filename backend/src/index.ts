@@ -12,6 +12,7 @@ import occurrencesRouter from './routes/occurrences'
 import notificationsRouter from './routes/notifications'
 import wahaRouter from './routes/waha'
 import usersRouter from './routes/users'
+import { initScheduler } from './scheduler'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 4000
@@ -71,4 +72,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`[backend] DB_NAME=${process.env.DB_NAME || 'não definido'}`)
   console.log(`[backend] DB_USER=${process.env.DB_USER || 'não definido'}`)
   console.log(`[backend] DB_PASSWORD=${process.env.DB_PASSWORD ? '***definido***' : 'não definido'}`)
+  initScheduler()
 })
