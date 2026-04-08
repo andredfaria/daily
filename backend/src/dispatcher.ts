@@ -67,9 +67,13 @@ export async function runDispatch(): Promise<{ sent: number; failed: number; ski
   const stats = { sent: 0, failed: 0, skipped: 0 }
 
   // 1. Buscar usuário (número WhatsApp)
-  const [userRows]: any = await pool.query('SELECT whatsapp_number FROM users LIMIT 1')
+  const [userRows]: any = await pool.query('SELECT whatsapp_number, whatsapp_alerts_enabled FROM users LIMIT 1')
   if (!userRows.length || !userRows[0].whatsapp_number) {
     console.warn('[dispatcher] nenhum usuário com WhatsApp configurado, abortando')
+    return stats
+  }
+  if (!userRows[0].whatsapp_alerts_enabled) {
+    console.log('[dispatcher] alertas WhatsApp desabilitados, abortando')
     return stats
   }
   const rawNumber: string = userRows[0].whatsapp_number
@@ -87,23 +91,21 @@ export async function runDispatch(): Promise<{ sent: number; failed: number; ski
     if (sessionData.status !== 'WORKING') {
       console.warn('[dispatcher] sessão WAHA não está ativa:', sessionData.status)
       // Marcar todas as notificações do dia como failed
-      await pool.query(
+      const [updateResult]: any = await pool.query(
         `UPDATE notifications SET status='failed', error_detail='Sessão WAHA inativa'
-         WHERE status='scheduled' AND DATE(scheduled_for) = DATE(NOW())`
+         WHERE status='scheduled' AND scheduled_for = CURDATE()`
       )
-      const [countRows]: any = await pool.query(
-        `SELECT COUNT(*) as total FROM notifications WHERE status='failed' AND DATE(updated_at) = DATE(NOW())`
-      )
-      stats.failed = countRows[0]?.total ?? 0
+      stats.failed = updateResult.affectedRows ?? 0
       return stats
     }
   } catch (err: any) {
     console.error('[dispatcher] erro ao verificar sessão WAHA:', err.message)
-    await pool.query(
+    const [updateResult]: any = await pool.query(
       `UPDATE notifications SET status='failed', error_detail=?
-       WHERE status='scheduled' AND DATE(scheduled_for) = DATE(NOW())`,
+       WHERE status='scheduled' AND scheduled_for = CURDATE()`,
       [`Erro ao verificar sessão WAHA: ${err.message}`]
     )
+    stats.failed = updateResult.affectedRows ?? 0
     return stats
   }
 
@@ -117,7 +119,7 @@ export async function runDispatch(): Promise<{ sent: number; failed: number; ski
      JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
      JOIN bills b ON b.id = o.bill_id
      LEFT JOIN payment_methods pm ON pm.bill_id = b.id AND pm.is_primary = 1
-     WHERE n.status = 'scheduled' AND DATE(n.scheduled_for) = DATE(NOW())`
+     WHERE n.status = 'scheduled' AND n.scheduled_for = CURDATE()`
   )
 
   if (!notifications.length) {
