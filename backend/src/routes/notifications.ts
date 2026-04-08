@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
+import { runDispatch } from '../dispatcher'
 
 const router = Router()
 
@@ -72,6 +73,17 @@ router.patch('/:id/failed', async (req: Request, res: Response) => {
     )
     const [rows]: any = await pool.query('SELECT * FROM notifications WHERE id = ?', [req.params.id])
     res.json(rows[0])
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/notifications/dispatch
+// Dispara o envio das notificações do dia imediatamente (manual/debug).
+router.post('/dispatch', async (_req: Request, res: Response) => {
+  try {
+    const result = await runDispatch()
+    res.json(result)
   } catch (err: any) {
     res.status(500).json({ error: err.message })
   }
