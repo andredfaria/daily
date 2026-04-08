@@ -1,14 +1,14 @@
+// backend/src/routes/users.ts
 import { Router, Request, Response } from 'express'
 import pool from '../db'
+import { reloadSchedule } from '../scheduler'
 
 const router = Router()
 
 // GET /api/users/me — retorna o primeiro usuário (single-tenant)
 router.get('/me', async (_req: Request, res: Response) => {
   try {
-    const [rows]: any = await pool.query(
-      'SELECT * FROM users LIMIT 1'
-    )
+    const [rows]: any = await pool.query('SELECT * FROM users LIMIT 1')
     if (!rows.length) {
       return res.json({
         id: '00000000-0000-0000-0000-000000000001',
@@ -16,6 +16,10 @@ router.get('/me', async (_req: Request, res: Response) => {
         whatsapp_number: '',
         timezone: 'America/Sao_Paulo',
         is_active: true,
+        whatsapp_alerts_enabled: true,
+        weekly_summary_enabled: false,
+        default_days_before_alert: 3,
+        notification_time: 8,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -29,7 +33,16 @@ router.get('/me', async (_req: Request, res: Response) => {
 // PATCH /api/users/me
 router.patch('/me', async (req: Request, res: Response) => {
   try {
-    const allowed = ['name', 'whatsapp_number', 'timezone', 'is_active']
+    const allowed = [
+      'name',
+      'whatsapp_number',
+      'timezone',
+      'is_active',
+      'whatsapp_alerts_enabled',
+      'weekly_summary_enabled',
+      'default_days_before_alert',
+      'notification_time',
+    ]
     const fields: string[] = []
     const values: any[] = []
 
@@ -47,6 +60,16 @@ router.patch('/me', async (req: Request, res: Response) => {
     }
 
     const [rows]: any = await pool.query('SELECT * FROM users LIMIT 1')
+
+    // Recarregar o scheduler se preferências de notificação foram alteradas
+    const notifFields = ['whatsapp_alerts_enabled', 'notification_time']
+    const hasNotifChange = notifFields.some((f) => req.body[f] !== undefined)
+    if (hasNotifChange) {
+      reloadSchedule().catch((err) =>
+        console.error('[users] erro ao recarregar schedule:', err.message)
+      )
+    }
+
     res.json(rows[0])
   } catch (err: any) {
     res.status(500).json({ error: err.message })
