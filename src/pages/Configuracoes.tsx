@@ -114,6 +114,7 @@ const Configuracoes: React.FC = () => {
 
   const handleSaveNotifications = async () => {
     setSavingNotif(true)
+    const prev = { ...notifSettings }
     try {
       await client.patch('/users/me', {
         whatsapp_alerts_enabled: notifSettings.whatsapp_alerts,
@@ -123,6 +124,7 @@ const Configuracoes: React.FC = () => {
       })
       success('Configurações salvas!')
     } catch {
+      setNotifSettings(prev)
       showError('Erro ao salvar configurações.')
     } finally {
       setSavingNotif(false)
@@ -168,7 +170,7 @@ const Configuracoes: React.FC = () => {
       setDispatchResult(result)
     } catch (err: any) {
       const detail = err.response?.data?.error ?? err.message ?? 'Erro de conexão.'
-      setTestResult({ success: false, message: detail })
+      setTestResult({ success: false, message: `Erro no disparo: ${detail}` })
     } finally {
       setDispatching(false)
     }
