@@ -68,6 +68,10 @@ export interface User {
   whatsapp_number: string
   timezone: string
   is_active: boolean
+  whatsapp_alerts_enabled: boolean
+  weekly_summary_enabled: boolean
+  default_days_before_alert: number
+  notification_time: number
   created_at: string
   updated_at: string
 }

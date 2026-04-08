@@ -44,4 +44,9 @@ export const notificationsApi = {
     const res = await client.post('/waha/test-message')
     return res.data
   },
+
+  dispatch: async (): Promise<{ sent: number; failed: number; skipped: number }> => {
+    const res = await client.post<{ sent: number; failed: number; skipped: number }>('/notifications/dispatch')
+    return res.data
+  },
 }

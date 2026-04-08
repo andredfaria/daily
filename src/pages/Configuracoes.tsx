@@ -46,6 +46,10 @@ const Configuracoes: React.FC = () => {
         whatsapp_number: '+55 (11) 99999-9999',
         timezone: 'America/Sao_Paulo',
         is_active: true,
+        whatsapp_alerts_enabled: true,
+        weekly_summary_enabled: true,
+        default_days_before_alert: 3,
+        notification_time: 9,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
