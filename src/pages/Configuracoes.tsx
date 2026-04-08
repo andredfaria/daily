@@ -4,10 +4,13 @@ import { notificationsApi } from '../api/notifications'
 import type { User } from '../types'
 import { useToast } from '../context/ToastContext'
 
+const NOTIFICATION_HOURS = [7, 8, 9, 10, 12, 18]
+
 interface NotificationSettings {
   whatsapp_alerts: boolean
   weekly_summary: boolean
   days_before: number
+  notification_time: number
 }
 
 const APP_VERSION = '1.0.0'
@@ -24,10 +27,18 @@ const Configuracoes: React.FC = () => {
     whatsapp_alerts: true,
     weekly_summary: false,
     days_before: 3,
+    notification_time: 8,
   })
+  const [savingNotif, setSavingNotif] = useState(false)
+
+  const [wahaStatus, setWahaStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading')
+  const [reconnecting, setReconnecting] = useState(false)
 
   const [testingMessage, setTestingMessage] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  const [dispatching, setDispatching] = useState(false)
+  const [dispatchResult, setDispatchResult] = useState<{ sent: number; failed: number; skipped: number } | null>(null)
 
   const { success, error: showError } = useToast()
 
@@ -35,11 +46,17 @@ const Configuracoes: React.FC = () => {
     try {
       setLoadingUser(true)
       const res = await client.get<User>('/users/me')
-      setUser(res.data)
-      setProfileName(res.data.name ?? '')
-      setProfileWhatsapp(res.data.whatsapp_number)
+      const u = res.data
+      setUser(u)
+      setProfileName(u.name ?? '')
+      setProfileWhatsapp(u.whatsapp_number)
+      setNotifSettings({
+        whatsapp_alerts: u.whatsapp_alerts_enabled ?? true,
+        weekly_summary: u.weekly_summary_enabled ?? false,
+        days_before: u.default_days_before_alert ?? 3,
+        notification_time: u.notification_time ?? 8,
+      })
     } catch {
-      // Use placeholder user
       const placeholder: User = {
         id: '1',
         name: 'Usuário',
@@ -47,9 +64,9 @@ const Configuracoes: React.FC = () => {
         timezone: 'America/Sao_Paulo',
         is_active: true,
         whatsapp_alerts_enabled: true,
-        weekly_summary_enabled: true,
+        weekly_summary_enabled: false,
         default_days_before_alert: 3,
-        notification_time: 9,
+        notification_time: 8,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
@@ -61,9 +78,19 @@ const Configuracoes: React.FC = () => {
     }
   }, [])
 
+  const fetchWahaStatus = useCallback(async () => {
+    try {
+      const res = await notificationsApi.getWahaStatus()
+      setWahaStatus(res.connected ? 'connected' : 'disconnected')
+    } catch {
+      setWahaStatus('disconnected')
+    }
+  }, [])
+
   useEffect(() => {
     fetchUser()
-  }, [fetchUser])
+    fetchWahaStatus()
+  }, [fetchUser, fetchWahaStatus])
 
   const handleSaveProfile = async () => {
     if (!profileName.trim()) return
@@ -73,13 +100,45 @@ const Configuracoes: React.FC = () => {
         name: profileName.trim(),
         whatsapp_number: profileWhatsapp.trim(),
       })
-      setUser((prev) => prev ? { ...prev, name: profileName.trim(), whatsapp_number: profileWhatsapp.trim() } : prev)
+      setUser((prev) =>
+        prev ? { ...prev, name: profileName.trim(), whatsapp_number: profileWhatsapp.trim() } : prev
+      )
       setEditingProfile(false)
       success('Perfil atualizado!')
     } catch {
       showError('Erro ao atualizar perfil.')
     } finally {
       setSavingProfile(false)
+    }
+  }
+
+  const handleSaveNotifications = async () => {
+    setSavingNotif(true)
+    try {
+      await client.patch('/users/me', {
+        whatsapp_alerts_enabled: notifSettings.whatsapp_alerts,
+        weekly_summary_enabled: notifSettings.weekly_summary,
+        default_days_before_alert: notifSettings.days_before,
+        notification_time: notifSettings.notification_time,
+      })
+      success('Configurações salvas!')
+    } catch {
+      showError('Erro ao salvar configurações.')
+    } finally {
+      setSavingNotif(false)
+    }
+  }
+
+  const handleReconnect = async () => {
+    setReconnecting(true)
+    try {
+      await notificationsApi.reconnectWaha()
+      await fetchWahaStatus()
+      success('Reconexão iniciada!')
+    } catch {
+      showError('Erro ao reconectar WAHA.')
+    } finally {
+      setReconnecting(false)
     }
   }
 
@@ -101,6 +160,20 @@ const Configuracoes: React.FC = () => {
     }
   }
 
+  const handleDispatch = async () => {
+    setDispatching(true)
+    setDispatchResult(null)
+    try {
+      const result = await notificationsApi.dispatch()
+      setDispatchResult(result)
+    } catch (err: any) {
+      const detail = err.response?.data?.error ?? err.message ?? 'Erro de conexão.'
+      setTestResult({ success: false, message: detail })
+    } finally {
+      setDispatching(false)
+    }
+  }
+
   return (
     <div className="space-y-6 animate-fadeIn">
       <div className="grid grid-cols-12 gap-6">
@@ -114,10 +187,7 @@ const Configuracoes: React.FC = () => {
                 <h3 className="text-base font-semibold text-on-surface">Perfil</h3>
               </div>
               {!editingProfile && (
-                <button
-                  onClick={() => setEditingProfile(true)}
-                  className="btn-ghost text-xs"
-                >
+                <button onClick={() => setEditingProfile(true)} className="btn-ghost text-xs">
                   <span className="material-symbols-outlined text-base">edit</span>
                   Editar Perfil
                 </button>
@@ -171,7 +241,6 @@ const Configuracoes: React.FC = () => {
               </div>
             )}
           </div>
-
         </div>
 
         {/* Right column */}
@@ -197,77 +266,155 @@ const Configuracoes: React.FC = () => {
                 onChange={(v) => setNotifSettings((prev) => ({ ...prev, weekly_summary: v }))}
               />
 
-              <div className="pt-2 border-t border-outline-variant/30">
-                <label className="label">Dias de antecedência</label>
-                <div className="flex items-center gap-3 mt-2">
-                  <button
-                    type="button"
-                    onClick={() => setNotifSettings((p) => ({ ...p, days_before: Math.max(0, p.days_before - 1) }))}
-                    className="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-sm">remove</span>
-                  </button>
-                  <span className="w-10 text-center text-base font-semibold text-on-surface">
-                    {notifSettings.days_before}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setNotifSettings((p) => ({ ...p, days_before: Math.min(30, p.days_before + 1) }))}
-                    className="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-sm">add</span>
-                  </button>
+              <div className="pt-2 border-t border-outline-variant/30 space-y-3">
+                <div>
+                  <label className="label">Dias de antecedência</label>
+                  <div className="flex items-center gap-3 mt-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNotifSettings((p) => ({ ...p, days_before: Math.max(0, p.days_before - 1) }))
+                      }
+                      className="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">remove</span>
+                    </button>
+                    <span className="w-10 text-center text-base font-semibold text-on-surface">
+                      {notifSettings.days_before}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNotifSettings((p) => ({ ...p, days_before: Math.min(30, p.days_before + 1) }))
+                      }
+                      className="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">add</span>
+                    </button>
+                  </div>
                 </div>
+
+                {notifSettings.whatsapp_alerts && (
+                  <div>
+                    <label className="label">Horário de envio</label>
+                    <select
+                      value={notifSettings.notification_time}
+                      onChange={(e) =>
+                        setNotifSettings((p) => ({ ...p, notification_time: Number(e.target.value) }))
+                      }
+                      className="input-field mt-1"
+                    >
+                      {NOTIFICATION_HOURS.map((h) => (
+                        <option key={h} value={h}>
+                          {String(h).padStart(2, '0')}:00
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               <button
-                onClick={() => success('Configurações salvas!')}
+                onClick={handleSaveNotifications}
+                disabled={savingNotif}
                 className="btn-primary w-full justify-center mt-2"
               >
-                <span className="material-symbols-outlined text-lg">save</span>
+                {savingNotif ? (
+                  <span className="w-4 h-4 border-2 border-on-primary-fixed border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <span className="material-symbols-outlined text-lg">save</span>
+                )}
                 Salvar
               </button>
             </div>
           </div>
 
-          {/* Test Message Card */}
+          {/* Test / Dispatch Card */}
           <div className="section-card">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined text-primary">send</span>
-              <h3 className="text-base font-semibold text-on-surface">Testar Envio</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">send</span>
+                <h3 className="text-base font-semibold text-on-surface">WhatsApp</h3>
+              </div>
+              {/* Status WAHA */}
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    wahaStatus === 'connected'
+                      ? 'bg-tertiary'
+                      : wahaStatus === 'disconnected'
+                      ? 'bg-error'
+                      : 'bg-outline animate-pulse'
+                  }`}
+                />
+                <span className="text-xs text-on-surface-variant">
+                  {wahaStatus === 'connected' ? 'Conectado' : wahaStatus === 'disconnected' ? 'Desconectado' : '...'}
+                </span>
+                {wahaStatus === 'disconnected' && (
+                  <button
+                    onClick={handleReconnect}
+                    disabled={reconnecting}
+                    className="btn-ghost text-xs ml-1 py-0.5 px-2"
+                  >
+                    {reconnecting ? (
+                      <span className="w-3 h-3 border border-primary border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      'Reconectar'
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
 
             <p className="text-xs text-on-surface-variant mb-4 leading-relaxed">
-              Envia uma mensagem de teste para o número WhatsApp configurado no seu perfil, validando se a integração está funcionando corretamente.
+              Valide a integração enviando uma mensagem de teste, ou dispare manualmente as notificações agendadas para hoje.
             </p>
 
-            <button
-              onClick={handleTestMessage}
-              disabled={testingMessage}
-              className="btn-primary w-full justify-center"
-            >
-              {testingMessage ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-on-primary-fixed border-t-transparent rounded-full animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-lg">send</span>
-                  Enviar Mensagem de Teste
-                </>
-              )}
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={handleTestMessage}
+                disabled={testingMessage}
+                className="btn-primary w-full justify-center"
+              >
+                {testingMessage ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-on-primary-fixed border-t-transparent rounded-full animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-lg">send</span>
+                    Mensagem de Teste
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleDispatch}
+                disabled={dispatching}
+                className="btn-ghost w-full justify-center"
+              >
+                {dispatching ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    Disparando...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-lg">notifications_active</span>
+                    Disparar Notificações de Hoje
+                  </>
+                )}
+              </button>
+            </div>
 
             {testResult && (
               <div
-                className={`
-                  mt-4 p-3 rounded-xl flex items-start gap-2.5 text-sm
-                  ${testResult.success
+                className={`mt-4 p-3 rounded-xl flex items-start gap-2.5 text-sm ${
+                  testResult.success
                     ? 'bg-tertiary/10 border border-tertiary/30 text-tertiary'
                     : 'bg-error-container/30 border border-error/30 text-error'
-                  }
-                `}
+                }`}
               >
                 <span className="material-symbols-outlined text-base flex-shrink-0 mt-0.5">
                   {testResult.success ? 'check_circle' : 'error'}
@@ -275,8 +422,16 @@ const Configuracoes: React.FC = () => {
                 <p className="leading-relaxed">{testResult.message}</p>
               </div>
             )}
-          </div>
 
+            {dispatchResult && (
+              <div className="mt-4 p-3 rounded-xl bg-surface-container border border-outline-variant/30 text-sm">
+                <p className="text-on-surface font-medium mb-1">Resultado do disparo:</p>
+                <p className="text-on-surface-variant">
+                  ✅ {dispatchResult.sent} enviadas &nbsp;·&nbsp; ❌ {dispatchResult.failed} falhas &nbsp;·&nbsp; ⏭ {dispatchResult.skipped} ignoradas
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -286,7 +441,6 @@ const Configuracoes: React.FC = () => {
           BillSync v{APP_VERSION} · Gestão de Pagamentos
         </p>
       </div>
-
     </div>
   )
 }
@@ -324,16 +478,14 @@ const ToggleRow: React.FC<ToggleRowProps> = ({ label, description, checked, onCh
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className={`
-        relative w-10 h-5 rounded-full transition-all duration-300 flex-shrink-0
-        ${checked ? 'bg-tertiary shadow-[0_0_6px_rgba(74,225,118,0.3)]' : 'bg-outline/30'}
-      `}
+      className={`relative w-10 h-5 rounded-full transition-all duration-300 flex-shrink-0 ${
+        checked ? 'bg-tertiary shadow-[0_0_6px_rgba(74,225,118,0.3)]' : 'bg-outline/30'
+      }`}
     >
       <span
-        className={`
-          absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300
-          ${checked ? 'left-5' : 'left-0.5'}
-        `}
+        className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300 ${
+          checked ? 'left-5' : 'left-0.5'
+        }`}
       />
     </button>
   </div>
