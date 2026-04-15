@@ -1,19 +1,8 @@
 import { Router, Request, Response } from 'express'
-import axios from 'axios'
 import pool from '../db'
+import { wahaClient } from '../services/waha'
 
 const router = Router()
-
-function wahaClient() {
-  return axios.create({
-    baseURL: process.env.WAHA_URL || 'http://localhost:3000',
-    headers: {
-      'X-Api-Key': process.env.WAHA_API_KEY || '',
-      'Content-Type': 'application/json',
-    },
-    timeout: 10000,
-  })
-}
 
 // GET /api/waha/status
 router.get('/status', async (_req: Request, res: Response) => {
