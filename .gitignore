@@ -55,3 +55,6 @@ database/data/
 *.sql.gz
 *.sql.tar
 dump.rdb
+
+# Git worktrees
+.worktrees/
