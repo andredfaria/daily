@@ -41,6 +41,8 @@ pnpm-debug.log*
 
 # Database Local Data & Dumps
 database/data/
+backend/node_modules/
+frontend/node_modules/
 *.sqlite
 *.sqlite3
 *.sql.gz
@@ -90,3 +92,10 @@ Thumbs.db
 
 # Git worktrees
 .worktrees/
+
+
+#node module
+node_modules/*
+*/node_modules/*
+*/node_modules/*
+*/node_modules
