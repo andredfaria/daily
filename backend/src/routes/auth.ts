@@ -31,7 +31,7 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       `SELECT COUNT(*) as count FROM otp_codes WHERE phone_number = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
       [digits]
     )
-    if (hourRows[0].count >= 5) {
+    if (hourRows[0].count > 5) {
       return res.status(429).json({ error: 'Limite de tentativas excedido. Tente novamente em 1 hora' })
     }
 
