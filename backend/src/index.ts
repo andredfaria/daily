@@ -12,6 +12,8 @@ import occurrencesRouter from './routes/occurrences'
 import notificationsRouter from './routes/notifications'
 import wahaRouter from './routes/waha'
 import usersRouter from './routes/users'
+import authRouter from './routes/auth'
+import { authMiddleware } from './middleware/auth'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 4000
@@ -36,6 +38,8 @@ app.get('/api/health', async (_req, res) => {
 })
 
 // Rotas
+app.use('/api/auth', authRouter)  // público — sem autenticação
+app.use(authMiddleware)            // tudo abaixo requer autenticação
 app.use('/api/bills', billsRouter)
 app.use('/api/occurrences', occurrencesRouter)
 app.use('/api/notifications', notificationsRouter)
