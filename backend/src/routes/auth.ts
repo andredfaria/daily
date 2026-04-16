@@ -31,7 +31,7 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       `SELECT COUNT(*) as count FROM otp_codes WHERE phone_number = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
       [digits]
     )
-    if (hourRows[0].count > 5) {
+    if (hourRows[0].count >= 5) {
       return res.status(429).json({ error: 'Limite de tentativas excedido. Tente novamente em 1 hora' })
     }
 
@@ -50,7 +50,8 @@ router.post('/request-otp', async (req: Request, res: Response) => {
 
     return res.json({ success: true, message: 'Código enviado via WhatsApp' })
   } catch (err: any) {
-    return res.status(500).json({ error: err.message })
+    console.error(err)
+    return res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -75,23 +76,25 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
 
     const row = otpRows[0]
 
-    if (row.attempts >= 5) {
-      return res.status(401).json({ error: 'Código bloqueado por excesso de tentativas' })
-    }
-
-    await pool.query(
-      `UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?`,
+    // Increment attempts atomically — only if code is valid and not exhausted
+    const [incResult]: any = await pool.query(
+      'UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ? AND used = FALSE AND attempts < 5 AND expires_at > NOW()',
       [row.id]
     )
+    if (incResult.affectedRows === 0) {
+      return res.status(401).json({ error: 'Código bloqueado por excesso de tentativas ou expirado' })
+    }
 
-    if (row.code !== (code || '').trim()) {
+    // Constant-time comparison to prevent timing attacks
+    const { timingSafeEqual } = await import('crypto')
+    const expected = Buffer.from(row.code)
+    const provided = Buffer.from((code || '').trim().padEnd(row.code.length, '\0').slice(0, row.code.length))
+    if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
       return res.status(401).json({ error: 'Código incorreto' })
     }
 
-    await pool.query(
-      `UPDATE otp_codes SET used = TRUE WHERE id = ?`,
-      [row.id]
-    )
+    // Mark OTP as used
+    await pool.query('UPDATE otp_codes SET used = TRUE WHERE id = ?', [row.id])
 
     // Find or create user
     const [userRows]: any = await pool.query(
@@ -133,9 +136,19 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       { expiresIn: '30d' }
     )
 
-    return res.json({ token, user })
+    const safeUser = {
+      id: user.id,
+      name: user.name,
+      whatsapp_number: user.whatsapp_number,
+      timezone: user.timezone,
+      is_active: user.is_active,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
+    }
+    return res.json({ token, user: safeUser })
   } catch (err: any) {
-    return res.status(500).json({ error: err.message })
+    console.error(err)
+    return res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -153,7 +166,8 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
 
     return res.json(rows[0])
   } catch (err: any) {
-    return res.status(500).json({ error: err.message })
+    console.error(err)
+    return res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 

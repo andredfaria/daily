@@ -51,7 +51,8 @@ router.get('/stats', async (req: Request, res: Response) => {
       overdue_count: countRows.overdue_count ?? 0,
     })
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -73,7 +74,8 @@ router.get('/upcoming', async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -106,7 +108,8 @@ router.get('/', async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -120,7 +123,8 @@ router.get('/:id', async (req: Request, res: Response) => {
     if (!rows.length) return res.status(404).json({ error: 'Not found' })
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -146,7 +150,8 @@ router.patch('/:id/pay', async (req: Request, res: Response) => {
     )
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -183,7 +188,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
     )
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 

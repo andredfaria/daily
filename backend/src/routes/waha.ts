@@ -26,7 +26,8 @@ router.post('/reconnect', async (_req: Request, res: Response) => {
     const { data } = await wahaClient().post(`/api/sessions/${session}/restart`)
     res.json({ status: data.status ?? 'restarting', qr_code: data.qr ?? undefined })
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -37,7 +38,8 @@ router.post('/disconnect', async (_req: Request, res: Response) => {
     await wahaClient().post(`/api/sessions/${session}/stop`)
     res.json({ status: 'stopped' })
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -102,14 +104,10 @@ router.post('/test-message', async (req: Request, res: Response) => {
       message_id: msgData.id ?? msgData.key?.id ?? null,
     })
   } catch (err: any) {
-    const status = err.response?.status
-    const detail = err.response?.data?.message ?? err.response?.data?.error ?? err.message
-
+    console.error(err)
     return res.status(500).json({
       success: false,
-      error: status
-        ? `Erro ${status} ao enviar mensagem: ${detail}`
-        : `Erro de conexão com WAHA: ${detail}`,
+      error: 'Erro interno do servidor',
     })
   }
 })

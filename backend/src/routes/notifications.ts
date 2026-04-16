@@ -21,7 +21,8 @@ router.get('/due-today', async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -49,7 +50,8 @@ router.get('/', async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -73,7 +75,8 @@ router.patch('/:id/sent', async (req: Request, res: Response) => {
     const [rows]: any = await pool.query('SELECT * FROM notifications WHERE id = ?', [req.params.id])
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -96,7 +99,8 @@ router.patch('/:id/failed', async (req: Request, res: Response) => {
     const [rows]: any = await pool.query('SELECT * FROM notifications WHERE id = ?', [req.params.id])
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 

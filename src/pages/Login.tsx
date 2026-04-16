@@ -191,6 +191,7 @@ export const Login: React.FC = () => {
                     inputMode="numeric"
                     maxLength={1}
                     value={d}
+                    autoComplete={i === 0 ? 'one-time-code' : 'off'}
                     onChange={(e) => handleOtpInput(i, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(i, e)}
                     className="w-11 h-14 text-center text-xl font-bold text-on-surface bg-surface-container-high border border-outline-variant rounded-xl focus:border-primary focus:outline-none transition-colors"

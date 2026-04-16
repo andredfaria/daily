@@ -10,7 +10,8 @@ router.get('/', async (req: Request, res: Response) => {
     const [rows] = await pool.query('SELECT * FROM bills WHERE user_id = ? ORDER BY created_at DESC', [req.userId])
     res.json(rows)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -27,7 +28,8 @@ router.get('/:id', async (req: Request, res: Response) => {
     bill.payment_methods = methods
     res.json(bill)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -60,7 +62,8 @@ router.post('/', async (req: Request, res: Response) => {
     const [rows]: any = await pool.query('SELECT * FROM bills WHERE id = ?', [id])
     res.status(201).json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -95,17 +98,20 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const [rows]: any = await pool.query('SELECT * FROM bills WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
 // DELETE /api/bills/:id
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    await pool.query('DELETE FROM bills WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
+    const [result]: any = await pool.query('DELETE FROM bills WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Not found' })
     res.status(204).send()
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -123,7 +129,8 @@ router.get('/:billId/payment-methods', async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -154,7 +161,8 @@ router.post('/:billId/payment-methods', async (req: Request, res: Response) => {
     )
     res.status(201).json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -185,7 +193,8 @@ router.patch('/:billId/payment-methods/:methodId', async (req: Request, res: Res
     )
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -198,7 +207,8 @@ router.delete('/:billId/payment-methods/:methodId', async (req: Request, res: Re
     await pool.query('DELETE FROM payment_methods WHERE id = ?', [req.params.methodId])
     res.status(204).send()
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 

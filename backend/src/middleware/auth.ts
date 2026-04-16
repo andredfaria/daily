@@ -12,7 +12,7 @@ declare global {
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   // Allow n8n service-to-service calls via API key
   const apiKey = req.headers['x-api-key']
-  if (apiKey && apiKey === process.env.N8N_API_KEY) {
+  if (process.env.N8N_API_KEY && apiKey === process.env.N8N_API_KEY) {
     req.userId = '__service__'
     return next()
   }

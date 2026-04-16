@@ -12,7 +12,8 @@ router.get('/me', async (req: Request, res: Response) => {
     }
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -40,7 +41,8 @@ router.patch('/me', async (req: Request, res: Response) => {
     const [rows]: any = await pool.query('SELECT * FROM users WHERE id = ? LIMIT 1', [req.userId])
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
