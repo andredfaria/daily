@@ -3,22 +3,12 @@ import pool from '../db'
 
 const router = Router()
 
-// GET /api/users/me — retorna o primeiro usuário (single-tenant)
-router.get('/me', async (_req: Request, res: Response) => {
+// GET /api/users/me
+router.get('/me', async (req: Request, res: Response) => {
   try {
-    const [rows]: any = await pool.query(
-      'SELECT * FROM users LIMIT 1'
-    )
+    const [rows]: any = await pool.query('SELECT * FROM users WHERE id = ? LIMIT 1', [req.userId])
     if (!rows.length) {
-      return res.json({
-        id: '00000000-0000-0000-0000-000000000001',
-        name: null,
-        whatsapp_number: '',
-        timezone: 'America/Sao_Paulo',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      return res.status(404).json({ error: 'Usuário não encontrado' })
     }
     res.json(rows[0])
   } catch (err: any) {
@@ -43,10 +33,11 @@ router.patch('/me', async (req: Request, res: Response) => {
     if (fields.length) {
       fields.push('updated_at = ?')
       values.push(new Date())
-      await pool.query(`UPDATE users SET ${fields.join(', ')} LIMIT 1`, values)
+      values.push(req.userId)
+      await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values)
     }
 
-    const [rows]: any = await pool.query('SELECT * FROM users LIMIT 1')
+    const [rows]: any = await pool.query('SELECT * FROM users WHERE id = ? LIMIT 1', [req.userId])
     res.json(rows[0])
   } catch (err: any) {
     res.status(500).json({ error: err.message })

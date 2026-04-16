@@ -5,11 +5,9 @@ import pool from '../db'
 const router = Router()
 
 // GET /api/bills
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM bills ORDER BY created_at DESC'
-    )
+    const [rows] = await pool.query('SELECT * FROM bills WHERE user_id = ? ORDER BY created_at DESC', [req.userId])
     res.json(rows)
   } catch (err: any) {
     res.status(500).json({ error: err.message })
@@ -19,10 +17,7 @@ router.get('/', async (_req: Request, res: Response) => {
 // GET /api/bills/:id
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const [rows]: any = await pool.query(
-      'SELECT * FROM bills WHERE id = ?',
-      [req.params.id]
-    )
+    const [rows]: any = await pool.query('SELECT * FROM bills WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
     if (!rows.length) return res.status(404).json({ error: 'Not found' })
     const bill = rows[0]
     const [methods]: any = await pool.query(
@@ -55,7 +50,7 @@ router.post('/', async (req: Request, res: Response) => {
          days_before_alert, is_active, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id, '00000000-0000-0000-0000-000000000001',
+        id, req.userId,
         name, description ?? null, amount, recurrence_type,
         recurrence_day_of_month ?? null, recurrence_day_of_week ?? null,
         due_date ?? null, days_before_alert, is_active ? 1 : 0, now, now,
@@ -92,11 +87,12 @@ router.patch('/:id', async (req: Request, res: Response) => {
     fields.push('updated_at = ?')
     values.push(new Date())
     values.push(req.params.id)
+    values.push(req.userId)
 
-    await pool.query(`UPDATE bills SET ${fields.join(', ')} WHERE id = ?`, values)
+    const [result] = await pool.query(`UPDATE bills SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`, values)
+    if ((result as any).affectedRows === 0) return res.status(404).json({ error: 'Not found' })
 
-    const [rows]: any = await pool.query('SELECT * FROM bills WHERE id = ?', [req.params.id])
-    if (!rows.length) return res.status(404).json({ error: 'Not found' })
+    const [rows]: any = await pool.query('SELECT * FROM bills WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
     res.json(rows[0])
   } catch (err: any) {
     res.status(500).json({ error: err.message })
@@ -106,7 +102,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 // DELETE /api/bills/:id
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    await pool.query('DELETE FROM bills WHERE id = ?', [req.params.id])
+    await pool.query('DELETE FROM bills WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
     res.status(204).send()
   } catch (err: any) {
     res.status(500).json({ error: err.message })
@@ -118,6 +114,9 @@ router.delete('/:id', async (req: Request, res: Response) => {
 // GET /api/bills/:billId/payment-methods
 router.get('/:billId/payment-methods', async (req: Request, res: Response) => {
   try {
+    const [billRows]: any = await pool.query('SELECT id FROM bills WHERE id = ? AND user_id = ?', [req.params.billId, req.userId])
+    if (!billRows.length) return res.status(404).json({ error: 'Conta não encontrada' })
+
     const [rows] = await pool.query(
       'SELECT * FROM payment_methods WHERE bill_id = ?',
       [req.params.billId]
@@ -131,6 +130,9 @@ router.get('/:billId/payment-methods', async (req: Request, res: Response) => {
 // POST /api/bills/:billId/payment-methods
 router.post('/:billId/payment-methods', async (req: Request, res: Response) => {
   try {
+    const [billRows]: any = await pool.query('SELECT id FROM bills WHERE id = ? AND user_id = ?', [req.params.billId, req.userId])
+    if (!billRows.length) return res.status(404).json({ error: 'Conta não encontrada' })
+
     const {
       type, pix_key_type, pix_key, pix_beneficiary, boleto_code, is_primary = false,
     } = req.body
@@ -159,6 +161,9 @@ router.post('/:billId/payment-methods', async (req: Request, res: Response) => {
 // PATCH /api/bills/:billId/payment-methods/:methodId
 router.patch('/:billId/payment-methods/:methodId', async (req: Request, res: Response) => {
   try {
+    const [billRows]: any = await pool.query('SELECT id FROM bills WHERE id = ? AND user_id = ?', [req.params.billId, req.userId])
+    if (!billRows.length) return res.status(404).json({ error: 'Conta não encontrada' })
+
     const allowed = ['type', 'pix_key_type', 'pix_key', 'pix_beneficiary', 'boleto_code', 'is_primary']
     const fields: string[] = []
     const values: any[] = []
@@ -187,6 +192,9 @@ router.patch('/:billId/payment-methods/:methodId', async (req: Request, res: Res
 // DELETE /api/bills/:billId/payment-methods/:methodId
 router.delete('/:billId/payment-methods/:methodId', async (req: Request, res: Response) => {
   try {
+    const [billRows]: any = await pool.query('SELECT id FROM bills WHERE id = ? AND user_id = ?', [req.params.billId, req.userId])
+    if (!billRows.length) return res.status(404).json({ error: 'Conta não encontrada' })
+
     await pool.query('DELETE FROM payment_methods WHERE id = ?', [req.params.methodId])
     res.status(204).send()
   } catch (err: any) {
