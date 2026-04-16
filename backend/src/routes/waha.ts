@@ -44,10 +44,10 @@ router.post('/disconnect', async (_req: Request, res: Response) => {
 // POST /api/waha/test-message
 // Envia uma mensagem de teste para o número WhatsApp configurado no perfil do usuário.
 // Retorna { success: true, to, message_id } ou { success: false, error }
-router.post('/test-message', async (_req: Request, res: Response) => {
+router.post('/test-message', async (req: Request, res: Response) => {
   try {
     // 1. Buscar número do usuário no banco
-    const [rows]: any = await pool.query('SELECT whatsapp_number, name FROM users LIMIT 1')
+    const [rows]: any = await pool.query('SELECT whatsapp_number, name FROM users WHERE id = ?', [req.userId])
 
     if (!rows.length || !rows[0].whatsapp_number) {
       return res.status(400).json({
