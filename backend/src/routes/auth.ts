@@ -42,7 +42,7 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       [digits, code]
     )
 
-    await wahaClient().post('/api/send-text', {
+    await wahaClient().post('/api/sendText', {
       session: process.env.WAHA_SESSION || 'default',
       chatId: `${digits}@c.us`,
       text: `🔐 *BillSync* — Seu código de acesso:\n\n*${code}*\n\nVálido por 5 minutos. Não compartilhe.`,
