@@ -4,7 +4,7 @@ import pool from '../db'
 const router = Router()
 
 // GET /api/occurrences/stats  (antes de /:id para não colidir)
-router.get('/stats', async (_req: Request, res: Response) => {
+router.get('/stats', async (req: Request, res: Response) => {
   try {
     const now = new Date()
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -18,20 +18,24 @@ router.get('/stats', async (_req: Request, res: Response) => {
         SUM(CASE WHEN status = 'paid'    THEN amount ELSE 0 END)                      AS monthly_paid_amount,
         SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END)                      AS monthly_pending_amount,
         SUM(CASE WHEN status = 'overdue' THEN amount ELSE 0 END)                      AS monthly_overdue_amount
-       FROM bill_occurrences
-       WHERE due_date BETWEEN ? AND ?`,
-      [firstOfMonth, lastOfMonth]
+       FROM bill_occurrences bo
+       JOIN bills b ON b.id = bo.bill_id
+       WHERE bo.due_date BETWEEN ? AND ? AND b.user_id = ?`,
+      [firstOfMonth, lastOfMonth, req.userId]
     )
 
     const [[billCount]]: any = await pool.query(
-      "SELECT COUNT(*) AS active_bills FROM bills WHERE is_active = 1"
+      "SELECT COUNT(*) AS active_bills FROM bills WHERE is_active = 1 AND user_id = ?",
+      [req.userId]
     )
 
     const weekEnd = new Date()
     weekEnd.setDate(weekEnd.getDate() + 7)
     const [[dueWeek]]: any = await pool.query(
-      "SELECT COUNT(*) AS due_this_week FROM bill_occurrences WHERE status = 'pending' AND due_date BETWEEN ? AND ?",
-      [now, weekEnd]
+      `SELECT COUNT(*) AS due_this_week FROM bill_occurrences bo
+       JOIN bills b ON b.id = bo.bill_id
+       WHERE bo.status = 'pending' AND bo.due_date BETWEEN ? AND ? AND b.user_id = ?`,
+      [now, weekEnd, req.userId]
     )
 
     res.json({
@@ -47,7 +51,8 @@ router.get('/stats', async (_req: Request, res: Response) => {
       overdue_count: countRows.overdue_count ?? 0,
     })
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -63,13 +68,14 @@ router.get('/upcoming', async (req: Request, res: Response) => {
       `SELECT o.*, b.name AS bill_name, b.amount AS bill_amount
        FROM bill_occurrences o
        LEFT JOIN bills b ON b.id = o.bill_id
-       WHERE o.due_date BETWEEN ? AND ? AND o.status = 'pending'
+       WHERE o.due_date BETWEEN ? AND ? AND o.status = 'pending' AND b.user_id = ?
        ORDER BY o.due_date ASC`,
-      [from, to]
+      [from, to, req.userId]
     )
     res.json(rows)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -79,6 +85,9 @@ router.get('/', async (req: Request, res: Response) => {
     const { status, bill_id, from, to, limit = 200, offset = 0 } = req.query
     const conditions: string[] = []
     const values: any[] = []
+
+    conditions.push('b.user_id = ?')
+    values.push(req.userId)
 
     if (status) { conditions.push('o.status = ?'); values.push(status) }
     if (bill_id) { conditions.push('o.bill_id = ?'); values.push(bill_id) }
@@ -99,7 +108,8 @@ router.get('/', async (req: Request, res: Response) => {
     )
     res.json(rows)
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -107,18 +117,26 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const [rows]: any = await pool.query(
-      'SELECT * FROM bill_occurrences WHERE id = ?', [req.params.id]
+      'SELECT o.* FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id WHERE o.id = ? AND b.user_id = ?',
+      [req.params.id, req.userId]
     )
     if (!rows.length) return res.status(404).json({ error: 'Not found' })
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
 // PATCH /api/occurrences/:id/pay
 router.patch('/:id/pay', async (req: Request, res: Response) => {
   try {
+    const [ownerRows]: any = await pool.query(
+      'SELECT o.id FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id WHERE o.id = ? AND b.user_id = ?',
+      [req.params.id, req.userId]
+    )
+    if (!ownerRows.length) return res.status(404).json({ error: 'Not found' })
+
     const { paid_via, confirmation_source } = req.body
     const now = new Date()
     await pool.query(
@@ -132,13 +150,20 @@ router.patch('/:id/pay', async (req: Request, res: Response) => {
     )
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
 // PATCH /api/occurrences/:id
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
+    const [ownerRows]: any = await pool.query(
+      'SELECT o.id FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id WHERE o.id = ? AND b.user_id = ?',
+      [req.params.id, req.userId]
+    )
+    if (!ownerRows.length) return res.status(404).json({ error: 'Not found' })
+
     const allowed = ['status', 'paid_via', 'confirmation_source', 'amount']
     const fields: string[] = []
     const values: any[] = []
@@ -163,7 +188,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
     )
     res.json(rows[0])
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 

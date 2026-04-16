@@ -1,19 +1,8 @@
 import { Router, Request, Response } from 'express'
-import axios from 'axios'
 import pool from '../db'
+import { wahaClient } from '../services/waha'
 
 const router = Router()
-
-function wahaClient() {
-  return axios.create({
-    baseURL: process.env.WAHA_URL || 'http://localhost:3000',
-    headers: {
-      'X-Api-Key': process.env.WAHA_API_KEY || '',
-      'Content-Type': 'application/json',
-    },
-    timeout: 10000,
-  })
-}
 
 // GET /api/waha/status
 router.get('/status', async (_req: Request, res: Response) => {
@@ -37,7 +26,8 @@ router.post('/reconnect', async (_req: Request, res: Response) => {
     const { data } = await wahaClient().post(`/api/sessions/${session}/restart`)
     res.json({ status: data.status ?? 'restarting', qr_code: data.qr ?? undefined })
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
@@ -48,17 +38,18 @@ router.post('/disconnect', async (_req: Request, res: Response) => {
     await wahaClient().post(`/api/sessions/${session}/stop`)
     res.json({ status: 'stopped' })
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
 
 // POST /api/waha/test-message
 // Envia uma mensagem de teste para o número WhatsApp configurado no perfil do usuário.
 // Retorna { success: true, to, message_id } ou { success: false, error }
-router.post('/test-message', async (_req: Request, res: Response) => {
+router.post('/test-message', async (req: Request, res: Response) => {
   try {
     // 1. Buscar número do usuário no banco
-    const [rows]: any = await pool.query('SELECT whatsapp_number, name FROM users LIMIT 1')
+    const [rows]: any = await pool.query('SELECT whatsapp_number, name FROM users WHERE id = ?', [req.userId])
 
     if (!rows.length || !rows[0].whatsapp_number) {
       return res.status(400).json({
@@ -113,14 +104,10 @@ router.post('/test-message', async (_req: Request, res: Response) => {
       message_id: msgData.id ?? msgData.key?.id ?? null,
     })
   } catch (err: any) {
-    const status = err.response?.status
-    const detail = err.response?.data?.message ?? err.response?.data?.error ?? err.message
-
+    console.error(err)
     return res.status(500).json({
       success: false,
-      error: status
-        ? `Erro ${status} ao enviar mensagem: ${detail}`
-        : `Erro de conexão com WAHA: ${detail}`,
+      error: 'Erro interno do servidor',
     })
   }
 })
