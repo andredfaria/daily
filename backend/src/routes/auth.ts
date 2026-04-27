@@ -17,30 +17,47 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Número de telefone inválido' })
     }
 
-    // Rate limit: check last 1 minute
-    const [recentRows]: any = await pool.query(
-      `SELECT COUNT(*) as count FROM otp_codes WHERE phone_number = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)`,
-      [digits]
-    )
-    if (recentRows[0].count > 0) {
-      return res.status(429).json({ error: 'Aguarde 1 minuto antes de solicitar novo código' })
-    }
+    const devBypass = process.env.DEV_OTP_BYPASS === 'true'
 
-    // Rate limit: check last 1 hour (5+ entries)
-    const [hourRows]: any = await pool.query(
-      `SELECT COUNT(*) as count FROM otp_codes WHERE phone_number = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
-      [digits]
-    )
-    if (hourRows[0].count >= 5) {
-      return res.status(429).json({ error: 'Limite de tentativas excedido. Tente novamente em 1 hora' })
+    if (!devBypass) {
+      // Rate limit: check last 1 minute
+      const [recentRows]: any = await pool.query(
+        `SELECT COUNT(*) as count FROM otp_codes WHERE phone_number = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)`,
+        [digits]
+      )
+      if (recentRows[0].count > 0) {
+        return res.status(429).json({ error: 'Aguarde 1 minuto antes de solicitar novo código' })
+      }
+
+      // Rate limit: check last 1 hour (5+ entries)
+      const [hourRows]: any = await pool.query(
+        `SELECT COUNT(*) as count FROM otp_codes WHERE phone_number = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
+        [digits]
+      )
+      if (hourRows[0].count >= 5) {
+        return res.status(429).json({ error: 'Limite de tentativas excedido. Tente novamente em 1 hora' })
+      }
     }
 
     const code = String(Math.floor(100000 + Math.random() * 900000))
+
+    if (devBypass) {
+      // Clear previous unused OTPs so attempts/expiry never block local testing
+      await pool.query(
+        `DELETE FROM otp_codes WHERE phone_number = ? AND used = FALSE`,
+        [digits]
+      )
+    }
 
     await pool.query(
       `INSERT INTO otp_codes (id, phone_number, code, expires_at) VALUES (UUID(), ?, ?, DATE_ADD(NOW(), INTERVAL 5 MINUTE))`,
       [digits, code]
     )
+
+    if (devBypass) {
+      console.log(`[dev-otp] phone=${digits} code=${code}`)
+      return res.json({ success: true, message: 'Código gerado (dev bypass — veja o log do backend)' })
+    }
 
     const resolvedNumber = await resolveWhatsAppNumber(digits)
     const session = process.env.WAHA_SESSION || 'default'
