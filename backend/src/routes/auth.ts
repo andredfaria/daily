@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
-import { wahaClient, fetchWhatsAppName } from '../services/waha'
+import { wahaClient, fetchWhatsAppName, resolveWhatsAppNumber, generatePhoneVariant } from '../services/waha'
 import { authMiddleware } from '../middleware/auth'
 
 const router = Router()
@@ -42,11 +42,33 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       [digits, code]
     )
 
-    await wahaClient().post('/api/sendText', {
-      session: process.env.WAHA_SESSION || 'default',
-      chatId: `${digits}@c.us`,
-      text: `🔐 *BillSync* — Seu código de acesso:\n\n*${code}*\n\nVálido por 5 minutos. Não compartilhe.`,
-    })
+    const resolvedNumber = await resolveWhatsAppNumber(digits)
+    const session = process.env.WAHA_SESSION || 'default'
+    const otpText = `🔐 *BillSync* — Seu código de acesso:\n\n*${code}*\n\nVálido por 5 minutos. Não compartilhe.`
+    try {
+      await wahaClient().post('/api/sendText', {
+        session,
+        chatId: `${resolvedNumber}@c.us`,
+        text: otpText,
+      })
+    } catch (sendErr: any) {
+      // WAHA retorna 500 quando o numero nao existe no WhatsApp.
+      // Tenta automaticamente com a variante (com/sem o 9).
+      if (sendErr?.response?.status === 500) {
+        const variant = generatePhoneVariant(resolvedNumber)
+        if (variant) {
+          await wahaClient().post('/api/sendText', {
+            session,
+            chatId: `${variant}@c.us`,
+            text: otpText,
+          })
+        } else {
+          throw sendErr
+        }
+      } else {
+        throw sendErr
+      }
+    }
 
     return res.json({ success: true, message: 'Código enviado via WhatsApp' })
   } catch (err: any) {
@@ -96,10 +118,13 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
     // Mark OTP as used
     await pool.query('UPDATE otp_codes SET used = TRUE WHERE id = ?', [row.id])
 
-    // Find or create user
+    // Resolve numero correto no WhatsApp (com ou sem o 9)
+    const resolvedNumber = await resolveWhatsAppNumber(digits)
+
+    // Find or create user — busca pelo numero original e pelo resolvido
     const [userRows]: any = await pool.query(
-      `SELECT * FROM users WHERE whatsapp_number = ? LIMIT 1`,
-      [digits]
+      `SELECT * FROM users WHERE whatsapp_number IN (?, ?) LIMIT 1`,
+      [digits, resolvedNumber]
     )
 
     let user: any
@@ -109,7 +134,7 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       const newId = uuidv4()
       await pool.query(
         `INSERT INTO users (id, name, whatsapp_number, timezone, is_active) VALUES (?, NULL, ?, 'America/Sao_Paulo', TRUE)`,
-        [newId, digits]
+        [newId, resolvedNumber]
       )
       const [newUserRows]: any = await pool.query(
         `SELECT * FROM users WHERE id = ? LIMIT 1`,
@@ -120,7 +145,7 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
 
     // Fetch WhatsApp name if not set
     if (user.name === null) {
-      const name = await fetchWhatsAppName(digits)
+      const name = await fetchWhatsAppName(resolvedNumber)
       if (name) {
         await pool.query(
           `UPDATE users SET name = ? WHERE id = ?`,
