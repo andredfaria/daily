@@ -148,12 +148,16 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
     console.log(`[dispatcher] ✓ enviado: ${notif.bill_name} (${notifId})`)
     return 'sent'
   } catch (err: any) {
-    const detail = err.response?.data?.message ?? err.response?.data?.error ?? err.message
+    const detail =
+      err.response?.data?.exception?.message ??
+      err.response?.data?.message ??
+      err.response?.data?.error ??
+      err.message
+    console.error(`[dispatcher] ✗ falha: ${notif.bill_name} (${notifId}):`, JSON.stringify(err.response?.data ?? err.message, null, 2))
     await pool.query(
       `UPDATE notifications SET status='failed', error_detail=? WHERE id=?`,
       [detail, notifId]
     )
-    console.error(`[dispatcher] ✗ falha: ${notif.bill_name} (${notifId}):`, detail)
     return 'failed'
   }
 }

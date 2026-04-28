@@ -1,6 +1,17 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
-import { wahaClient } from '../services/waha'
+import { wahaClient, resolveWhatsAppNumber } from '../services/waha'
+
+// Extrai a mensagem de erro mais descritiva de uma resposta WAHA/Axios
+function extractWahaError(err: any): string {
+  return (
+    err.response?.data?.exception?.message ??
+    err.response?.data?.message ??
+    err.response?.data?.error ??
+    err.message ??
+    'Erro desconhecido'
+  )
+}
 
 const router = Router()
 
@@ -61,7 +72,7 @@ router.post('/test-message', async (req: Request, res: Response) => {
     const rawNumber: string = rows[0].whatsapp_number
     const userName: string = rows[0].name || 'Usuário'
 
-    // 2. Normalizar número: remover tudo que não for dígito e adicionar sufixo @c.us
+    // 2. Resolver número: tenta variante com/sem o 9 para encontrar o correto no WhatsApp
     const digits = rawNumber.replace(/\D/g, '')
     if (digits.length < 10) {
       return res.status(400).json({
@@ -69,7 +80,8 @@ router.post('/test-message', async (req: Request, res: Response) => {
         error: `Número inválido: "${rawNumber}". Use o formato +55 (11) 99999-9999.`,
       })
     }
-    const chatId = `${digits}@c.us`
+    const resolvedDigits = await resolveWhatsAppNumber(rawNumber)
+    const chatId = `${resolvedDigits}@c.us`
 
     // 3. Verificar se sessão WAHA está ativa
     const session = process.env.WAHA_SESSION || 'default'
@@ -104,10 +116,11 @@ router.post('/test-message', async (req: Request, res: Response) => {
       message_id: msgData.id ?? msgData.key?.id ?? null,
     })
   } catch (err: any) {
-    console.error(err)
+    const detail = extractWahaError(err)
+    console.error('[waha] test-message falhou:', JSON.stringify(err.response?.data ?? err.message, null, 2))
     return res.status(500).json({
       success: false,
-      error: 'Erro interno do servidor',
+      error: detail,
     })
   }
 })
