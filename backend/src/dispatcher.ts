@@ -63,10 +63,105 @@ function buildMessage(billName: string, amount: number, dueDate: string, pm: any
   )
 }
 
+// Envia uma única notificação pelo ID. Funciona para status 'scheduled' ou 'failed'.
+export async function sendSingleNotification(notifId: string): Promise<'sent' | 'failed' | 'skipped'> {
+  // 1. Buscar dados da notificação + conta + ocorrência + método de pagamento
+  const [notifRows]: any = await pool.query(
+    `SELECT n.id, n.bill_occurrence_id, n.type,
+            o.due_date, o.amount, o.status AS occurrence_status,
+            b.name AS bill_name,
+            pm.type AS pm_type, pm.pix_key_type, pm.pix_key, pm.pix_beneficiary, pm.boleto_code
+     FROM notifications n
+     JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
+     JOIN bills b ON b.id = o.bill_id
+     LEFT JOIN payment_methods pm ON pm.bill_id = b.id AND pm.is_primary = 1
+     WHERE n.id = ?`,
+    [notifId]
+  )
+
+  if (!notifRows.length) throw new Error(`Notificação ${notifId} não encontrada`)
+  const notif = notifRows[0]
+
+  // 2. Pular se ocorrência já foi paga/cancelada
+  if (notif.occurrence_status === 'paid' || notif.occurrence_status === 'cancelled') {
+    await pool.query(`UPDATE notifications SET status='skipped' WHERE id=?`, [notifId])
+    console.log(`[dispatcher] ⏭ ignorado: ${notif.bill_name} (${notifId}) — ocorrência ${notif.occurrence_status}`)
+    return 'skipped'
+  }
+
+  // 3. Buscar número WhatsApp do usuário
+  const [userRows]: any = await pool.query('SELECT whatsapp_number, whatsapp_alerts_enabled FROM users LIMIT 1')
+  if (!userRows.length || !userRows[0].whatsapp_number) {
+    const detail = 'Nenhum usuário com WhatsApp configurado'
+    await pool.query(`UPDATE notifications SET status='failed', error_detail=? WHERE id=?`, [detail, notifId])
+    return 'failed'
+  }
+  if (!userRows[0].whatsapp_alerts_enabled) {
+    await pool.query(`UPDATE notifications SET status='skipped' WHERE id=?`, [notifId])
+    return 'skipped'
+  }
+
+  const rawNumber: string = userRows[0].whatsapp_number
+  const digits = rawNumber.replace(/\D/g, '')
+  if (digits.length < 10) {
+    const detail = `Número WhatsApp inválido: ${rawNumber}`
+    await pool.query(`UPDATE notifications SET status='failed', error_detail=? WHERE id=?`, [detail, notifId])
+    return 'failed'
+  }
+  const chatId = `${digits}@c.us`
+
+  // 4. Verificar sessão WAHA
+  const session = process.env.WAHA_SESSION || 'default'
+  try {
+    const { data: sessionData } = await wahaClient().get(`/api/sessions/${session}`)
+    if (sessionData.status !== 'WORKING') {
+      const detail = `Sessão WAHA inativa: ${sessionData.status}`
+      await pool.query(`UPDATE notifications SET status='failed', error_detail=? WHERE id=?`, [detail, notifId])
+      return 'failed'
+    }
+  } catch (err: any) {
+    const detail = `Erro ao verificar sessão WAHA: ${err.message}`
+    await pool.query(`UPDATE notifications SET status='failed', error_detail=? WHERE id=?`, [detail, notifId])
+    return 'failed'
+  }
+
+  // 5. Montar e enviar mensagem
+  const pm = notif.pm_type
+    ? { type: notif.pm_type, pix_key_type: notif.pix_key_type, pix_key: notif.pix_key,
+        pix_beneficiary: notif.pix_beneficiary, boleto_code: notif.boleto_code }
+    : null
+
+  const messageBody = buildMessage(notif.bill_name, notif.amount, notif.due_date, pm)
+
+  try {
+    const { data: msgData } = await wahaClient().post('/api/sendText', {
+      session,
+      chatId,
+      text: messageBody,
+    })
+
+    const wahaMessageId = msgData.id ?? msgData.key?.id ?? null
+    await pool.query(
+      `UPDATE notifications SET status='sent', sent_at=NOW(), waha_message_id=?, message_body=?, error_detail=NULL WHERE id=?`,
+      [wahaMessageId, messageBody, notifId]
+    )
+    console.log(`[dispatcher] ✓ enviado: ${notif.bill_name} (${notifId})`)
+    return 'sent'
+  } catch (err: any) {
+    const detail = err.response?.data?.message ?? err.response?.data?.error ?? err.message
+    await pool.query(
+      `UPDATE notifications SET status='failed', error_detail=? WHERE id=?`,
+      [detail, notifId]
+    )
+    console.error(`[dispatcher] ✗ falha: ${notif.bill_name} (${notifId}):`, detail)
+    return 'failed'
+  }
+}
+
 export async function runDispatch(): Promise<{ sent: number; failed: number; skipped: number }> {
   const stats = { sent: 0, failed: 0, skipped: 0 }
 
-  // 1. Buscar usuário (número WhatsApp)
+  // 1. Verificar usuário
   const [userRows]: any = await pool.query('SELECT whatsapp_number, whatsapp_alerts_enabled FROM users LIMIT 1')
   if (!userRows.length || !userRows[0].whatsapp_number) {
     console.warn('[dispatcher] nenhum usuário com WhatsApp configurado, abortando')
@@ -76,21 +171,13 @@ export async function runDispatch(): Promise<{ sent: number; failed: number; ski
     console.log('[dispatcher] alertas WhatsApp desabilitados, abortando')
     return stats
   }
-  const rawNumber: string = userRows[0].whatsapp_number
-  const digits = rawNumber.replace(/\D/g, '')
-  if (digits.length < 10) {
-    console.warn('[dispatcher] número WhatsApp inválido:', rawNumber)
-    return stats
-  }
-  const chatId = `${digits}@c.us`
 
-  // 2. Verificar sessão WAHA
+  // 2. Verificar sessão WAHA antes do loop para falhar em lote se necessário
   const session = process.env.WAHA_SESSION || 'default'
   try {
     const { data: sessionData } = await wahaClient().get(`/api/sessions/${session}`)
     if (sessionData.status !== 'WORKING') {
       console.warn('[dispatcher] sessão WAHA não está ativa:', sessionData.status)
-      // Marcar todas as notificações do dia como failed
       const [updateResult]: any = await pool.query(
         `UPDATE notifications SET status='failed', error_detail='Sessão WAHA inativa'
          WHERE status='scheduled' AND scheduled_for = CURDATE()`
@@ -109,16 +196,11 @@ export async function runDispatch(): Promise<{ sent: number; failed: number; ski
     return stats
   }
 
-  // 3. Buscar notificações agendadas para hoje
+  // 3. Buscar IDs das notificações agendadas para hoje
   const [notifications]: any = await pool.query(
-    `SELECT n.id, n.bill_occurrence_id, n.type,
-            o.due_date, o.amount, o.status AS occurrence_status,
-            b.name AS bill_name,
-            pm.type AS pm_type, pm.pix_key_type, pm.pix_key, pm.pix_beneficiary, pm.boleto_code
-     FROM notifications n
+    `SELECT n.id FROM notifications n
      JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
      JOIN bills b ON b.id = o.bill_id
-     LEFT JOIN payment_methods pm ON pm.bill_id = b.id AND pm.is_primary = 1
      WHERE n.status = 'scheduled' AND n.scheduled_for = CURDATE()`
   )
 
@@ -129,48 +211,10 @@ export async function runDispatch(): Promise<{ sent: number; failed: number; ski
 
   console.log(`[dispatcher] ${notifications.length} notificação(ões) para processar`)
 
-  // 4. Processar cada notificação
-  for (const notif of notifications) {
-    // Pular se ocorrência já foi paga/cancelada
-    if (notif.occurrence_status === 'paid' || notif.occurrence_status === 'cancelled') {
-      await pool.query(
-        `UPDATE notifications SET status='skipped' WHERE id=?`,
-        [notif.id]
-      )
-      stats.skipped++
-      continue
-    }
-
-    const pm = notif.pm_type
-      ? { type: notif.pm_type, pix_key_type: notif.pix_key_type, pix_key: notif.pix_key,
-          pix_beneficiary: notif.pix_beneficiary, boleto_code: notif.boleto_code }
-      : null
-
-    const messageBody = buildMessage(notif.bill_name, notif.amount, notif.due_date, pm)
-
-    try {
-      const { data: msgData } = await wahaClient().post('/api/sendText', {
-        session,
-        chatId,
-        text: messageBody,
-      })
-
-      const wahaMessageId = msgData.id ?? msgData.key?.id ?? null
-      await pool.query(
-        `UPDATE notifications SET status='sent', sent_at=NOW(), waha_message_id=?, message_body=? WHERE id=?`,
-        [wahaMessageId, messageBody, notif.id]
-      )
-      stats.sent++
-      console.log(`[dispatcher] ✓ enviado: ${notif.bill_name} (${notif.id})`)
-    } catch (err: any) {
-      const detail = err.response?.data?.message ?? err.response?.data?.error ?? err.message
-      await pool.query(
-        `UPDATE notifications SET status='failed', error_detail=? WHERE id=?`,
-        [detail, notif.id]
-      )
-      stats.failed++
-      console.error(`[dispatcher] ✗ falha: ${notif.bill_name} (${notif.id}):`, detail)
-    }
+  // 4. Enviar cada uma via sendSingleNotification
+  for (const { id } of notifications) {
+    const result = await sendSingleNotification(id)
+    stats[result]++
   }
 
   console.log(`[dispatcher] concluído — enviadas: ${stats.sent}, falhas: ${stats.failed}, ignoradas: ${stats.skipped}`)

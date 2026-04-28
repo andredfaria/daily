@@ -5,6 +5,7 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: 'dashboard', exact: true },
   { path: '/contas', label: 'Contas', icon: 'receipt_long' },
   { path: '/historico', label: 'Histórico', icon: 'history' },
+  { path: '/notificacoes', label: 'Notificações', icon: 'notifications' },
   { path: '/configuracoes', label: 'Configurações', icon: 'settings' },
 ]
 

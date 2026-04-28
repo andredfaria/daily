@@ -1,5 +1,5 @@
 import client from './client'
-import type { Notification } from '../types'
+import type { Notification, NotificationEnriched } from '../types'
 
 export const notificationsApi = {
   list: async (params?: { status?: string; limit?: number }): Promise<Notification[]> => {
@@ -47,6 +47,22 @@ export const notificationsApi = {
 
   dispatch: async (): Promise<{ sent: number; failed: number; skipped: number }> => {
     const res = await client.post<{ sent: number; failed: number; skipped: number }>('/notifications/dispatch')
+    return res.data
+  },
+
+  listEnriched: async (params?: {
+    upcoming?: boolean
+    history?: boolean
+    limit?: number
+  }): Promise<NotificationEnriched[]> => {
+    const res = await client.get<NotificationEnriched[]>('/notifications', { params })
+    return res.data
+  },
+
+  resend: async (id: string): Promise<{ result: string; notification: NotificationEnriched }> => {
+    const res = await client.post<{ result: string; notification: NotificationEnriched }>(
+      `/notifications/${id}/resend`
+    )
     return res.data
   },
 }

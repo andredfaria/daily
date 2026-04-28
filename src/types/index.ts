@@ -62,6 +62,12 @@ export interface Notification {
   created_at: string
 }
 
+export interface NotificationEnriched extends Notification {
+  bill_name: string
+  due_date: string
+  amount: number
+}
+
 export interface User {
   id: string
   name?: string

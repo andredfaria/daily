@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
-import { runDispatch } from '../dispatcher'
+import { runDispatch, sendSingleNotification } from '../dispatcher'
 
 const router = Router()
 
@@ -13,7 +13,8 @@ router.get('/due-today', async (req: Request, res: Response) => {
     tomorrow.setDate(tomorrow.getDate() + 1)
 
     const [rows] = await pool.query(
-      `SELECT n.* FROM notifications n
+      `SELECT n.*, b.name AS bill_name, o.due_date, o.amount
+       FROM notifications n
        JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
        JOIN bills b ON b.id = o.bill_id
        WHERE o.due_date BETWEEN ? AND ? AND n.status = 'scheduled' AND b.user_id = ?
@@ -28,22 +29,38 @@ router.get('/due-today', async (req: Request, res: Response) => {
 })
 
 // GET /api/notifications
+// Query params:
+//   status=<single>    — filtra por status exato
+//   upcoming=true      — status=scheduled E scheduled_for >= hoje
+//   history=true       — status IN (sent, failed, skipped)
+//   limit=<n>          — padrão 50 (200 quando history=true)
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { status, limit = 50 } = req.query
+    const { status, upcoming, history, limit } = req.query
     const conditions: string[] = []
     const values: any[] = []
 
     conditions.push('b.user_id = ?')
     values.push(req.userId)
 
-    if (status) { conditions.push('n.status = ?'); values.push(status) }
+    if (upcoming === 'true') {
+      conditions.push("n.status = 'scheduled' AND n.scheduled_for >= CURDATE()")
+    } else if (history === 'true') {
+      conditions.push("n.status IN ('sent','failed','skipped')")
+    } else if (status) {
+      conditions.push('n.status = ?')
+      values.push(status)
+    }
 
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-    values.push(Number(limit))
+    const defaultLimit = history === 'true' ? 200 : 50
+    const effectiveLimit = Number(limit ?? defaultLimit)
+
+    const where = `WHERE ${conditions.join(' AND ')}`
+    values.push(effectiveLimit)
 
     const [rows] = await pool.query(
-      `SELECT n.* FROM notifications n
+      `SELECT n.*, b.name AS bill_name, o.due_date, o.amount
+       FROM notifications n
        JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
        JOIN bills b ON b.id = o.bill_id
        ${where} ORDER BY n.scheduled_for DESC LIMIT ?`,
@@ -73,7 +90,14 @@ router.patch('/:id/sent', async (req: Request, res: Response) => {
       `UPDATE notifications SET status = 'sent', sent_at = ?, waha_message_id = ? WHERE id = ?`,
       [now, waha_message_id ?? null, req.params.id]
     )
-    const [rows]: any = await pool.query('SELECT * FROM notifications WHERE id = ?', [req.params.id])
+    const [rows]: any = await pool.query(
+      `SELECT n.*, b.name AS bill_name, o.due_date, o.amount
+       FROM notifications n
+       JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
+       JOIN bills b ON b.id = o.bill_id
+       WHERE n.id = ?`,
+      [req.params.id]
+    )
     res.json(rows[0])
   } catch (err: any) {
     console.error(err)
@@ -97,11 +121,57 @@ router.patch('/:id/failed', async (req: Request, res: Response) => {
       `UPDATE notifications SET status = 'failed', error_detail = ? WHERE id = ?`,
       [error_detail ?? null, req.params.id]
     )
-    const [rows]: any = await pool.query('SELECT * FROM notifications WHERE id = ?', [req.params.id])
+    const [rows]: any = await pool.query(
+      `SELECT n.*, b.name AS bill_name, o.due_date, o.amount
+       FROM notifications n
+       JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
+       JOIN bills b ON b.id = o.bill_id
+       WHERE n.id = ?`,
+      [req.params.id]
+    )
     res.json(rows[0])
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// POST /api/notifications/:id/resend
+// Reenvia uma notificação individual (scheduled ou failed).
+router.post('/:id/resend', async (req: Request, res: Response) => {
+  try {
+    // Verificar ownership
+    const [ownerRows]: any = await pool.query(
+      `SELECT n.id, n.status FROM notifications n
+       JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
+       JOIN bills b ON b.id = o.bill_id
+       WHERE n.id = ? AND b.user_id = ?`,
+      [req.params.id, req.userId]
+    )
+    if (!ownerRows.length) return res.status(404).json({ error: 'Notificação não encontrada' })
+
+    // Se estava failed, resetar para scheduled para que sendSingleNotification possa processar
+    if (ownerRows[0].status === 'failed') {
+      await pool.query(
+        `UPDATE notifications SET status='scheduled', error_detail=NULL WHERE id=?`,
+        [req.params.id]
+      )
+    }
+
+    const result = await sendSingleNotification(req.params.id)
+
+    const [rows]: any = await pool.query(
+      `SELECT n.*, b.name AS bill_name, o.due_date, o.amount
+       FROM notifications n
+       JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
+       JOIN bills b ON b.id = o.bill_id
+       WHERE n.id = ?`,
+      [req.params.id]
+    )
+    res.json({ result, notification: rows[0] })
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
   }
 })
 
