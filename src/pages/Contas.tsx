@@ -76,6 +76,9 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete })
           <div>
             <h3 className="text-sm font-semibold text-on-surface leading-tight">{bill.name}</h3>
             <p className="text-xs text-on-surface-variant mt-0.5">{recurrenceDetail}</p>
+            {bill.description && (
+              <p className="text-xs text-on-surface-variant/70 mt-0.5 line-clamp-1">{bill.description}</p>
+            )}
           </div>
         </div>
 
@@ -152,6 +155,12 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete })
           Vence em {formatDate(bill.due_date)}
         </p>
       )}
+
+      {/* Alert */}
+      <p className="text-xs text-on-surface-variant/60 mt-1">
+        <span className="material-symbols-outlined text-xs align-middle mr-0.5">notifications</span>
+        Alerta {bill.days_before_alert} {bill.days_before_alert === 1 ? 'dia' : 'dias'} antes
+      </p>
 
       {/* Active toggle */}
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-outline-variant/20">

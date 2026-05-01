@@ -38,6 +38,7 @@ export interface BillOccurrence {
   id: string
   bill_id: string
   bill?: Bill
+  bill_name?: string
   due_date: string
   amount: number
   status: OccurrenceStatus

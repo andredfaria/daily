@@ -1,16 +1,17 @@
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: 'dashboard', exact: true },
   { path: '/contas', label: 'Contas', icon: 'receipt_long' },
-  { path: '/historico', label: 'Histórico', icon: 'history' },
   { path: '/notificacoes', label: 'Notificações', icon: 'notifications' },
   { path: '/configuracoes', label: 'Configurações', icon: 'settings' },
 ]
 
 const Sidebar: React.FC = () => {
   const navigate = useNavigate()
+  const { logout } = useAuth()
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-[220px] bg-surface-container-lowest border-r border-outline-variant/50 flex flex-col z-40">
@@ -46,14 +47,21 @@ const Sidebar: React.FC = () => {
         ))}
       </nav>
 
-      {/* New Payment Button */}
-      <div className="px-3 py-4 border-t border-outline-variant/30">
+      {/* New Payment Button + Logout */}
+      <div className="px-3 py-4 border-t border-outline-variant/30 space-y-2">
         <button
           onClick={() => navigate('/contas/nova')}
           className="w-full btn-primary justify-center"
         >
           <span className="material-symbols-outlined text-lg">add</span>
           Novo Pagamento
+        </button>
+        <button
+          onClick={logout}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-error hover:bg-error/10 transition-colors"
+        >
+          <span className="material-symbols-outlined text-lg">logout</span>
+          Sair
         </button>
       </div>
     </aside>

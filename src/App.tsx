@@ -6,7 +6,6 @@ import Layout from './components/Layout/Layout'
 import Dashboard from './pages/Dashboard'
 import Contas from './pages/Contas'
 import BillForm from './pages/BillForm'
-import Historico from './pages/Historico'
 import Notificacoes from './pages/Notificacoes'
 import Configuracoes from './pages/Configuracoes'
 import Login from './pages/Login'
@@ -46,7 +45,6 @@ const App: React.FC = () => {
                 <Route path="/contas" element={<Contas />} />
                 <Route path="/contas/nova" element={<BillForm />} />
                 <Route path="/contas/:id/editar" element={<BillForm />} />
-                <Route path="/historico" element={<Historico />} />
                 <Route path="/notificacoes" element={<Notificacoes />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
               </Route>

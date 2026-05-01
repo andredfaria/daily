@@ -1,14 +1,32 @@
 import { Router, Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
+import { generateOccurrencesForBill, regenerateOccurrencesForBill } from '../services/occurrenceGenerator'
 
 const router = Router()
 
 // GET /api/bills
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM bills WHERE user_id = ? ORDER BY created_at DESC', [req.userId])
-    res.json(rows)
+    const [rows]: any = await pool.query(
+      'SELECT * FROM bills WHERE user_id = ? ORDER BY created_at DESC',
+      [req.userId]
+    )
+    if (!rows.length) return res.json([])
+
+    const billIds = rows.map((b: any) => b.id)
+    const [methods]: any = await pool.query(
+      'SELECT * FROM payment_methods WHERE bill_id IN (?)',
+      [billIds]
+    )
+
+    const byBill: Record<string, any[]> = {}
+    for (const m of methods) {
+      if (!byBill[m.bill_id]) byBill[m.bill_id] = []
+      byBill[m.bill_id].push(m)
+    }
+
+    res.json(rows.map((b: any) => ({ ...b, payment_methods: byBill[b.id] ?? [] })))
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -60,7 +78,17 @@ router.post('/', async (req: Request, res: Response) => {
     )
 
     const [rows]: any = await pool.query('SELECT * FROM bills WHERE id = ?', [id])
-    res.status(201).json(rows[0])
+    const bill = rows[0]
+
+    generateOccurrencesForBill(id, {
+      recurrence_type: bill.recurrence_type,
+      recurrence_day_of_month: bill.recurrence_day_of_month,
+      recurrence_day_of_week: bill.recurrence_day_of_week,
+      due_date: bill.due_date,
+      amount: bill.amount,
+    }).catch((err: any) => console.error('[bills] erro ao gerar ocorrências:', err.message))
+
+    res.status(201).json(bill)
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -96,7 +124,21 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if ((result as any).affectedRows === 0) return res.status(404).json({ error: 'Not found' })
 
     const [rows]: any = await pool.query('SELECT * FROM bills WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
-    res.json(rows[0])
+    const updatedBill = rows[0]
+
+    const recurrenceChanged = ['recurrence_type', 'recurrence_day_of_month', 'recurrence_day_of_week', 'due_date', 'amount']
+      .some(k => req.body[k] !== undefined)
+    if (recurrenceChanged) {
+      regenerateOccurrencesForBill(req.params.id, {
+        recurrence_type: updatedBill.recurrence_type,
+        recurrence_day_of_month: updatedBill.recurrence_day_of_month,
+        recurrence_day_of_week: updatedBill.recurrence_day_of_week,
+        due_date: updatedBill.due_date,
+        amount: updatedBill.amount,
+      }).catch((err: any) => console.error('[bills] erro ao regenerar ocorrências:', err.message))
+    }
+
+    res.json(updatedBill)
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })

@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
-import { wahaClient, fetchWhatsAppName, resolveWhatsAppNumber, generatePhoneVariant } from '../services/waha'
+import { fetchWhatsAppName, resolveWhatsAppNumber, sendWhatsAppText, WhatsAppNumberNotFoundError } from '../services/waha'
 import { authMiddleware } from '../middleware/auth'
 
 const router = Router()
@@ -59,32 +59,14 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       return res.json({ success: true, message: 'Código gerado (dev bypass — veja o log do backend)' })
     }
 
-    const resolvedNumber = await resolveWhatsAppNumber(digits)
-    const session = process.env.WAHA_SESSION || 'default'
     const otpText = `🔐 *BillSync* — Seu código de acesso:\n\n*${code}*\n\nVálido por 5 minutos. Não compartilhe.`
     try {
-      await wahaClient().post('/api/sendText', {
-        session,
-        chatId: `${resolvedNumber}@c.us`,
-        text: otpText,
-      })
-    } catch (sendErr: any) {
-      // WAHA retorna 500 quando o numero nao existe no WhatsApp.
-      // Tenta automaticamente com a variante (com/sem o 9).
-      if (sendErr?.response?.status === 500) {
-        const variant = generatePhoneVariant(resolvedNumber)
-        if (variant) {
-          await wahaClient().post('/api/sendText', {
-            session,
-            chatId: `${variant}@c.us`,
-            text: otpText,
-          })
-        } else {
-          throw sendErr
-        }
-      } else {
-        throw sendErr
+      await sendWhatsAppText(digits, otpText)
+    } catch (err) {
+      if (err instanceof WhatsAppNumberNotFoundError) {
+        return res.status(400).json({ error: 'Número não encontrado no WhatsApp. Verifique o número e tente novamente.' })
       }
+      throw err
     }
 
     return res.json({ success: true, message: 'Código enviado via WhatsApp' })
@@ -136,7 +118,12 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
     await pool.query('UPDATE otp_codes SET used = TRUE WHERE id = ?', [row.id])
 
     // Resolve numero correto no WhatsApp (com ou sem o 9)
-    const resolvedNumber = await resolveWhatsAppNumber(digits)
+    let resolvedNumber = digits
+    try {
+      resolvedNumber = await resolveWhatsAppNumber(digits)
+    } catch {
+      // Número não encontrado no WhatsApp — usa os dígitos originais para lookup no banco
+    }
 
     // Find or create user — busca pelo numero original e pelo resolvido
     const [userRows]: any = await pool.query(

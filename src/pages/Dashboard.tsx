@@ -162,8 +162,8 @@ const OccurrenceRow: React.FC<OccurrenceRowProps> = ({ occurrence, onMarkPaid, p
   const { label, color } = formatRelativeDate(occurrence.due_date)
   const isPaid = occurrence.status === 'paid'
   const isOverdue = occurrence.status === 'overdue'
-  const icon = getBillIcon(occurrence.bill?.name ?? '')
-  const billName = occurrence.bill?.name ?? 'Sem nome'
+  const icon = getBillIcon(occurrence.bill_name ?? occurrence.bill?.name ?? '')
+  const billName = occurrence.bill_name ?? occurrence.bill?.name ?? 'Sem nome'
   const isJustPaid = justPaid === occurrence.id
   const isPaying = paying === occurrence.id
 
@@ -377,10 +377,10 @@ const Dashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <h3 className="text-base font-semibold text-on-surface">Próximos Vencimentos</h3>
             <button
-              onClick={() => navigate('/historico')}
+              onClick={() => navigate('/notificacoes')}
               className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
             >
-              Ver histórico →
+              Ver notificações →
             </button>
           </div>
 

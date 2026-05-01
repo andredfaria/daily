@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
-import { wahaClient, resolveWhatsAppNumber } from '../services/waha'
+import { wahaClient, sendWhatsAppText, WhatsAppNumberNotFoundError } from '../services/waha'
 
 // Extrai a mensagem de erro mais descritiva de uma resposta WAHA/Axios
 function extractWahaError(err: any): string {
@@ -72,7 +72,7 @@ router.post('/test-message', async (req: Request, res: Response) => {
     const rawNumber: string = rows[0].whatsapp_number
     const userName: string = rows[0].name || 'Usuário'
 
-    // 2. Resolver número: tenta variante com/sem o 9 para encontrar o correto no WhatsApp
+    // 2. Validar comprimento mínimo
     const digits = rawNumber.replace(/\D/g, '')
     if (digits.length < 10) {
       return res.status(400).json({
@@ -80,8 +80,6 @@ router.post('/test-message', async (req: Request, res: Response) => {
         error: `Número inválido: "${rawNumber}". Use o formato +55 (11) 99999-9999.`,
       })
     }
-    const resolvedDigits = await resolveWhatsAppNumber(rawNumber)
-    const chatId = `${resolvedDigits}@c.us`
 
     // 3. Verificar se sessão WAHA está ativa
     const session = process.env.WAHA_SESSION || 'default'
@@ -100,21 +98,22 @@ router.post('/test-message', async (req: Request, res: Response) => {
       })
     }
 
-    // 4. Enviar mensagem de teste
+    // 4. Resolver número e enviar (valida existência com/sem 9 automaticamente)
     const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
     const body = `✅ *Teste de Integração — BillSync*\n\nOlá, ${userName}! Esta é uma mensagem de teste enviada em ${now}.\n\nSe você está recebendo isso, o envio de notificações está funcionando corretamente. 🎉`
 
-    const { data: msgData } = await wahaClient().post(`/api/sendText`, {
-      session,
-      chatId,
-      text: body,
-    })
-
-    return res.json({
-      success: true,
-      to: rawNumber,
-      message_id: msgData.id ?? msgData.key?.id ?? null,
-    })
+    try {
+      const { id: messageId } = await sendWhatsAppText(rawNumber, body)
+      return res.json({ success: true, to: rawNumber, message_id: messageId })
+    } catch (sendErr) {
+      if (sendErr instanceof WhatsAppNumberNotFoundError) {
+        return res.status(400).json({
+          success: false,
+          error: `Número ${rawNumber} não foi encontrado no WhatsApp. Verifique o número em Configurações > Perfil.`,
+        })
+      }
+      throw sendErr
+    }
   } catch (err: any) {
     const detail = extractWahaError(err)
     console.error('[waha] test-message falhou:', JSON.stringify(err.response?.data ?? err.message, null, 2))

@@ -11,14 +11,22 @@ export function wahaClient() {
   })
 }
 
-async function numberExistsOnWhatsApp(digits: string, session: string): Promise<boolean> {
+export class WhatsAppNumberNotFoundError extends Error {
+  constructor(phone: string) {
+    super(`Número não encontrado no WhatsApp: ${phone}`)
+    this.name = 'WhatsAppNumberNotFoundError'
+  }
+}
+
+async function lookupChatId(digits: string, session: string): Promise<string | null> {
   try {
     const { data } = await wahaClient().get('/api/contacts/check-exists', {
       params: { phone: digits, session },
     })
-    return data?.numberExists === true
+    if (data?.numberExists === true && data?.chatId) return data.chatId as string
+    return null
   } catch {
-    return false
+    return null
   }
 }
 
@@ -38,21 +46,45 @@ export function generatePhoneVariant(digits: string): string | null {
   return null
 }
 
-/**
- * Resolve o numero de telefone para o formato correto no WhatsApp.
- * Numeros brasileiros podem ter 12 digitos (sem o 9) ou 13 digitos (com o 9).
- * Verifica qual variante esta registrada no WhatsApp e retorna essa.
- */
-export async function resolveWhatsAppNumber(phone: string): Promise<string> {
+async function resolveWhatsAppChatId(phone: string): Promise<string> {
   const digits = phone.replace(/\D/g, '')
   const session = process.env.WAHA_SESSION || 'default'
 
-  if (await numberExistsOnWhatsApp(digits, session)) return digits
+  const chatId = await lookupChatId(digits, session)
+  if (chatId) return chatId
 
   const variant = generatePhoneVariant(digits)
-  if (variant && await numberExistsOnWhatsApp(variant, session)) return variant
+  if (variant) {
+    const variantChatId = await lookupChatId(variant, session)
+    if (variantChatId) return variantChatId
+  }
 
-  return digits // fallback: tenta com o numero original
+  throw new WhatsAppNumberNotFoundError(phone)
+}
+
+/**
+ * Resolve o numero de telefone para o formato correto no WhatsApp.
+ * Retorna apenas os digitos canonicos (sem @c.us).
+ * Lanca WhatsAppNumberNotFoundError se nenhuma variante existir.
+ */
+export async function resolveWhatsAppNumber(phone: string): Promise<string> {
+  const chatId = await resolveWhatsAppChatId(phone)
+  return chatId.replace('@c.us', '')
+}
+
+/**
+ * Valida a existencia do numero no WhatsApp (tentando com e sem o 9),
+ * usa o chatId retornado pela API e envia a mensagem.
+ * Lanca WhatsAppNumberNotFoundError se o numero nao existir.
+ */
+export async function sendWhatsAppText(
+  phone: string,
+  text: string,
+): Promise<{ id: string | null }> {
+  const chatId = await resolveWhatsAppChatId(phone)
+  const session = process.env.WAHA_SESSION || 'default'
+  const { data } = await wahaClient().post('/api/sendText', { session, chatId, text })
+  return { id: data.id ?? data.key?.id ?? null }
 }
 
 export async function fetchWhatsAppName(phone: string): Promise<string | null> {

@@ -20,15 +20,39 @@ router.get('/me', async (req: Request, res: Response) => {
 // PATCH /api/users/me
 router.patch('/me', async (req: Request, res: Response) => {
   try {
-    const allowed = ['name', 'whatsapp_number', 'timezone', 'is_active']
+    const allowed = [
+      'name', 'whatsapp_number', 'timezone', 'is_active',
+      'notification_time', 'whatsapp_alerts_enabled',
+      'weekly_summary_enabled', 'default_days_before_alert',
+    ]
     const fields: string[] = []
     const values: any[] = []
 
     for (const key of allowed) {
-      if (req.body[key] !== undefined) {
+      if (req.body[key] === undefined) continue
+
+      if (key === 'notification_time') {
+        const h = Number(req.body[key])
+        if (!Number.isInteger(h) || h < 0 || h > 23) {
+          return res.status(400).json({ error: 'notification_time deve ser um inteiro entre 0 e 23' })
+        }
         fields.push(`${key} = ?`)
-        values.push(req.body[key])
+        values.push(h)
+        continue
       }
+
+      if (key === 'default_days_before_alert') {
+        const d = Number(req.body[key])
+        if (!Number.isInteger(d) || d < 0 || d > 30) {
+          return res.status(400).json({ error: 'default_days_before_alert deve ser um inteiro entre 0 e 30' })
+        }
+        fields.push(`${key} = ?`)
+        values.push(d)
+        continue
+      }
+
+      fields.push(`${key} = ?`)
+      values.push(req.body[key])
     }
 
     if (fields.length) {

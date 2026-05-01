@@ -1,74 +1,51 @@
 // backend/src/scheduler.ts
-import cron, { ScheduledTask } from 'node-cron'
+import cron from 'node-cron'
 import pool from './db'
-import { runDispatch } from './dispatcher'
+import { runDispatchForUser } from './dispatcher'
+import { materializeForUser, getTodaySaoPaulo } from './services/notificationMaterializer'
 
-let activeTask: ScheduledTask | null = null
-let reloading = false
-
-async function loadConfig(): Promise<{ notificationTime: number; alertsEnabled: boolean }> {
-  const [rows]: any = await pool.query(
-    'SELECT notification_time, whatsapp_alerts_enabled FROM users LIMIT 1'
-  )
-  if (!rows.length) return { notificationTime: 8, alertsEnabled: false }
-  return {
-    notificationTime: rows[0].notification_time ?? 8,
-    alertsEnabled: Boolean(rows[0].whatsapp_alerts_enabled),
-  }
-}
-
-function cancelActive() {
-  if (activeTask) {
-    activeTask.stop()
-    activeTask = null
-    console.log('[scheduler] job cancelado')
-  }
-}
-
-function scheduleJob(hour: number) {
-  if (hour < 0 || hour > 23) {
-    console.error(`[scheduler] hora inválida: ${hour} — job não agendado`)
-    return
-  }
-  const expression = `0 ${hour} * * *`
-  activeTask = cron.schedule(expression, async () => {
-    console.log(`[scheduler] disparando envio de notificações (${hour}h)`)
-    try {
-      await runDispatch()
-    } catch (err: any) {
-      console.error('[scheduler] erro no dispatch:', err.message)
-    }
-  }, { timezone: 'America/Sao_Paulo' })
-  console.log(`[scheduler] job agendado para ${String(hour).padStart(2, '0')}:00`)
+function getCurrentHourSaoPaulo(): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    hour: 'numeric',
+    hour12: false,
+  }).formatToParts(new Date())
+  const hourPart = parts.find(p => p.type === 'hour')
+  return parseInt(hourPart?.value ?? '0', 10)
 }
 
 export async function initScheduler(): Promise<void> {
-  try {
-    const { notificationTime, alertsEnabled } = await loadConfig()
-    if (!alertsEnabled) {
-      console.log('[scheduler] alertas WhatsApp desabilitados, job não iniciado')
-      return
-    }
-    scheduleJob(notificationTime)
-  } catch (err: any) {
-    console.error('[scheduler] erro ao inicializar:', err.message)
-  }
-}
+  cron.schedule('0 * * * *', async () => {
+    const hour = getCurrentHourSaoPaulo()
+    const today = getTodaySaoPaulo()
+    console.log(`[scheduler] tick ${String(hour).padStart(2, '0')}h (${today} BRT)`)
 
-export async function reloadSchedule(): Promise<void> {
-  if (reloading) return
-  reloading = true
-  cancelActive()
-  try {
-    const { notificationTime, alertsEnabled } = await loadConfig()
-    if (!alertsEnabled) {
-      console.log('[scheduler] alertas desabilitados, job não reagendado')
-      return
+    try {
+      const [users]: any = await pool.query(
+        `SELECT id FROM users
+         WHERE notification_time = ? AND whatsapp_alerts_enabled = 1 AND is_active = 1`,
+        [hour]
+      )
+
+      if (!users.length) {
+        console.log(`[scheduler] nenhum usuário com notification_time=${hour}`)
+        return
+      }
+
+      console.log(`[scheduler] ${users.length} usuário(s) elegível(eis) para envio`)
+
+      for (const { id: userId } of users) {
+        try {
+          await materializeForUser(userId, today)
+          await runDispatchForUser(userId)
+        } catch (err: any) {
+          console.error(`[scheduler] erro ao processar usuário ${userId}:`, err.message)
+        }
+      }
+    } catch (err: any) {
+      console.error('[scheduler] erro no tick horário:', err.message)
     }
-    scheduleJob(notificationTime)
-  } catch (err: any) {
-    console.error('[scheduler] erro ao recarregar schedule:', err.message)
-  } finally {
-    reloading = false
-  }
+  }, { timezone: 'America/Sao_Paulo' })
+
+  console.log('[scheduler] cron horário registrado (timezone America/Sao_Paulo)')
 }

@@ -1,6 +1,8 @@
 // backend/src/dispatcher.ts
 import pool from './db'
 import axios from 'axios'
+import { materializeForUser } from './services/notificationMaterializer'
+import { sendWhatsAppText, WhatsAppNumberNotFoundError } from './services/waha'
 
 function wahaClient() {
   return axios.create({
@@ -63,17 +65,17 @@ function buildMessage(billName: string, amount: number, dueDate: string, pm: any
   )
 }
 
-// Envia uma única notificação pelo ID. Funciona para status 'scheduled' ou 'failed'.
 export async function sendSingleNotification(notifId: string): Promise<'sent' | 'failed' | 'skipped'> {
-  // 1. Buscar dados da notificação + conta + ocorrência + método de pagamento
   const [notifRows]: any = await pool.query(
     `SELECT n.id, n.bill_occurrence_id, n.type,
             o.due_date, o.amount, o.status AS occurrence_status,
             b.name AS bill_name,
+            u.whatsapp_number, u.whatsapp_alerts_enabled,
             pm.type AS pm_type, pm.pix_key_type, pm.pix_key, pm.pix_beneficiary, pm.boleto_code
      FROM notifications n
      JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
      JOIN bills b ON b.id = o.bill_id
+     JOIN users u ON u.id = b.user_id
      LEFT JOIN payment_methods pm ON pm.bill_id = b.id AND pm.is_primary = 1
      WHERE n.id = ?`,
     [notifId]
@@ -82,35 +84,29 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
   if (!notifRows.length) throw new Error(`Notificação ${notifId} não encontrada`)
   const notif = notifRows[0]
 
-  // 2. Pular se ocorrência já foi paga/cancelada
   if (notif.occurrence_status === 'paid' || notif.occurrence_status === 'cancelled') {
     await pool.query(`UPDATE notifications SET status='skipped' WHERE id=?`, [notifId])
     console.log(`[dispatcher] ⏭ ignorado: ${notif.bill_name} (${notifId}) — ocorrência ${notif.occurrence_status}`)
     return 'skipped'
   }
 
-  // 3. Buscar número WhatsApp do usuário
-  const [userRows]: any = await pool.query('SELECT whatsapp_number, whatsapp_alerts_enabled FROM users LIMIT 1')
-  if (!userRows.length || !userRows[0].whatsapp_number) {
+  if (!notif.whatsapp_number) {
     const detail = 'Nenhum usuário com WhatsApp configurado'
     await pool.query(`UPDATE notifications SET status='failed', error_detail=? WHERE id=?`, [detail, notifId])
     return 'failed'
   }
-  if (!userRows[0].whatsapp_alerts_enabled) {
+  if (!notif.whatsapp_alerts_enabled) {
     await pool.query(`UPDATE notifications SET status='skipped' WHERE id=?`, [notifId])
     return 'skipped'
   }
 
-  const rawNumber: string = userRows[0].whatsapp_number
-  const digits = rawNumber.replace(/\D/g, '')
+  const digits = notif.whatsapp_number.replace(/\D/g, '')
   if (digits.length < 10) {
-    const detail = `Número WhatsApp inválido: ${rawNumber}`
+    const detail = `Número WhatsApp inválido: ${notif.whatsapp_number}`
     await pool.query(`UPDATE notifications SET status='failed', error_detail=? WHERE id=?`, [detail, notifId])
     return 'failed'
   }
-  const chatId = `${digits}@c.us`
 
-  // 4. Verificar sessão WAHA
   const session = process.env.WAHA_SESSION || 'default'
   try {
     const { data: sessionData } = await wahaClient().get(`/api/sessions/${session}`)
@@ -125,7 +121,6 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
     return 'failed'
   }
 
-  // 5. Montar e enviar mensagem
   const pm = notif.pm_type
     ? { type: notif.pm_type, pix_key_type: notif.pix_key_type, pix_key: notif.pix_key,
         pix_beneficiary: notif.pix_beneficiary, boleto_code: notif.boleto_code }
@@ -134,13 +129,7 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
   const messageBody = buildMessage(notif.bill_name, notif.amount, notif.due_date, pm)
 
   try {
-    const { data: msgData } = await wahaClient().post('/api/sendText', {
-      session,
-      chatId,
-      text: messageBody,
-    })
-
-    const wahaMessageId = msgData.id ?? msgData.key?.id ?? null
+    const { id: wahaMessageId } = await sendWhatsAppText(notif.whatsapp_number, messageBody)
     await pool.query(
       `UPDATE notifications SET status='sent', sent_at=NOW(), waha_message_id=?, message_body=?, error_detail=NULL WHERE id=?`,
       [wahaMessageId, messageBody, notifId]
@@ -148,12 +137,10 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
     console.log(`[dispatcher] ✓ enviado: ${notif.bill_name} (${notifId})`)
     return 'sent'
   } catch (err: any) {
-    const detail =
-      err.response?.data?.exception?.message ??
-      err.response?.data?.message ??
-      err.response?.data?.error ??
-      err.message
-    console.error(`[dispatcher] ✗ falha: ${notif.bill_name} (${notifId}):`, JSON.stringify(err.response?.data ?? err.message, null, 2))
+    const detail = err instanceof WhatsAppNumberNotFoundError
+      ? err.message
+      : (err.response?.data?.exception?.message ?? err.response?.data?.message ?? err.response?.data?.error ?? err.message)
+    console.error(`[dispatcher] ✗ falha: ${notif.bill_name} (${notifId}):`, detail)
     await pool.query(
       `UPDATE notifications SET status='failed', error_detail=? WHERE id=?`,
       [detail, notifId]
@@ -162,29 +149,34 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
   }
 }
 
-export async function runDispatch(): Promise<{ sent: number; failed: number; skipped: number }> {
+export async function runDispatchForUser(userId: string): Promise<{ sent: number; failed: number; skipped: number }> {
   const stats = { sent: 0, failed: 0, skipped: 0 }
 
-  // 1. Verificar usuário
-  const [userRows]: any = await pool.query('SELECT whatsapp_number, whatsapp_alerts_enabled FROM users LIMIT 1')
+  const [userRows]: any = await pool.query(
+    'SELECT whatsapp_number, whatsapp_alerts_enabled FROM users WHERE id = ?',
+    [userId]
+  )
   if (!userRows.length || !userRows[0].whatsapp_number) {
-    console.warn('[dispatcher] nenhum usuário com WhatsApp configurado, abortando')
+    console.warn(`[dispatcher] usuário ${userId} sem WhatsApp configurado, abortando`)
     return stats
   }
   if (!userRows[0].whatsapp_alerts_enabled) {
-    console.log('[dispatcher] alertas WhatsApp desabilitados, abortando')
+    console.log(`[dispatcher] alertas desabilitados para usuário ${userId}, abortando`)
     return stats
   }
 
-  // 2. Verificar sessão WAHA antes do loop para falhar em lote se necessário
   const session = process.env.WAHA_SESSION || 'default'
   try {
     const { data: sessionData } = await wahaClient().get(`/api/sessions/${session}`)
     if (sessionData.status !== 'WORKING') {
       console.warn('[dispatcher] sessão WAHA não está ativa:', sessionData.status)
       const [updateResult]: any = await pool.query(
-        `UPDATE notifications SET status='failed', error_detail='Sessão WAHA inativa'
-         WHERE status='scheduled' AND scheduled_for = CURDATE()`
+        `UPDATE notifications n
+         JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
+         JOIN bills b ON b.id = o.bill_id
+         SET n.status='failed', n.error_detail='Sessão WAHA inativa'
+         WHERE b.user_id = ? AND n.status='scheduled' AND n.scheduled_for = CURDATE()`,
+        [userId]
       )
       stats.failed = updateResult.affectedRows ?? 0
       return stats
@@ -192,30 +184,32 @@ export async function runDispatch(): Promise<{ sent: number; failed: number; ski
   } catch (err: any) {
     console.error('[dispatcher] erro ao verificar sessão WAHA:', err.message)
     const [updateResult]: any = await pool.query(
-      `UPDATE notifications SET status='failed', error_detail=?
-       WHERE status='scheduled' AND scheduled_for = CURDATE()`,
-      [`Erro ao verificar sessão WAHA: ${err.message}`]
+      `UPDATE notifications n
+       JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
+       JOIN bills b ON b.id = o.bill_id
+       SET n.status='failed', n.error_detail=?
+       WHERE b.user_id = ? AND n.status='scheduled' AND n.scheduled_for = CURDATE()`,
+      [`Erro ao verificar sessão WAHA: ${err.message}`, userId]
     )
     stats.failed = updateResult.affectedRows ?? 0
     return stats
   }
 
-  // 3. Buscar IDs das notificações agendadas para hoje
   const [notifications]: any = await pool.query(
     `SELECT n.id FROM notifications n
      JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
      JOIN bills b ON b.id = o.bill_id
-     WHERE n.status = 'scheduled' AND n.scheduled_for = CURDATE()`
+     WHERE b.user_id = ? AND n.status = 'scheduled' AND n.scheduled_for = CURDATE()`,
+    [userId]
   )
 
   if (!notifications.length) {
-    console.log('[dispatcher] nenhuma notificação agendada para hoje')
+    console.log(`[dispatcher] nenhuma notificação agendada para hoje (usuário ${userId})`)
     return stats
   }
 
-  console.log(`[dispatcher] ${notifications.length} notificação(ões) para processar`)
+  console.log(`[dispatcher] ${notifications.length} notificação(ões) para processar (usuário ${userId})`)
 
-  // 4. Enviar cada uma via sendSingleNotification
   for (const { id } of notifications) {
     const result = await sendSingleNotification(id)
     stats[result]++
@@ -223,4 +217,32 @@ export async function runDispatch(): Promise<{ sent: number; failed: number; ski
 
   console.log(`[dispatcher] concluído — enviadas: ${stats.sent}, falhas: ${stats.failed}, ignoradas: ${stats.skipped}`)
   return stats
+}
+
+export async function runDispatch(): Promise<{ sent: number; failed: number; skipped: number }> {
+  const totals = { sent: 0, failed: 0, skipped: 0 }
+
+  const [users]: any = await pool.query(
+    'SELECT id FROM users WHERE whatsapp_alerts_enabled = 1 AND is_active = 1 AND whatsapp_number IS NOT NULL'
+  )
+
+  if (!users.length) {
+    console.log('[dispatcher] nenhum usuário com alertas habilitados')
+    return totals
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+  for (const { id: userId } of users) {
+    try {
+      await materializeForUser(userId, today)
+      const stats = await runDispatchForUser(userId)
+      totals.sent += stats.sent
+      totals.failed += stats.failed
+      totals.skipped += stats.skipped
+    } catch (err: any) {
+      console.error(`[dispatcher] erro ao processar usuário ${userId}:`, err.message)
+    }
+  }
+
+  return totals
 }

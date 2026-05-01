@@ -15,9 +15,9 @@ router.get('/stats', async (req: Request, res: Response) => {
         SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END)                              AS paid_count,
         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END)                           AS pending_count,
         SUM(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END)                           AS overdue_count,
-        SUM(CASE WHEN status = 'paid'    THEN amount ELSE 0 END)                      AS monthly_paid_amount,
-        SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END)                      AS monthly_pending_amount,
-        SUM(CASE WHEN status = 'overdue' THEN amount ELSE 0 END)                      AS monthly_overdue_amount
+        SUM(CASE WHEN status = 'paid'    THEN bo.amount ELSE 0 END)                    AS monthly_paid_amount,
+        SUM(CASE WHEN status = 'pending' THEN bo.amount ELSE 0 END)                  AS monthly_pending_amount,
+        SUM(CASE WHEN status = 'overdue' THEN bo.amount ELSE 0 END)                  AS monthly_overdue_amount
        FROM bill_occurrences bo
        JOIN bills b ON b.id = bo.bill_id
        WHERE bo.due_date BETWEEN ? AND ? AND b.user_id = ?`,
