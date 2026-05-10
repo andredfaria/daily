@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { billsApi } from '../api/bills'
 import type { Bill, RecurrenceType } from '../types'
@@ -24,22 +24,10 @@ interface BillCardProps {
   onEdit: (id: string) => void
   onToggle: (id: string, active: boolean) => void
   onDelete: (bill: Bill) => void
+  toggling?: string | null
 }
 
-const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete }) => {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    if (menuOpen) document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [menuOpen])
-
+const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, toggling }) => {
   const icon = getBillIcon(bill.name)
   const recurrenceLabel = getRecurrenceShortLabel(bill.recurrence_type)
   const recurrenceColor = getRecurrenceBadgeColor(bill.recurrence_type)
@@ -82,48 +70,40 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete })
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${recurrenceColor}`}>
             {recurrenceLabel}
           </span>
 
-          {/* Three-dot menu */}
-          <div className="relative" ref={menuRef}>
+          <div className="flex items-center gap-0.5 ml-1">
             <button
-              onClick={() => setMenuOpen((v) => !v)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant"
+              onClick={() => onEdit(bill.id)}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-primary"
+              title="Editar"
             >
-              <span className="material-symbols-outlined text-base">more_vert</span>
+              <span className="material-symbols-outlined text-base">edit</span>
             </button>
-
-            {menuOpen && (
-              <div className="absolute right-0 top-8 z-20 w-40 bg-surface-container-high border border-outline-variant/50 rounded-xl shadow-xl overflow-hidden animate-fadeIn">
-                <button
-                  onClick={() => { onEdit(bill.id); setMenuOpen(false) }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-surface-variant transition-colors"
-                >
-                  <span className="material-symbols-outlined text-base">edit</span>
-                  Editar
-                </button>
-                <button
-                  onClick={() => { onToggle(bill.id, !bill.is_active); setMenuOpen(false) }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-surface-variant transition-colors"
-                >
-                  <span className="material-symbols-outlined text-base">
-                    {bill.is_active ? 'toggle_off' : 'toggle_on'}
-                  </span>
-                  {bill.is_active ? 'Desativar' : 'Ativar'}
-                </button>
-                <div className="border-t border-outline-variant/30" />
-                <button
-                  onClick={() => { onDelete(bill); setMenuOpen(false) }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-error hover:bg-error-container/30 transition-colors"
-                >
-                  <span className="material-symbols-outlined text-base">delete</span>
-                  Excluir
-                </button>
-              </div>
-            )}
+            <button
+              onClick={() => onToggle(bill.id, !bill.is_active)}
+              disabled={toggling === bill.id}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-tertiary disabled:opacity-40"
+              title={bill.is_active ? 'Desativar' : 'Ativar'}
+            >
+              {toggling === bill.id ? (
+                <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <span className="material-symbols-outlined text-base">
+                  {bill.is_active ? 'toggle_on' : 'toggle_off'}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => onDelete(bill)}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-error"
+              title="Excluir"
+            >
+              <span className="material-symbols-outlined text-base">delete</span>
+            </button>
           </div>
         </div>
       </div>
@@ -162,29 +142,7 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete })
         Alerta {bill.days_before_alert} {bill.days_before_alert === 1 ? 'dia' : 'dias'} antes
       </p>
 
-      {/* Active toggle */}
-      <div className="flex items-center justify-between mt-4 pt-3 border-t border-outline-variant/20">
-        <span className={`text-xs font-medium ${bill.is_active ? 'text-tertiary' : 'text-outline'}`}>
-          {bill.is_active ? 'Ativa' : 'Inativa'}
-        </span>
-        <button
-          onClick={() => onToggle(bill.id, !bill.is_active)}
-          className={`
-            relative w-10 h-5 rounded-full transition-all duration-300 flex-shrink-0
-            ${bill.is_active
-              ? 'bg-tertiary shadow-[0_0_8px_rgba(74,225,118,0.4)]'
-              : 'bg-outline/30'
-            }
-          `}
-        >
-          <span
-            className={`
-              absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300
-              ${bill.is_active ? 'left-5' : 'left-0.5'}
-            `}
-          />
-        </button>
-      </div>
+
     </div>
   )
 }
@@ -197,6 +155,7 @@ const Contas: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('active')
   const [deleteTarget, setDeleteTarget] = useState<Bill | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [toggling, setToggling] = useState<string | null>(null)
   const { success, error: showError } = useToast()
   const navigate = useNavigate()
 
@@ -217,12 +176,15 @@ const Contas: React.FC = () => {
   }, [fetchBills])
 
   const handleToggle = async (id: string, active: boolean) => {
+    setToggling(id)
     try {
       await billsApi.toggle(id, active)
       setBills((prev) => prev.map((b) => (b.id === id ? { ...b, is_active: active } : b)))
       success(active ? 'Conta ativada!' : 'Conta desativada.')
     } catch {
       showError('Erro ao atualizar conta.')
+    } finally {
+      setToggling(null)
     }
   }
 
@@ -362,6 +324,7 @@ const Contas: React.FC = () => {
               onEdit={(id) => navigate(`/contas/${id}/editar`)}
               onToggle={handleToggle}
               onDelete={setDeleteTarget}
+              toggling={toggling}
             />
           ))}
         </div>

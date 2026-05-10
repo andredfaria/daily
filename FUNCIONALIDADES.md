@@ -253,8 +253,6 @@ O sistema envia alertas automáticos pelo WhatsApp do usuário antes e no dia do
 🏦 Formas de pagamento:
 PIX → [tipo]: [chave] ([beneficiário])
 Boleto → [código]
-
-Responda PAGO quando efetuar o pagamento ✅
 ```
 
 ### Template da mensagem (no dia)
@@ -266,8 +264,6 @@ Responda PAGO quando efetuar o pagamento ✅
 📅 Vencimento: HOJE, [data]
 
 🏦 PIX → [tipo]: [chave] ([beneficiário])
-
-Responda PAGO para confirmar ✅
 ```
 
 ### Onde os dados são armazenados
@@ -276,25 +272,6 @@ Responda PAGO para confirmar ✅
 - O campo `message_body` armazena o texto exato enviado (auditoria).
 
 ---
-
-## 9. Confirmação de Pagamento via WhatsApp
-
-### O que é
-O usuário pode confirmar o pagamento de uma conta respondendo a mensagem no WhatsApp com palavras-chave. O sistema reconhece a resposta e marca a ocorrência como paga automaticamente.
-
-### Palavras-chave reconhecidas
-`pago` · `ok` · `feito` · `confirmado` · `✅`
-
-### Fluxo de execução
-
-1. O usuário recebe a notificação no WhatsApp e responde com uma das palavras-chave.
-2. O WAHA recebe a mensagem e dispara um webhook para o n8n.
-3. O n8n extrai o número do remetente e o texto da mensagem.
-4. O n8n verifica se o texto contém uma palavra-chave de confirmação.
-5. O n8n consulta `GET /api/occurrences/upcoming` filtrando pelo número do usuário para identificar qual ocorrência está pendente para aquele contato.
-6. O n8n chama `PATCH /api/occurrences/:id/pay` com `{ confirmation_source: 'whatsapp', whatsapp_msg: '[mensagem original]' }`.
-7. O backend atualiza a ocorrência: `status = 'paid'`, `paid_at = now()`, `confirmation_source = 'whatsapp'`.
-8. O n8n envia uma resposta de confirmação ao usuário: "✅ Pagamento de [conta] registrado!"
 
 ### Onde os dados são armazenados
 - Status da ocorrência atualizado para `paid` em **bill_occurrences**.

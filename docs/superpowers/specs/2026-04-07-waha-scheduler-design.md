@@ -82,8 +82,6 @@ Vencimento: *{referência relativa} ({data})*
 
 💳 *Pagamento:*
 {dados do método principal — PIX ou Boleto}
-
-Responda *PAGO* para confirmar o pagamento.
 ```
 
 Referência relativa: `hoje`, `amanhã`, `em X dias`, `venceu há X dias`.
@@ -202,7 +200,7 @@ Horário de envio:      [08:00 ▼]   ← novo (apenas se whatsapp_alerts ativo)
 
 ## 7. Fora do escopo desta iteração
 
-- Webhook de confirmação via WhatsApp (`PAGO`)
+
 - Resumo semanal automático (toggle existe, lógica de disparo fica para próxima iteração)
 - Retry automático em caso de falha do WAHA
 - Multi-usuário

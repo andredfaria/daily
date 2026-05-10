@@ -50,13 +50,8 @@ function buildPaymentSection(pm: any): string {
 }
 
 function buildMessage(billName: string, amount: number, dueDate: string, pm: any): string {
-  const due = new Date(dueDate)
-  const dueFmt = due.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    timeZone: 'America/Sao_Paulo'
-  })
+  const [y, m, d] = dueDate.split('-')
+  const dueFmt = `${d}/${m}/${y}`
   const relative = buildRelativeDate(dueDate)
   const paymentSection = buildPaymentSection(pm)
 
@@ -65,8 +60,7 @@ function buildMessage(billName: string, amount: number, dueDate: string, pm: any
     `Conta: *${billName}*\n` +
     `Valor: R$ ${formatAmount(amount)}\n` +
     `Vencimento: *${relative} (${dueFmt})*` +
-    paymentSection +
-    `\n\nResponda *PAGO* para confirmar o pagamento.`
+    paymentSection
   )
 }
 
