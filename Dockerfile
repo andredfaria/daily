@@ -25,7 +25,7 @@ RUN npm run build
 # Stage 3 — Imagem final
 # ─────────────────────────────────────────
 FROM nginx:alpine
-RUN apk add --no-cache nodejs
+RUN apk add --no-cache nodejs-lts
 
 # Frontend
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
