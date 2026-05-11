@@ -75,6 +75,15 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, t
             {recurrenceLabel}
           </span>
 
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+            bill.is_active
+              ? 'bg-tertiary/15 text-tertiary'
+              : 'bg-outline/15 text-outline'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${bill.is_active ? 'bg-tertiary' : 'bg-outline'}`} />
+            {bill.is_active ? 'Ativa' : 'Inativa'}
+          </span>
+
           <div className="flex items-center gap-0.5 ml-1">
             <button
               onClick={() => onEdit(bill.id)}
