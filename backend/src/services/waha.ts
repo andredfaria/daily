@@ -87,6 +87,25 @@ export async function sendWhatsAppText(
   return { id: data.id ?? data.key?.id ?? null }
 }
 
+export async function sendWhatsAppPoll(
+  phone: string,
+  name: string,
+  options: string[],
+): Promise<{ id: string | null }> {
+  const chatId = await resolveWhatsAppChatId(phone)
+  const session = process.env.WAHA_SESSION || 'default'
+  const { data } = await wahaClient().post('/api/sendPoll', {
+    session,
+    chatId,
+    poll: {
+      name,
+      options,
+      multipleAnswers: true,
+    },
+  })
+  return { id: data.id ?? data.key?.id ?? null }
+}
+
 export async function fetchWhatsAppName(phone: string): Promise<string | null> {
   try {
     const session = process.env.WAHA_SESSION || 'default'

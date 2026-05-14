@@ -83,6 +83,49 @@ export interface User {
   updated_at: string
 }
 
+export interface ChecklistItem {
+  id: string
+  checklist_id: string
+  text: string
+  sort_order: number
+}
+
+export interface Checklist {
+  id: string
+  user_id: string
+  name: string
+  send_time: number
+  timezone: string
+  is_active: boolean
+  items: ChecklistItem[]
+  created_at: string
+  updated_at: string
+}
+
+export interface DailyPoll {
+  id: string
+  poll_date: string
+  waha_poll_id?: string
+  selected_options: string[]
+  completed_count: number
+  total_count: number
+  completion_pct: number
+  status: 'pending' | 'sent' | 'completed'
+  created_at: string
+}
+
+export interface ChecklistDashboardData {
+  checklist: Checklist | null
+  today: DailyPoll | null
+  history: Array<{
+    poll_date: string
+    completed_count: number
+    total_count: number
+    completion_pct: number
+    status: string
+  }>
+}
+
 export interface DashboardStats {
   active_bills: number
   due_this_week: number

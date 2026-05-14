@@ -12,8 +12,11 @@ import notificationsRouter from './routes/notifications'
 import wahaRouter from './routes/waha'
 import usersRouter from './routes/users'
 import authRouter from './routes/auth'
+import webhooksRouter from './routes/webhooks'
+import checklistsRouter from './routes/checklists'
 import { authMiddleware } from './middleware/auth'
 import { initScheduler } from './scheduler'
+import { runMigrations } from './migrate'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 4000
@@ -36,8 +39,10 @@ app.get('/api/health', async (_req, res) => {
 })
 
 app.use('/api/auth', authRouter)
+app.use('/api/webhooks', webhooksRouter)
 app.use(authMiddleware)
 app.use('/api/bills', billsRouter)
+app.use('/api/checklists', checklistsRouter)
 app.use('/api/occurrences', occurrencesRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/waha', wahaRouter)
@@ -63,11 +68,22 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1)
 })
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[backend] running on port ${PORT}`)
-  console.log(`[backend] DB_HOST=${process.env.DB_HOST || 'não definido'}`)
-  console.log(`[backend] DB_NAME=${process.env.DB_NAME || 'não definido'}`)
-  console.log(`[backend] DB_USER=${process.env.DB_USER || 'não definido'}`)
-  console.log(`[backend] DB_PASSWORD=${process.env.DB_PASSWORD ? '***definido***' : 'não definido'}`)
-  initScheduler()
-})
+async function start() {
+  try {
+    await runMigrations()
+  } catch (err: any) {
+    console.error('[start] erro na migração:', err.message)
+    process.exit(1)
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`[backend] running on port ${PORT}`)
+    console.log(`[backend] DB_HOST=${process.env.DB_HOST || 'não definido'}`)
+    console.log(`[backend] DB_NAME=${process.env.DB_NAME || 'não definido'}`)
+    console.log(`[backend] DB_USER=${process.env.DB_USER || 'não definido'}`)
+    console.log(`[backend] DB_PASSWORD=${process.env.DB_PASSWORD ? '***definido***' : 'não definido'}`)
+    initScheduler()
+  })
+}
+
+start()

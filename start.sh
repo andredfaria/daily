@@ -11,6 +11,7 @@ echo "[start] DB_NAME=${DB_NAME:-não definido}"
 echo "[start] DB_USER=${DB_USER:-não definido}"
 echo "[start] DB_PASSWORD=${DB_PASSWORD:+***definido***}"
 echo "[start] WAHA_URL=${WAHA_URL:-não definido}"
+echo "[start] WHATSAPP_HOOK_HMAC_KEY=${WHATSAPP_HOOK_HMAC_KEY:+***definido***}"
 echo "[start] ============================================"
 
 # Inicia o backend em background
