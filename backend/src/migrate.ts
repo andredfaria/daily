@@ -1,9 +1,16 @@
 import pool from './db'
 
+function splitStatements(sql: string): string[] {
+  return sql
+    .split(';')
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && !s.startsWith('--'))
+}
+
 const MIGRATIONS = [
   {
     name: '003_checklists',
-    sql: `
+    statements: splitStatements(`
 SET FOREIGN_KEY_CHECKS = 0;
 
 CREATE TABLE IF NOT EXISTS checklists (
@@ -55,29 +62,36 @@ CREATE TABLE IF NOT EXISTS checklist_daily_polls (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
-`,
+`),
   },
 ]
 
 export async function runMigrations(): Promise<void> {
-  const [rows]: any = await pool.query(
-    `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = ? AND table_name = 'checklists'`,
-    [process.env.DB_NAME || 'daily'],
-  )
-
-  if (rows[0].cnt > 0) {
-    console.log('[migrate] checklists ja existe — pulando')
-    return
+  try {
+    const [rows]: any = await pool.query(
+      `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = ? AND table_name = 'checklists'`,
+      [process.env.DB_NAME || 'daily'],
+    )
+    if (rows[0].cnt > 0) {
+      console.log('[migrate] checklists ja existe — pulando')
+      return
+    }
+  } catch {
+    console.log('[migrate] nao foi possivel verificar — tentando criar mesmo assim')
   }
 
   for (const migration of MIGRATIONS) {
-    try {
-      console.log(`[migrate] executando ${migration.name}...`)
-      await pool.query(migration.sql)
-      console.log(`[migrate] ${migration.name} concluida`)
-    } catch (err: any) {
-      console.error(`[migrate] erro em ${migration.name}:`, err.message)
-      throw err
+    console.log(`[migrate] executando ${migration.name}...`)
+    for (let i = 0; i < migration.statements.length; i++) {
+      const stmt = migration.statements[i]
+      try {
+        await pool.query(stmt + ';')
+      } catch (err: any) {
+        console.error(`[migrate] erro na statement ${i + 1} de ${migration.name}:`, err.message)
+        console.error(`[migrate] sql: ${stmt.slice(0, 80)}...`)
+        throw err
+      }
     }
+    console.log(`[migrate] ${migration.name} concluida`)
   }
 }

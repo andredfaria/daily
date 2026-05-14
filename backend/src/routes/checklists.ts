@@ -164,9 +164,12 @@ router.get('/dashboard', async (req: Request, res: Response) => {
       [checklist.id, today],
     )
 
+    const rawOpts = todayRows[0]?.selected_options
+    const selectedOptions = Array.isArray(rawOpts) ? rawOpts : (rawOpts ? JSON.parse(rawOpts) : [])
+
     const todayPoll = todayRows.length > 0 ? {
       ...todayRows[0],
-      selected_options: todayRows[0].selected_options ? JSON.parse(todayRows[0].selected_options) : [],
+      selected_options: selectedOptions,
     } : null
 
     const [historyRows]: any = await pool.query(
