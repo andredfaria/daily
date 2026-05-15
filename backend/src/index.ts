@@ -77,7 +77,7 @@ async function start() {
     process.exit(1)
   }
 
-  app.listen(PORT, '0.0.0.0', async () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`[backend] running on port ${PORT}`)
     console.log(`[backend] DB_HOST=${process.env.DB_HOST || 'não definido'}`)
     console.log(`[backend] DB_NAME=${process.env.DB_NAME || 'não definido'}`)
@@ -87,7 +87,7 @@ async function start() {
 
     const backendPublicUrl = process.env.BACKEND_PUBLIC_URL
     if (backendPublicUrl) {
-      await configureWahaWebhook(backendPublicUrl)
+      configureWahaWebhook(backendPublicUrl)
     } else {
       console.warn('[backend] BACKEND_PUBLIC_URL não definido — webhook do WAHA não será configurado automaticamente')
     }

@@ -32,7 +32,8 @@ router.post('/waha-poll', async (req: Request, res: Response) => {
     const data = req.body.payload || req.body
 
     if (!event) {
-      return res.status(400).json({ error: 'evento não especificado' })
+      console.log('[webhook] evento não especificado — payload ignorado')
+      return res.status(200).json({ ok: true })
     }
 
     if (event === 'poll.vote.failed') {
