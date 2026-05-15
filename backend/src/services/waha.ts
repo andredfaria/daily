@@ -163,6 +163,21 @@ export async function fetchWhatsAppProfile(phone: string): Promise<{
   return { name, about, profilePicUrl }
 }
 
+export async function getWahaWebhookStatus(backendPublicUrl: string): Promise<{
+  registered: boolean
+  url: string
+  webhooks: any[]
+}> {
+  const session = process.env.WAHA_SESSION || 'default'
+  const webhookUrl = backendPublicUrl
+    ? `${backendPublicUrl.replace(/\/$/, '')}/api/webhooks/waha-poll`
+    : ''
+  const { data } = await wahaClient().get(`/api/sessions/${session}`)
+  const webhooks: any[] = data?.config?.webhooks ?? data?.webhooks ?? []
+  const registered = webhooks.some((w: any) => String(w.url ?? '').includes('/api/webhooks/waha-poll'))
+  return { registered, url: webhookUrl, webhooks }
+}
+
 export async function configureWahaWebhook(backendPublicUrl: string): Promise<void> {
   if (!backendPublicUrl) {
     console.warn('[waha] BACKEND_PUBLIC_URL não definido — webhook não configurado')
@@ -171,17 +186,26 @@ export async function configureWahaWebhook(backendPublicUrl: string): Promise<vo
 
   const session = process.env.WAHA_SESSION || 'default'
   const webhookUrl = `${backendPublicUrl.replace(/\/$/, '')}/api/webhooks/waha-poll`
+  const webhookEntry = { url: webhookUrl, events: ['poll.vote', 'poll.vote.failed'] }
 
   try {
-    await wahaClient().put(`/api/sessions/${session}`, {
-      webhooks: [
-        {
-          url: webhookUrl,
-          events: ['poll.vote', 'poll.vote.failed'],
-        },
-      ],
-    })
-    console.log(`[waha] webhook configurado: ${webhookUrl}`)
+    try {
+      await wahaClient().put(`/api/sessions/${session}`, { config: { webhooks: [webhookEntry] } })
+    } catch (err: any) {
+      if (err.response?.status >= 400 && err.response?.status < 500) {
+        console.log('[waha] tentando formato legado de webhook...')
+        await wahaClient().put(`/api/sessions/${session}`, { webhooks: [webhookEntry] })
+      } else {
+        throw err
+      }
+    }
+
+    const status = await getWahaWebhookStatus(backendPublicUrl)
+    if (status.registered) {
+      console.log(`[waha] webhook confirmado ✓: ${webhookUrl}`)
+    } else {
+      console.warn(`[waha] webhook NÃO confirmado na sessão — verificar configuração do WAHA`)
+    }
   } catch (err: any) {
     const detail =
       err.response?.data?.message ??
