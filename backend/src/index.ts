@@ -17,6 +17,7 @@ import checklistsRouter from './routes/checklists'
 import { authMiddleware } from './middleware/auth'
 import { initScheduler } from './scheduler'
 import { runMigrations } from './migrate'
+import { configureWahaWebhook } from './services/waha'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 4000
@@ -76,13 +77,20 @@ async function start() {
     process.exit(1)
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '0.0.0.0', async () => {
     console.log(`[backend] running on port ${PORT}`)
     console.log(`[backend] DB_HOST=${process.env.DB_HOST || 'não definido'}`)
     console.log(`[backend] DB_NAME=${process.env.DB_NAME || 'não definido'}`)
     console.log(`[backend] DB_USER=${process.env.DB_USER || 'não definido'}`)
     console.log(`[backend] DB_PASSWORD=${process.env.DB_PASSWORD ? '***definido***' : 'não definido'}`)
     initScheduler()
+
+    const backendPublicUrl = process.env.BACKEND_PUBLIC_URL
+    if (backendPublicUrl) {
+      await configureWahaWebhook(backendPublicUrl)
+    } else {
+      console.warn('[backend] BACKEND_PUBLIC_URL não definido — webhook do WAHA não será configurado automaticamente')
+    }
   })
 }
 
