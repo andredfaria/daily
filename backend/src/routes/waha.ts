@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
-import { wahaClient, sendWhatsAppText, WhatsAppNumberNotFoundError, fetchWhatsAppProfile } from '../services/waha'
+import { wahaClient, sendWhatsAppText, WhatsAppNumberNotFoundError, fetchWhatsAppProfile, configureWahaWebhook, getWahaWebhookStatus } from '../services/waha'
 
 // Extrai a mensagem de erro mais descritiva de uma resposta WAHA/Axios
 function extractWahaError(err: any): string {
@@ -148,6 +148,41 @@ router.get('/profile', async (req: Request, res: Response) => {
   } catch (err: any) {
     const detail = extractWahaError(err)
     return res.status(503).json({ error: detail })
+  }
+})
+
+// POST /api/waha/register-webhook
+// Re-registra o webhook no WAHA sem reiniciar o servidor.
+// Útil quando BACKEND_PUBLIC_URL não estava definida na última startup.
+router.post('/register-webhook', async (_req: Request, res: Response) => {
+  const backendPublicUrl = process.env.BACKEND_PUBLIC_URL ?? ''
+  if (!backendPublicUrl) {
+    return res.status(400).json({
+      ok: false,
+      error: 'BACKEND_PUBLIC_URL não definida — configure a variável de ambiente e reinicie o servidor',
+    })
+  }
+
+  try {
+    await configureWahaWebhook(backendPublicUrl)
+    const status = await getWahaWebhookStatus(backendPublicUrl)
+    res.json({ ok: true, ...status })
+  } catch (err: any) {
+    const detail = extractWahaError(err)
+    res.status(500).json({ ok: false, error: detail })
+  }
+})
+
+// GET /api/waha/webhook-status
+// Retorna a configuração atual de webhooks na sessão WAHA.
+router.get('/webhook-status', async (_req: Request, res: Response) => {
+  const backendPublicUrl = process.env.BACKEND_PUBLIC_URL ?? ''
+  try {
+    const status = await getWahaWebhookStatus(backendPublicUrl)
+    res.json(status)
+  } catch (err: any) {
+    const detail = extractWahaError(err)
+    res.status(503).json({ registered: false, error: detail })
   }
 })
 
