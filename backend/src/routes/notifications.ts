@@ -59,10 +59,13 @@ router.get('/', async (req: Request, res: Response) => {
     values.push(effectiveLimit)
 
     const [rows] = await pool.query(
-      `SELECT n.*, b.name AS bill_name, o.due_date, o.amount
+      `SELECT n.*, b.name AS bill_name, o.due_date, o.amount,
+              pm.type AS pm_type, pm.pix_key_type, pm.pix_key,
+              pm.pix_beneficiary, pm.boleto_code
        FROM notifications n
        JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
        JOIN bills b ON b.id = o.bill_id
+       LEFT JOIN payment_methods pm ON pm.bill_id = b.id AND pm.is_primary = 1
        ${where} ORDER BY n.scheduled_for DESC LIMIT ?`,
       values
     )
