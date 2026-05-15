@@ -4,6 +4,13 @@ import type { ChecklistDashboardData } from '../types'
 import { useToast } from '../context/ToastContext'
 import { SkeletonStatCard } from '../components/ui/Skeleton'
 
+// MySQL2 retorna colunas DATE como objetos Date — normaliza para string YYYY-MM-DD
+const toDateStr = (v: unknown): string => {
+  if (!v) return ''
+  if (v instanceof Date) return v.toISOString().slice(0, 10)
+  return String(v).slice(0, 10)
+}
+
 // -------- Progress Bar --------
 const ProgressBar: React.FC<{ pct: number; size?: 'sm' | 'lg' }> = ({ pct, size = 'lg' }) => {
   const h = size === 'lg' ? 'h-3' : 'h-2'
@@ -260,10 +267,15 @@ const Checklists: React.FC = () => {
       <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
         <h3 className="text-base font-semibold text-on-surface mb-4">Últimos 14 Dias</h3>
         <div className="space-y-3">
-          {history.map((day) => (
-            <div key={day.poll_date} className="flex items-center gap-3">
+          {history.map((day) => {
+            const dateStr = toDateStr(day.poll_date)
+            const dateLabel = dateStr
+              ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }).format(new Date(dateStr + 'T00:00:00'))
+              : '—'
+            return (
+            <div key={dateStr} className="flex items-center gap-3">
               <span className="text-xs text-on-surface-variant w-24 flex-shrink-0">
-                {new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }).format(new Date(day.poll_date + 'T00:00:00'))}
+                {dateLabel}
               </span>
               <div className="flex-1">
                 <ProgressBar pct={day.completion_pct} size="sm" />
@@ -272,7 +284,7 @@ const Checklists: React.FC = () => {
                 {day.completion_pct}%
               </span>
             </div>
-          ))}
+          )})}
         </div>
       </div>
     )
