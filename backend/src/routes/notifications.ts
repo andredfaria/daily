@@ -189,4 +189,29 @@ router.post('/dispatch', async (_req: Request, res: Response) => {
   }
 })
 
+// DELETE /api/notifications/:id
+// Cancela (hard delete) uma notificação com status=scheduled.
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const [ownerRows]: any = await pool.query(
+      `SELECT n.id, n.status FROM notifications n
+       JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
+       JOIN bills b ON b.id = o.bill_id
+       WHERE n.id = ? AND b.user_id = ?`,
+      [req.params.id, req.userId]
+    )
+    if (!ownerRows.length) {
+      return res.status(404).json({ error: 'Notificação não encontrada' })
+    }
+    if (ownerRows[0].status !== 'scheduled') {
+      return res.status(400).json({ error: 'Apenas notificações agendadas podem ser canceladas' })
+    }
+    await pool.query('DELETE FROM notifications WHERE id = ?', [req.params.id])
+    res.status(204).send()
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
 export default router
