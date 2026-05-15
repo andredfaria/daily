@@ -221,7 +221,7 @@ const Contas: React.FC = () => {
     return recMatch && activeMatch
   })
 
-  const totalAmount = filtered.reduce((s, b) => s + b.amount, 0)
+  const totalAmount = filtered.reduce((s, b) => s + Number(b.amount), 0)
 
   const recurrenceFilters: { value: RecurrenceFilter; label: string }[] = [
     { value: 'all', label: 'Todas' },

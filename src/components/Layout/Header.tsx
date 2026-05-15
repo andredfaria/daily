@@ -51,14 +51,14 @@ const Header: React.FC = () => {
   }, [])
 
   return (
-    <header className="sticky top-0 z-30 bg-surface-container-lowest/80 backdrop-blur-xl border-b border-outline-variant/30 px-6 h-16 flex items-center justify-between">
-      <h2 className="text-base font-semibold text-on-surface">{title}</h2>
+    <header className="sticky top-0 z-30 bg-surface-container-lowest/80 backdrop-blur-xl border-b border-outline-variant/30 px-4 md:px-6 h-14 md:h-16 flex items-center justify-between">
+      <h2 className="text-sm md:text-base font-semibold text-on-surface">{title}</h2>
 
-      <div className="flex items-center gap-3">
-        {/* WAHA Status */}
+      <div className="flex items-center gap-2 md:gap-3">
+        {/* WAHA Status — hide label on mobile */}
         <div
           className={`
-            flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border
+            flex items-center gap-1.5 px-2 md:px-3 py-1.5 rounded-full text-xs font-medium border
             ${wahaConnected === true
               ? 'bg-tertiary/10 text-tertiary border-tertiary/30'
               : wahaConnected === false
@@ -77,7 +77,9 @@ const Header: React.FC = () => {
             }`}
           />
           <span className="material-symbols-outlined text-sm">chat</span>
-          {wahaConnected === null ? 'Verificando...' : wahaConnected ? 'WAHA Online' : 'WAHA Offline'}
+          <span className="hidden sm:inline">
+            {wahaConnected === null ? 'Verificando...' : wahaConnected ? 'WAHA Online' : 'WAHA Offline'}
+          </span>
         </div>
 
         {/* Notifications Bell */}

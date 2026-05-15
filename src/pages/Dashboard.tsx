@@ -270,13 +270,13 @@ const Dashboard: React.FC = () => {
             waha_connected: false,
             monthly_paid_amount: occ
               .filter((o) => o.status === 'paid')
-              .reduce((s, o) => s + o.amount, 0),
+              .reduce((s, o) => s + Number(o.amount), 0),
             monthly_pending_amount: occ
               .filter((o) => o.status === 'pending')
-              .reduce((s, o) => s + o.amount, 0),
+              .reduce((s, o) => s + Number(o.amount), 0),
             monthly_overdue_amount: occ
               .filter((o) => o.status === 'overdue')
-              .reduce((s, o) => s + o.amount, 0),
+              .reduce((s, o) => s + Number(o.amount), 0),
             paid_count: paid,
             pending_count: pending,
             overdue_count: overdue,
