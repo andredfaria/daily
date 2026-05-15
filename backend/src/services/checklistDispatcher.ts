@@ -3,10 +3,14 @@ import pool from '../db'
 import { sendWhatsAppPoll, WhatsAppNumberNotFoundError } from './waha'
 
 export function getTodaySaoPaulo(): string {
-  return new Intl.DateTimeFormat('en-CA', {
+  // formatToParts garante YYYY-MM-DD independente da versão do ICU/Node
+  const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo',
     year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(new Date())
+  }).formatToParts(new Date())
+  const p: Record<string, string> = {}
+  parts.forEach(({ type, value }) => { p[type] = value })
+  return `${p.year}-${p.month}-${p.day}`
 }
 
 export async function sendDailyPoll(
