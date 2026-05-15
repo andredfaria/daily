@@ -67,6 +67,25 @@ export interface NotificationEnriched extends Notification {
   bill_name: string
   due_date: string
   amount: number
+  pm_type?: 'pix' | 'boleto'
+  pix_key_type?: PixKeyType
+  pix_key?: string
+  pix_beneficiary?: string
+  boleto_code?: string
+}
+
+export interface ChecklistPollNotif {
+  id: string
+  checklist_id: string
+  checklist_name: string
+  poll_date: string
+  status: 'pending' | 'sent' | 'completed'
+  completed_count: number
+  total_count: number
+  completion_pct: number
+  selected_options: string[]
+  items: string[]
+  sent_at?: string
 }
 
 export interface User {
