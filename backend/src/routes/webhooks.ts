@@ -58,28 +58,43 @@ router.post('/waha-poll', async (req: Request, res: Response) => {
 })
 
 async function handlePollVote(data: any): Promise<void> {
-  // WAHA envia: { pollMessageId, chatId, selectedOptions, timestamp, ... }
-  const pollMessageId: string | undefined =
+  // GOWS engine: short ID em _data.Message.pollUpdateMessage.pollCreationMessageKey.ID
+  // Outros engines: ID completo em poll.id, pollMessageId, pollInfo.msgId, key.id ou id
+  const shortId: string | undefined =
+    data._data?.Message?.pollUpdateMessage?.pollCreationMessageKey?.ID
+
+  const rawFullId: string | undefined =
+    data.poll?.id ??
     data.pollMessageId ??
     data.pollInfo?.msgId ??
     data.key?.id ??
     data.id
 
-  const rawOptions: unknown[] = Array.isArray(data.selectedOptions) ? data.selectedOptions : []
+  // Normaliza para short ID (último segmento de "true_CHATID_SHORTID")
+  const pollMessageId: string | undefined =
+    shortId ??
+    (rawFullId?.includes('_') ? rawFullId.split('_').pop() : rawFullId)
+
+  // GOWS engine: selectedOptions aninhado em vote.selectedOptions
+  const rawOptions: unknown[] =
+    Array.isArray(data.vote?.selectedOptions) ? data.vote.selectedOptions :
+    Array.isArray(data.selectedOptions) ? data.selectedOptions : []
   const selectedOptions: string[] = rawOptions.map((opt) =>
     typeof opt === 'string' ? opt : ((opt as any)?.name ?? String(opt))
   )
 
-  const voteTimestamp: number = Number(data.timestamp) || Date.now()
+  // GOWS engine: timestamp aninhado em vote.timestamp
+  const voteTimestamp: number = Number(data.vote?.timestamp ?? data.timestamp) || Date.now()
 
   if (!pollMessageId) {
     console.warn('[webhook] poll.vote sem pollMessageId')
     return
   }
 
+  // LIKE com sufixo para tolerar diferença de formato (LID vs c.us) no ID armazenado
   const [rows]: any = await pool.query(
-    'SELECT id, total_count, selected_options, last_vote_timestamp FROM checklist_daily_polls WHERE waha_poll_id = ?',
-    [pollMessageId],
+    'SELECT id, total_count, selected_options, last_vote_timestamp FROM checklist_daily_polls WHERE waha_poll_id LIKE ?',
+    [`%${pollMessageId}`],
   )
   if (!rows.length) {
     console.warn(`[webhook] poll não encontrado: ${pollMessageId}`)
