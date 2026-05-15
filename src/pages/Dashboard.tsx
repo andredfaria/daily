@@ -174,56 +174,58 @@ const OccurrenceRow: React.FC<OccurrenceRowProps> = ({ occurrence, onMarkPaid, p
   return (
     <div
       className={`
-        flex items-center gap-4 p-4 rounded-xl border bg-surface-container/50
-        hover:bg-surface-container transition-all duration-200 group
+        p-3 sm:p-4 rounded-xl border bg-surface-container/50
+        hover:bg-surface-container transition-all duration-200
         ${borderColor}
       `}
     >
-      {/* Left bar */}
-      <div className={`w-1 h-10 rounded-full flex-shrink-0 ${leftBar}`} />
+      {/* Main row: bar + icon + info + badge */}
+      <div className="flex items-center gap-3">
+        {/* Left bar */}
+        <div className={`w-1 h-10 rounded-full flex-shrink-0 ${leftBar}`} />
 
-      {/* Icon */}
-      <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
-        <span className="material-symbols-outlined text-primary text-lg">{icon}</span>
+        {/* Icon */}
+        <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+          <span className="material-symbols-outlined text-primary text-lg">{icon}</span>
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-on-surface truncate">{billName}</p>
+          <p className={`text-xs ${color} font-medium`}>
+            {formatDate(occurrence.due_date)} · {label}
+          </p>
+        </div>
+
+        {/* Status Badge — sempre visível */}
+        <StatusBadge status={isJustPaid ? 'paid' : occurrence.status} animate={isJustPaid} />
       </div>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-on-surface truncate">{billName}</p>
-        <p className={`text-xs ${color} font-medium`}>
-          {formatDate(occurrence.due_date)} · {label}
-        </p>
-      </div>
-
-      {/* Amount */}
-      <div className="text-right flex-shrink-0">
+      {/* Secondary row: amount + action */}
+      <div className="flex items-center justify-between mt-2 pl-[52px]">
         <p className="text-sm font-bold text-on-surface">{formatBRL(occurrence.amount)}</p>
+
+        {!isPaid && (
+          <button
+            onClick={() => onMarkPaid(occurrence.id)}
+            disabled={isPaying}
+            className="
+              flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+              bg-tertiary/10 text-tertiary border border-tertiary/30
+              hover:bg-tertiary/20 transition-all duration-200
+              disabled:opacity-60 disabled:cursor-not-allowed
+              min-h-[36px]
+            "
+          >
+            {isPaying ? (
+              <span className="w-3.5 h-3.5 border-2 border-tertiary border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <span className="material-symbols-outlined text-sm">check_circle</span>
+            )}
+            Pagar
+          </button>
+        )}
       </div>
-
-      {/* Status Badge */}
-      <StatusBadge status={isJustPaid ? 'paid' : occurrence.status} animate={isJustPaid} />
-
-      {/* Action */}
-      {!isPaid && (
-        <button
-          onClick={() => onMarkPaid(occurrence.id)}
-          disabled={isPaying}
-          className="
-            flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-            bg-tertiary/10 text-tertiary border border-tertiary/30
-            hover:bg-tertiary/20 transition-all duration-200
-            disabled:opacity-60 disabled:cursor-not-allowed
-            flex-shrink-0
-          "
-        >
-          {isPaying ? (
-            <span className="w-3.5 h-3.5 border-2 border-tertiary border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <span className="material-symbols-outlined text-sm">check_circle</span>
-          )}
-          Pagar
-        </button>
-      )}
     </div>
   )
 }

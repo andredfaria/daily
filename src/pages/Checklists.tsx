@@ -233,7 +233,7 @@ const Checklists: React.FC = () => {
               onClick={() => handleSendNow(true)}
               disabled={sending}
               title="Reenviar checklist (substitui envio atual)"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
+              className="w-11 h-11 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
             >
               {sending ? (
                 <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -334,7 +334,7 @@ const Checklists: React.FC = () => {
               <button
                 onClick={() => removeItem(i)}
                 disabled={formItems.length <= 2}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors disabled:opacity-30"
+                className="w-11 h-11 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors disabled:opacity-30"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>

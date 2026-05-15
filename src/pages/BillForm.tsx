@@ -72,7 +72,7 @@ const PaymentMethodCard: React.FC<PaymentMethodCardProps> = ({
             <button
               type="button"
               onClick={() => onRemove(method.draftId)}
-              className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-error/20 text-on-surface-variant hover:text-error transition-colors"
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-error/20 text-on-surface-variant hover:text-error transition-colors"
             >
               <span className="material-symbols-outlined text-sm">close</span>
             </button>
@@ -503,7 +503,7 @@ const BillForm: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setDaysBeforeAlert((v) => Math.max(0, v - 1))}
-                    className="w-9 h-9 rounded-xl bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
+                    className="w-11 h-11 rounded-xl bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
                   >
                     <span className="material-symbols-outlined text-base">remove</span>
                   </button>
@@ -513,7 +513,7 @@ const BillForm: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setDaysBeforeAlert((v) => Math.min(30, v + 1))}
-                    className="w-9 h-9 rounded-xl bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
+                    className="w-11 h-11 rounded-xl bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
                   >
                     <span className="material-symbols-outlined text-base">add</span>
                   </button>

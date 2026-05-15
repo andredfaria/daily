@@ -115,7 +115,7 @@ export const Login: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="min-h-dvh flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
@@ -140,7 +140,7 @@ export const Login: React.FC = () => {
                   Número de telefone
                 </label>
                 <div className="flex items-center gap-2 bg-surface-container-high rounded-xl px-4 py-3 border border-outline-variant focus-within:border-primary transition-colors">
-                  <span className="text-on-surface-variant text-sm font-medium shrink-0">🇧🇷 +55</span>
+                  <span className="text-on-surface-variant text-sm font-medium shrink-0">+55</span>
                   <input
                     type="tel"
                     value={phone}

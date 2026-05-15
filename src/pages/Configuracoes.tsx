@@ -359,7 +359,7 @@ const Configuracoes: React.FC = () => {
                       onClick={() =>
                         setNotifSettings((p) => ({ ...p, days_before: Math.max(0, p.days_before - 1) }))
                       }
-                      className="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
+                      className="w-11 h-11 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
                     >
                       <span className="material-symbols-outlined text-sm">remove</span>
                     </button>
@@ -371,7 +371,7 @@ const Configuracoes: React.FC = () => {
                       onClick={() =>
                         setNotifSettings((p) => ({ ...p, days_before: Math.min(30, p.days_before + 1) }))
                       }
-                      className="w-8 h-8 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
+                      className="w-11 h-11 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
                     >
                       <span className="material-symbols-outlined text-sm">add</span>
                     </button>
@@ -509,10 +509,21 @@ const Configuracoes: React.FC = () => {
 
             {dispatchResult && (
               <div className="mt-4 p-3 rounded-xl bg-surface-container border border-outline-variant/30 text-sm">
-                <p className="text-on-surface font-medium mb-1">Resultado do disparo:</p>
-                <p className="text-on-surface-variant">
-                  ✅ {dispatchResult.sent} enviadas &nbsp;·&nbsp; ❌ {dispatchResult.failed} falhas &nbsp;·&nbsp; ⏭ {dispatchResult.skipped} ignoradas
-                </p>
+                <p className="text-on-surface font-medium mb-2">Resultado do disparo:</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                  <span className="flex items-center gap-1 text-tertiary">
+                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                    {dispatchResult.sent} enviadas
+                  </span>
+                  <span className="flex items-center gap-1 text-error">
+                    <span className="material-symbols-outlined text-sm">cancel</span>
+                    {dispatchResult.failed} falhas
+                  </span>
+                  <span className="flex items-center gap-1 text-on-surface-variant">
+                    <span className="material-symbols-outlined text-sm">skip_next</span>
+                    {dispatchResult.skipped} ignoradas
+                  </span>
+                </div>
               </div>
             )}
           </div>

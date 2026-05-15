@@ -87,7 +87,7 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, t
           <div className="flex items-center gap-0.5 ml-1">
             <button
               onClick={() => onEdit(bill.id)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-primary"
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-primary"
               title="Editar"
             >
               <span className="material-symbols-outlined text-base">edit</span>
@@ -95,7 +95,7 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, t
             <button
               onClick={() => onToggle(bill.id, !bill.is_active)}
               disabled={toggling === bill.id}
-              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-tertiary disabled:opacity-40"
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-tertiary disabled:opacity-40"
               title={bill.is_active ? 'Desativar' : 'Ativar'}
             >
               {toggling === bill.id ? (
@@ -108,7 +108,7 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, t
             </button>
             <button
               onClick={() => onDelete(bill)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-error"
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-error"
               title="Excluir"
             >
               <span className="material-symbols-outlined text-base">delete</span>
