@@ -69,11 +69,11 @@ SET FOREIGN_KEY_CHECKS = 1;
 export async function runMigrations(): Promise<void> {
   try {
     const [rows]: any = await pool.query(
-      `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = ? AND table_name = 'checklists'`,
+      `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = ? AND table_name = 'checklist_daily_polls'`,
       [process.env.DB_NAME || 'daily'],
     )
     if (rows[0].cnt > 0) {
-      console.log('[migrate] checklists ja existe — pulando')
+      console.log('[migrate] checklist_daily_polls ja existe — pulando')
       return
     }
   } catch {

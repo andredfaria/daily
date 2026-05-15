@@ -125,7 +125,12 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
         pix_beneficiary: notif.pix_beneficiary, boleto_code: notif.boleto_code }
     : null
 
-  const messageBody = buildMessage(notif.bill_name, notif.amount, notif.due_date, pm)
+  // MySQL2 retorna DATE como objeto Date — converter para string YYYY-MM-DD
+  const dueDateStr = notif.due_date instanceof Date
+    ? notif.due_date.toISOString().slice(0, 10)
+    : String(notif.due_date).slice(0, 10)
+
+  const messageBody = buildMessage(notif.bill_name, notif.amount, dueDateStr, pm)
 
   try {
     const { id: wahaMessageId } = await sendWhatsAppText(notif.whatsapp_number, messageBody)
