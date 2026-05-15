@@ -43,7 +43,8 @@ router.post('/waha-poll', async (req: Request, res: Response) => {
     }
 
     if (event !== 'poll.vote') {
-      return res.status(400).json({ error: `evento desconhecido: ${event}` })
+      console.log(`[webhook] evento ignorado: ${event}`)
+      return res.status(200).json({ ok: true })
     }
 
     await handlePollVote(data)
