@@ -39,4 +39,8 @@ export const checklistsApi = {
     const res = await client.get<ChecklistDashboardData>('/checklists/dashboard')
     return res.data
   },
+
+  sendNow: async (force = false): Promise<void> => {
+    await client.post('/checklists/send-now', { force })
+  },
 }

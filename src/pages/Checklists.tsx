@@ -55,6 +55,9 @@ const Checklists: React.FC = () => {
   // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  // Send now
+  const [sending, setSending] = useState(false)
+
   const fetchDashboard = useCallback(async () => {
     try {
       setLoading(true)
@@ -131,6 +134,20 @@ const Checklists: React.FC = () => {
     }
   }
 
+  const handleSendNow = async (force = false) => {
+    setSending(true)
+    try {
+      await checklistsApi.sendNow(force)
+      success('Checklist enviado com sucesso!')
+      await fetchDashboard()
+    } catch (err: any) {
+      const msg = err.response?.data?.error ?? 'Erro ao enviar checklist.'
+      showError(msg)
+    } finally {
+      setSending(false)
+    }
+  }
+
   const handleDelete = async () => {
     if (!dashboard?.checklist) return
     setSaving(true)
@@ -175,9 +192,21 @@ const Checklists: React.FC = () => {
         <div className="glass-card rounded-2xl border border-outline-variant/50 p-6 text-center">
           <span className="material-symbols-outlined text-3xl text-on-surface-variant mb-2 block">today</span>
           <p className="text-on-surface font-semibold mb-1">Nenhum envio hoje</p>
-          <p className="text-sm text-on-surface-variant">
+          <p className="text-sm text-on-surface-variant mb-4">
             O checklist será enviado automaticamente às <strong>{String(checklist!.send_time).padStart(2, '0')}h</strong>.
           </p>
+          <button
+            onClick={() => handleSendNow(false)}
+            disabled={sending}
+            className="btn-primary mx-auto"
+          >
+            {sending ? (
+              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <span className="material-symbols-outlined text-lg">send</span>
+            )}
+            Enviar Agora
+          </button>
         </div>
       )
     }
@@ -191,7 +220,21 @@ const Checklists: React.FC = () => {
               {today.completed_count} de {today.total_count} concluídos
             </p>
           </div>
-          <span className="text-2xl font-bold text-primary">{today.completion_pct}%</span>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl font-bold text-primary">{today.completion_pct}%</span>
+            <button
+              onClick={() => handleSendNow(true)}
+              disabled={sending}
+              title="Reenviar checklist (substitui envio atual)"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
+            >
+              {sending ? (
+                <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <span className="material-symbols-outlined text-lg">refresh</span>
+              )}
+            </button>
+          </div>
         </div>
         <ProgressBar pct={today.completion_pct} />
         {today.selected_options.length > 0 && (

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
+import { sendDailyPoll, getTodaySaoPaulo } from '../services/checklistDispatcher'
 
 const router = Router()
 
@@ -154,7 +155,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
     const checklist = await getChecklist(req.userId!)
     if (!checklist) return res.json({ checklist: null, today: null, history: [] })
 
-    const today = new Date().toISOString().slice(0, 10)
+    const today = getTodaySaoPaulo()
 
     const [todayRows]: any = await pool.query(
       `SELECT id, poll_date, waha_poll_id, selected_options,
@@ -191,6 +192,30 @@ router.get('/dashboard', async (req: Request, res: Response) => {
     res.json({ checklist: { ...checklist, items }, today: todayPoll, history })
   } catch (err: any) {
     console.error('[checklists] GET /dashboard', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// -------- POST /api/checklists/send-now - envio manual/teste --------
+router.post('/send-now', async (req: Request, res: Response) => {
+  try {
+    const checklist = await getChecklist(req.userId!)
+    if (!checklist) {
+      return res.status(404).json({ error: 'Nenhum checklist cadastrado.' })
+    }
+
+    const force = req.body.force === true
+
+    try {
+      await sendDailyPoll(checklist.id, req.userId!, { force })
+    } catch (err: any) {
+      console.error('[checklists] POST /send-now erro no dispatch:', err.message)
+      return res.status(502).json({ error: `Erro ao enviar pelo WAHA: ${err.message}` })
+    }
+
+    res.json({ ok: true })
+  } catch (err: any) {
+    console.error('[checklists] POST /send-now', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })

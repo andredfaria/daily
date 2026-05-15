@@ -2,14 +2,18 @@ import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { sendWhatsAppPoll, WhatsAppNumberNotFoundError } from './waha'
 
-function getTodaySaoPaulo(): string {
+export function getTodaySaoPaulo(): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo',
     year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date())
 }
 
-export async function sendDailyPoll(checklistId: string, userId: string): Promise<void> {
+export async function sendDailyPoll(
+  checklistId: string,
+  userId: string,
+  opts: { force?: boolean } = {},
+): Promise<void> {
   try {
     const [checklistRows]: any = await pool.query(
       `SELECT c.id, c.name, c.user_id, u.whatsapp_number
@@ -26,13 +30,21 @@ export async function sendDailyPoll(checklistId: string, userId: string): Promis
     const checklist = checklistRows[0]
     const today = getTodaySaoPaulo()
 
-    const [existingRows]: any = await pool.query(
-      'SELECT id FROM checklist_daily_polls WHERE checklist_id = ? AND poll_date = ?',
-      [checklistId, today],
-    )
-    if (existingRows.length) {
-      console.log(`[checklistDispatcher] poll já enviado hoje (checklist ${checklistId})`)
-      return
+    if (!opts.force) {
+      const [existingRows]: any = await pool.query(
+        'SELECT id FROM checklist_daily_polls WHERE checklist_id = ? AND poll_date = ?',
+        [checklistId, today],
+      )
+      if (existingRows.length) {
+        console.log(`[checklistDispatcher] poll já enviado hoje (checklist ${checklistId})`)
+        return
+      }
+    } else {
+      // Force: remove o poll do dia para permitir reenvio
+      await pool.query(
+        'DELETE FROM checklist_daily_polls WHERE checklist_id = ? AND poll_date = ?',
+        [checklistId, today],
+      )
     }
 
     const [itemRows]: any = await pool.query(
