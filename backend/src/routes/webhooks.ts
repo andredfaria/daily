@@ -20,6 +20,7 @@ function verifyHmac(payload: string, headerHmac: string): boolean {
 // Recebe eventos poll.vote e poll.vote.failed do WAHA
 router.post('/waha-poll', async (req: Request, res: Response) => {
   try {
+    console.log('[webhook] payload raw:', JSON.stringify(req.body))
     const payload = JSON.stringify(req.body)
     const headerHmac = req.headers['x-webhook-hmac'] as string | undefined
 
@@ -59,8 +60,16 @@ router.post('/waha-poll', async (req: Request, res: Response) => {
 async function handlePollVote(data: any): Promise<void> {
   // WAHA envia: { pollMessageId, chatId, selectedOptions, timestamp, ... }
   const pollMessageId: string | undefined =
-    data.pollMessageId ?? data.key?.id ?? data.id
-  const selectedOptions: string[] = data.selectedOptions ?? []
+    data.pollMessageId ??
+    data.pollInfo?.msgId ??
+    data.key?.id ??
+    data.id
+
+  const rawOptions: unknown[] = Array.isArray(data.selectedOptions) ? data.selectedOptions : []
+  const selectedOptions: string[] = rawOptions.map((opt) =>
+    typeof opt === 'string' ? opt : ((opt as any)?.name ?? String(opt))
+  )
+
   const voteTimestamp: number = Number(data.timestamp) || Date.now()
 
   if (!pollMessageId) {
