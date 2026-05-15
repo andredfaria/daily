@@ -166,10 +166,10 @@ router.post('/register-webhook', async (_req: Request, res: Response) => {
   try {
     await configureWahaWebhook(backendPublicUrl)
     const status = await getWahaWebhookStatus(backendPublicUrl)
-    res.json({ ok: true, ...status })
+    return res.json({ ok: true, ...status })
   } catch (err: any) {
     const detail = extractWahaError(err)
-    res.status(500).json({ ok: false, error: detail })
+    return res.status(500).json({ ok: false, error: detail })
   }
 })
 
@@ -179,10 +179,10 @@ router.get('/webhook-status', async (_req: Request, res: Response) => {
   const backendPublicUrl = process.env.BACKEND_PUBLIC_URL ?? ''
   try {
     const status = await getWahaWebhookStatus(backendPublicUrl)
-    res.json(status)
+    return res.json(status)
   } catch (err: any) {
     const detail = extractWahaError(err)
-    res.status(503).json({ registered: false, error: detail })
+    return res.status(503).json({ registered: false, error: detail })
   }
 })
 
