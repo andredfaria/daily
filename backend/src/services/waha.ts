@@ -123,3 +123,27 @@ export async function fetchWhatsAppName(phone: string): Promise<string | null> {
     return null
   }
 }
+
+export async function configureWahaWebhook(backendPublicUrl: string): Promise<void> {
+  const session = process.env.WAHA_SESSION || 'default'
+  const webhookUrl = `${backendPublicUrl}/api/webhooks/waha-poll`
+
+  try {
+    await wahaClient().put(`/api/sessions/${session}`, {
+      webhooks: [
+        {
+          url: webhookUrl,
+          events: ['poll.vote', 'poll.vote.failed'],
+        },
+      ],
+    })
+    console.log(`[waha] webhook configurado: ${webhookUrl}`)
+  } catch (err: any) {
+    const detail =
+      err.response?.data?.message ??
+      err.response?.data?.error ??
+      err.message ??
+      'erro desconhecido'
+    console.warn(`[waha] não foi possível configurar webhook: ${detail}`)
+  }
+}
