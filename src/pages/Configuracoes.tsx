@@ -13,7 +13,6 @@ interface NotificationSettings {
   notification_time: number
 }
 
-const APP_VERSION = '1.0.0'
 
 const Configuracoes: React.FC = () => {
   const [user, setUser] = useState<User | null>(null)
@@ -437,12 +436,6 @@ const Configuracoes: React.FC = () => {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-center pt-4 border-t border-outline-variant/20">
-        <p className="text-xs text-on-surface-variant">
-          BillSync v{APP_VERSION} · Gestão de Pagamentos
-        </p>
-      </div>
     </div>
   )
 }

@@ -288,7 +288,7 @@ const Checklists: React.FC = () => {
       <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-on-surface">
-            {checklist ? 'Editar Itens' : 'Criar Checklist'}
+            {checklist ? 'Editar Checklist' : 'Criar Checklist'}
           </h3>
           <span className={`text-xs font-medium ${validCount > 12 ? 'text-error' : 'text-on-surface-variant'}`}>
             {validCount}/12 itens
@@ -368,7 +368,7 @@ const Checklists: React.FC = () => {
             ) : (
               <span className="material-symbols-outlined text-lg">save</span>
             )}
-            {checklist ? 'Salvar' : 'Criar'}
+            {checklist ? 'Salvar Checklist' : 'Criar Checklist'}
           </button>
           {checklist && (
             <button onClick={() => setEditing(false)} className="btn-ghost text-sm">
@@ -407,46 +407,69 @@ const Checklists: React.FC = () => {
     )
   }
 
+  // -------- Checklist Items Panel --------
+  const renderItemsList = () => {
+    if (!checklist) return null
+    return (
+      <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-semibold text-on-surface">{checklist.name}</h3>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              {checklist.items.length} itens · Envio às <strong>{String(checklist.send_time).padStart(2, '0')}h</strong>
+            </p>
+          </div>
+          <button
+            onClick={() => setEditing(true)}
+            className="btn-ghost text-xs py-1.5 px-3"
+          >
+            <span className="material-symbols-outlined text-base">edit</span>
+            Editar Checklist
+          </button>
+        </div>
+        <div className="space-y-1.5">
+          {checklist.items.map((item, i) => (
+            <div key={item.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-surface-container/50 border border-outline-variant/20">
+              <span className="text-[10px] font-bold text-on-surface-variant/50 w-4 text-right flex-shrink-0">{i + 1}</span>
+              <span className="text-sm text-on-surface">{item.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   // -------- Main Render --------
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-on-surface">Checklists</h2>
-        {checklist && !editing && (
-          <button onClick={() => setEditing(true)} className="btn-ghost text-sm">
-            <span className="material-symbols-outlined text-lg">edit</span>
-            Editar Itens
-          </button>
-        )}
       </div>
 
       {/* If no checklist, show creator */}
       {!checklist && !editing && (
-        <>
-          <div className="glass-card rounded-2xl border border-outline-variant/50 p-12 text-center">
-            <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-3 block">
-              checklist
-            </span>
-            <p className="text-on-surface font-semibold mb-1">Nenhum checklist criado</p>
-            <p className="text-sm text-on-surface-variant mb-4">
-              Crie um checklist diário para receber no WhatsApp e acompanhar seu progresso.
-            </p>
-            <button onClick={() => setEditing(true)} className="btn-primary mx-auto">
-              <span className="material-symbols-outlined text-lg">add</span>
-              Criar Checklist
-            </button>
-          </div>
-        </>
+        <div className="glass-card rounded-2xl border border-outline-variant/50 p-12 text-center">
+          <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-3 block">checklist</span>
+          <p className="text-on-surface font-semibold mb-1">Nenhum checklist criado</p>
+          <p className="text-sm text-on-surface-variant mb-4">
+            Crie um checklist diário para receber no WhatsApp e acompanhar seu progresso.
+          </p>
+          <button onClick={() => setEditing(true)} className="btn-primary mx-auto">
+            <span className="material-symbols-outlined text-lg">add</span>
+            Criar Checklist
+          </button>
+        </div>
       )}
 
       {/* Editor mode */}
       {editing && renderEditor()}
 
-      {/* View mode: stats + today + history */}
+      {/* View mode */}
       {checklist && !editing && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Stats row */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <StatCard icon="checklist" label="Itens" value={checklist.items.length} iconColor="text-primary" iconBg="bg-primary/15" />
             <StatCard
               icon="schedule"
@@ -457,8 +480,8 @@ const Checklists: React.FC = () => {
             />
             <StatCard
               icon="today"
-              label="Status Hoje"
-              value={today ? `${today.completion_pct}%` : '---'}
+              label="Conclusão Hoje"
+              value={today ? `${today.completion_pct}%` : '—'}
               iconColor={today && today.completion_pct >= 100 ? 'text-tertiary' : 'text-on-surface-variant'}
               iconBg={today && today.completion_pct >= 100 ? 'bg-tertiary/15' : 'bg-surface-container-high'}
             />
@@ -471,9 +494,15 @@ const Checklists: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {renderTodaySection()}
-            {renderHistory()}
+          {/* Main grid: items list + today + history */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Items list */}
+            <div>{renderItemsList()}</div>
+            {/* Today + History */}
+            <div className="xl:col-span-2 space-y-6">
+              {renderTodaySection()}
+              {renderHistory()}
+            </div>
           </div>
         </>
       )}

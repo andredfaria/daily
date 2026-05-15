@@ -27,7 +27,7 @@ const Sidebar: React.FC = () => {
           </div>
           <div>
             <h1 className="text-sm font-bold text-on-surface leading-none">BillSync</h1>
-            <p className="text-[10px] text-on-surface-variant mt-0.5">Gestão de Pagamentos</p>
+            <p className="text-[10px] text-on-surface-variant mt-0.5">Gestão do Dia a Dia</p>
           </div>
         </div>
       </div>

@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { occurrencesApi } from '../api/occurrences'
-import type { BillOccurrence, DashboardStats } from '../types'
+import { checklistsApi } from '../api/checklists'
+import type { BillOccurrence, DashboardStats, ChecklistDashboardData } from '../types'
 import { formatBRL, formatDate, formatRelativeDate, getBillIcon } from '../utils/format'
 import StatusBadge from '../components/ui/StatusBadge'
 import { SkeletonRow, SkeletonStatCard } from '../components/ui/Skeleton'
@@ -231,6 +232,7 @@ const OccurrenceRow: React.FC<OccurrenceRowProps> = ({ occurrence, onMarkPaid, p
 const Dashboard: React.FC = () => {
   const [occurrences, setOccurrences] = useState<BillOccurrence[]>([])
   const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [checklistData, setChecklistData] = useState<ChecklistDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState<string | null>(null)
   const [justPaid, setJustPaid] = useState<string | null>(null)
@@ -240,10 +242,15 @@ const Dashboard: React.FC = () => {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const [upcomingData, statsData] = await Promise.allSettled([
+      const [upcomingData, statsData, checklistResult] = await Promise.allSettled([
         occurrencesApi.upcoming(30),
         occurrencesApi.getDashboardStats(),
+        checklistsApi.dashboard(),
       ])
+
+      if (checklistResult.status === 'fulfilled') {
+        setChecklistData(checklistResult.value)
+      }
 
       if (upcomingData.status === 'fulfilled') {
         setOccurrences(upcomingData.value)
@@ -329,45 +336,121 @@ const Dashboard: React.FC = () => {
     return (order[a.status] ?? 3) - (order[b.status] ?? 3)
   })
 
+  // Checklist metrics
+  const checklistItems = checklistData?.checklist?.items.length ?? 0
+  const todayPct = checklistData?.today?.completion_pct ?? null
+  const historyAvg = checklistData?.history?.length
+    ? Math.round(
+        checklistData.history.reduce((s, d) => s + Number(d.completion_pct), 0) /
+          checklistData.history.length,
+      )
+    : null
+  const sendTime = checklistData?.checklist
+    ? `${String(checklistData.checklist.send_time).padStart(2, '0')}h`
+    : null
+
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)
-        ) : (
-          <>
-            <StatCard
-              icon="receipt_long"
-              label="Contas Ativas"
-              value={stats?.active_bills ?? 0}
-              iconColor="text-primary"
-              iconBg="bg-primary/15"
-            />
-            <StatCard
-              icon="event_upcoming"
-              label="Vencem Esta Semana"
-              value={stats?.due_this_week ?? 0}
-              iconColor="text-yellow-400"
-              iconBg="bg-yellow-400/15"
-            />
-            <StatCard
-              icon="check_circle"
-              label="Pagas Este Mês"
-              value={stats?.paid_this_month ?? 0}
-              iconColor="text-tertiary"
-              iconBg="bg-tertiary/15"
-              sub={formatBRL(stats?.monthly_paid_amount ?? 0)}
-            />
-            <StatCard
-              icon="chat"
-              label="WAHA Status"
-              value={stats?.waha_connected ? 'Online' : 'Offline'}
-              iconColor={stats?.waha_connected ? 'text-tertiary' : 'text-error'}
-              iconBg={stats?.waha_connected ? 'bg-tertiary/15' : 'bg-error/15'}
-            />
-          </>
-        )}
+
+      {/* Row 1 — Contas */}
+      <div>
+        <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide mb-3 flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-sm text-primary">receipt_long</span>
+          Contas a Pagar
+        </p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)
+          ) : (
+            <>
+              <StatCard
+                icon="receipt_long"
+                label="Contas Ativas"
+                value={stats?.active_bills ?? 0}
+                iconColor="text-primary"
+                iconBg="bg-primary/15"
+              />
+              <StatCard
+                icon="event_upcoming"
+                label="Vencem Esta Semana"
+                value={stats?.due_this_week ?? 0}
+                iconColor="text-yellow-400"
+                iconBg="bg-yellow-400/15"
+              />
+              <StatCard
+                icon="check_circle"
+                label="Pagas Este Mês"
+                value={stats?.paid_this_month ?? 0}
+                iconColor="text-tertiary"
+                iconBg="bg-tertiary/15"
+                sub={formatBRL(stats?.monthly_paid_amount ?? 0)}
+              />
+              <StatCard
+                icon="warning"
+                label="Em Atraso"
+                value={stats?.overdue_count ?? 0}
+                iconColor={stats?.overdue_count ? 'text-error' : 'text-on-surface-variant'}
+                iconBg={stats?.overdue_count ? 'bg-error/15' : 'bg-surface-container-high'}
+                sub={stats?.overdue_count ? formatBRL(stats.monthly_overdue_amount) : undefined}
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Row 2 — Checklists */}
+      <div>
+        <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide mb-3 flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-sm text-primary">checklist</span>
+          Checklist Diário
+        </p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)
+          ) : checklistData?.checklist ? (
+            <>
+              <StatCard
+                icon="format_list_bulleted"
+                label="Itens no Checklist"
+                value={checklistItems}
+                iconColor="text-primary"
+                iconBg="bg-primary/15"
+              />
+              <StatCard
+                icon="today"
+                label="Conclusão Hoje"
+                value={todayPct !== null ? `${todayPct}%` : '—'}
+                iconColor={todayPct !== null && todayPct >= 100 ? 'text-tertiary' : 'text-yellow-400'}
+                iconBg={todayPct !== null && todayPct >= 100 ? 'bg-tertiary/15' : 'bg-yellow-400/15'}
+              />
+              <StatCard
+                icon="bar_chart"
+                label="Média (14 dias)"
+                value={historyAvg !== null ? `${historyAvg}%` : '—'}
+                iconColor="text-primary"
+                iconBg="bg-primary/15"
+              />
+              <StatCard
+                icon="schedule"
+                label="Próximo Envio"
+                value={sendTime ?? '—'}
+                iconColor="text-on-surface-variant"
+                iconBg="bg-surface-container-high"
+              />
+            </>
+          ) : (
+            <div className="col-span-2 lg:col-span-4 glass-card rounded-2xl border border-outline-variant/50 p-4 flex items-center gap-3">
+              <span className="material-symbols-outlined text-on-surface-variant text-xl">checklist</span>
+              <div>
+                <p className="text-sm font-medium text-on-surface">Nenhum checklist cadastrado</p>
+                <p className="text-xs text-on-surface-variant">Configure um checklist diário na aba Checklists.</p>
+              </div>
+              <button onClick={() => navigate('/checklists')} className="ml-auto btn-ghost text-xs py-1.5 px-3">
+                Configurar →
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
