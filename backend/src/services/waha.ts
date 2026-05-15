@@ -125,8 +125,13 @@ export async function fetchWhatsAppName(phone: string): Promise<string | null> {
 }
 
 export async function configureWahaWebhook(backendPublicUrl: string): Promise<void> {
+  if (!backendPublicUrl) {
+    console.warn('[waha] BACKEND_PUBLIC_URL não definido — webhook não configurado')
+    return
+  }
+
   const session = process.env.WAHA_SESSION || 'default'
-  const webhookUrl = `${backendPublicUrl}/api/webhooks/waha-poll`
+  const webhookUrl = `${backendPublicUrl.replace(/\/$/, '')}/api/webhooks/waha-poll`
 
   try {
     await wahaClient().put(`/api/sessions/${session}`, {
