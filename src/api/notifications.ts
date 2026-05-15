@@ -69,4 +69,8 @@ export const notificationsApi = {
   getWhatsAppProfile(): Promise<{ name: string | null; about: string | null; profilePicUrl: string | null }> {
     return client.get('/waha/profile').then((r) => r.data)
   },
+
+  cancel: async (id: string): Promise<void> => {
+    await client.delete(`/notifications/${id}`)
+  },
 }

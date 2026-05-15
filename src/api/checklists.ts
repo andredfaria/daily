@@ -1,5 +1,5 @@
 import client from './client'
-import type { Checklist, ChecklistDashboardData } from '../types'
+import type { Checklist, ChecklistDashboardData, ChecklistPollNotif } from '../types'
 
 export interface CreateChecklistPayload {
   name?: string
@@ -42,5 +42,13 @@ export const checklistsApi = {
 
   sendNow: async (force = false): Promise<void> => {
     await client.post('/checklists/send-now', { force })
+  },
+
+  polls: async (params: {
+    upcoming?: boolean
+    history?: boolean
+  }): Promise<ChecklistPollNotif[]> => {
+    const res = await client.get<ChecklistPollNotif[]>('/checklists/polls', { params })
+    return res.data
   },
 }
