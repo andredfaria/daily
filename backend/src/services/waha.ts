@@ -124,6 +124,45 @@ export async function fetchWhatsAppName(phone: string): Promise<string | null> {
   }
 }
 
+export async function fetchWhatsAppProfile(phone: string): Promise<{
+  name: string | null
+  about: string | null
+  profilePicUrl: string | null
+}> {
+  const session = process.env.WAHA_SESSION || 'default'
+  const digits = phone.replace(/\D/g, '')
+  const contactId = `${digits}@c.us`
+
+  let name: string | null = null
+  let about: string | null = null
+  let profilePicUrl: string | null = null
+
+  try {
+    const { data } = await wahaClient().get('/api/contacts', {
+      params: { contactId, session },
+    })
+    const contact = Array.isArray(data) ? data[0] : data
+    name = contact?.name || contact?.pushName || null
+    about = contact?.about || null
+    if (typeof name !== 'string') name = null
+    if (typeof about !== 'string') about = null
+  } catch {
+    // sem nome/bio disponíveis
+  }
+
+  try {
+    const { data } = await wahaClient().get('/api/contacts/profile-picture', {
+      params: { contactId, session },
+    })
+    const url = data?.profilePictureURL || data?.profilePicUrl || data?.url || null
+    profilePicUrl = typeof url === 'string' ? url : null
+  } catch {
+    // foto não disponível (WAHA Core ou privacidade)
+  }
+
+  return { name, about, profilePicUrl }
+}
+
 export async function configureWahaWebhook(backendPublicUrl: string): Promise<void> {
   if (!backendPublicUrl) {
     console.warn('[waha] BACKEND_PUBLIC_URL não definido — webhook não configurado')

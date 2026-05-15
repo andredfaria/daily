@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
-import { wahaClient, sendWhatsAppText, WhatsAppNumberNotFoundError } from '../services/waha'
+import { wahaClient, sendWhatsAppText, WhatsAppNumberNotFoundError, fetchWhatsAppProfile } from '../services/waha'
 
 // Extrai a mensagem de erro mais descritiva de uma resposta WAHA/Axios
 function extractWahaError(err: any): string {
@@ -121,6 +121,33 @@ router.post('/test-message', async (req: Request, res: Response) => {
       success: false,
       error: detail,
     })
+  }
+})
+
+// GET /api/waha/profile
+router.get('/profile', async (req: Request, res: Response) => {
+  try {
+    const [rows]: any = await pool.query(
+      'SELECT whatsapp_number FROM users WHERE id = ?',
+      [req.userId]
+    )
+    if (!rows.length || !rows[0].whatsapp_number) {
+      return res.status(400).json({ error: 'Nenhum número WhatsApp configurado.' })
+    }
+
+    const session = process.env.WAHA_SESSION || 'default'
+    const { data: sessionData } = await wahaClient().get(`/api/sessions/${session}`)
+    if (sessionData.status !== 'WORKING') {
+      return res.status(503).json({
+        error: `WhatsApp desconectado (status: ${sessionData.status}). Reconecte primeiro.`,
+      })
+    }
+
+    const profile = await fetchWhatsAppProfile(rows[0].whatsapp_number)
+    return res.json(profile)
+  } catch (err: any) {
+    const detail = extractWahaError(err)
+    return res.status(503).json({ error: detail })
   }
 })
 

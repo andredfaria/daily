@@ -65,4 +65,8 @@ export const notificationsApi = {
     )
     return res.data
   },
+
+  getWhatsAppProfile(): Promise<{ name: string | null; about: string | null; profilePicUrl: string | null }> {
+    return client.get('/waha/profile').then((r) => r.data)
+  },
 }
