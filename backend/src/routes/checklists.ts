@@ -149,6 +149,68 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 })
 
+// GET /api/checklists/polls
+// Query params:
+//   upcoming=true  — poll de hoje com status=pending (inclui itens)
+//   history=true   — últimos 30 polls enviados/concluídos (inclui itens e selected_options)
+// Sempre retorna array. upcoming=true retorna [] ou [poll].
+router.get('/polls', async (req: Request, res: Response) => {
+  try {
+    const { upcoming, history } = req.query
+
+    let condition: string
+    if (upcoming === 'true') {
+      condition = "cdp.poll_date = CURDATE() AND cdp.status = 'pending'"
+    } else if (history === 'true') {
+      condition = "cdp.status IN ('sent','completed')"
+    } else {
+      return res.status(400).json({ error: 'Parâmetro upcoming ou history obrigatório' })
+    }
+
+    const [rows]: any = await pool.query(
+      `SELECT cdp.id, cdp.checklist_id, cdp.poll_date, cdp.status,
+              cdp.completed_count, cdp.total_count, cdp.completion_pct,
+              cdp.selected_options, cdp.updated_at AS sent_at,
+              c.name AS checklist_name,
+              GROUP_CONCAT(ci.text ORDER BY ci.sort_order SEPARATOR '|||') AS items_concat
+       FROM checklist_daily_polls cdp
+       JOIN checklists c ON c.id = cdp.checklist_id
+       JOIN checklist_items ci ON ci.checklist_id = cdp.checklist_id
+       WHERE cdp.user_id = ? AND ${condition}
+       GROUP BY cdp.id
+       ORDER BY cdp.poll_date DESC
+       LIMIT 30`,
+      [req.userId]
+    )
+
+    const polls = rows.map((row: any) => {
+      const rawOptions = row.selected_options
+      return {
+        id: row.id,
+        checklist_id: row.checklist_id,
+        checklist_name: row.checklist_name,
+        poll_date: row.poll_date instanceof Date
+          ? row.poll_date.toISOString().slice(0, 10)
+          : String(row.poll_date).slice(0, 10),
+        status: row.status,
+        completed_count: row.completed_count,
+        total_count: row.total_count,
+        completion_pct: Number(row.completion_pct),
+        selected_options: Array.isArray(rawOptions)
+          ? rawOptions
+          : (rawOptions ? JSON.parse(rawOptions) : []),
+        items: row.items_concat ? row.items_concat.split('|||') : [],
+        sent_at: row.sent_at,
+      }
+    })
+
+    res.json(polls)
+  } catch (err: any) {
+    console.error('[checklists] GET /polls', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
 // -------- GET /api/checklists/dashboard - dados do dashboard do checklist --------
 router.get('/dashboard', async (req: Request, res: Response) => {
   try {
