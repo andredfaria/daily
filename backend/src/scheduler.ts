@@ -12,7 +12,7 @@ function getCurrentHourSaoPaulo(): number {
     hour12: false,
   }).formatToParts(new Date())
   const hourPart = parts.find(p => p.type === 'hour')
-  return parseInt(hourPart?.value ?? '0', 10)
+  return parseInt(hourPart?.value ?? '0', 10) % 24
 }
 
 export async function initScheduler(): Promise<void> {
