@@ -69,7 +69,7 @@ const PollResult: React.FC<{ poll: ChecklistPollNotif }> = ({ poll }) => (
         const done = poll.selected_options.includes(item)
         return (
           <div
-            key={i}
+            key={`${poll.id}-item-${i}`}
             className={`flex items-center gap-2 text-xs ${done ? 'text-on-surface' : 'text-on-surface-variant line-through'}`}
           >
             <span
@@ -129,7 +129,7 @@ const BillFeedRow: React.FC<BillFeedRowProps> = ({
     } bg-surface-container/40 hover:bg-surface-container`}>
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-3 p-3 sm:p-4 text-left"
+        className="w-full flex items-center gap-3 p-3 sm:p-4 text-left min-h-[44px]"
       >
         <div className={`w-1 h-10 rounded-full flex-shrink-0 ${leftBarColor}`} />
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -265,7 +265,7 @@ const ChecklistFeedRow: React.FC<ChecklistFeedRowProps> = ({ poll, isExpanded, o
     } bg-surface-container/40 hover:bg-surface-container`}>
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-3 p-3 sm:p-4 text-left"
+        className="w-full flex items-center gap-3 p-3 sm:p-4 text-left min-h-[44px]"
       >
         <div className={`w-1 h-10 rounded-full flex-shrink-0 ${leftBarColor}`} />
         <div className="w-10 h-10 rounded-xl bg-tertiary/10 flex items-center justify-center flex-shrink-0">
