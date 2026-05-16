@@ -137,13 +137,13 @@ router.patch('/:id/pay', async (req: Request, res: Response) => {
     )
     if (!ownerRows.length) return res.status(404).json({ error: 'Not found' })
 
-    const { paid_via, confirmation_source } = req.body
+    const { confirmation_source } = req.body
     const now = new Date()
     await pool.query(
       `UPDATE bill_occurrences
-       SET status = 'paid', paid_at = ?, paid_via = ?, confirmation_source = ?, updated_at = ?
+       SET status = 'paid', paid_at = ?, confirmation_source = ?, updated_at = ?
        WHERE id = ?`,
-      [now, paid_via ?? null, confirmation_source ?? 'web', now, req.params.id]
+      [now, confirmation_source ?? 'web', now, req.params.id]
     )
     const [rows]: any = await pool.query(
       'SELECT * FROM bill_occurrences WHERE id = ?', [req.params.id]
@@ -164,7 +164,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
     )
     if (!ownerRows.length) return res.status(404).json({ error: 'Not found' })
 
-    const allowed = ['status', 'paid_via', 'confirmation_source', 'amount']
+    const allowed = ['status', 'confirmation_source', 'amount']
     const fields: string[] = []
     const values: any[] = []
 

@@ -43,7 +43,6 @@ export interface BillOccurrence {
   amount: number
   status: OccurrenceStatus
   paid_at?: string
-  paid_via?: string
   confirmation_source?: ConfirmationSource
   whatsapp_msg?: string
   created_at: string
