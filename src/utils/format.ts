@@ -1,5 +1,6 @@
 import { format, formatDistanceToNow, isToday, isTomorrow, isPast, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import type { NotificationEnriched } from '../types'
 
 export const formatBRL = (value: number): string =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
@@ -69,4 +70,44 @@ export const getRecurrenceShortLabel = (type: string): string => {
   if (type === 'monthly') return 'MENSAL'
   if (type === 'weekly') return 'SEMANAL'
   return 'AVULSO'
+}
+
+export const buildMessagePreview = (notif: NotificationEnriched): string => {
+  const dueDateStr = typeof notif.due_date === 'string'
+    ? notif.due_date.slice(0, 10)
+    : String(notif.due_date).slice(0, 10)
+  const [y, m, d] = dueDateStr.split('-')
+  const dueFmt = `${d}/${m}/${y}`
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(dueDateStr)
+  due.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+  let relative: string
+  if (diffDays === 0) relative = 'hoje'
+  else if (diffDays === 1) relative = 'amanhã'
+  else if (diffDays > 1) relative = `em ${diffDays} dias`
+  else if (diffDays === -1) relative = 'venceu ontem'
+  else relative = `venceu há ${Math.abs(diffDays)} dias`
+
+  const amount = Number(notif.amount).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+
+  let paymentSection = ''
+  if (notif.pm_type === 'pix') {
+    const keyTypeLabel: Record<string, string> = {
+      cpf: 'CPF', email: 'E-mail', phone: 'Telefone', random: 'Chave aleatória',
+    }
+    const label = notif.pix_key_type ? (keyTypeLabel[notif.pix_key_type] ?? notif.pix_key_type) : ''
+    const beneficiary = notif.pix_beneficiary ? `\nFavorecido: ${notif.pix_beneficiary}` : ''
+    paymentSection = `\n\n💳 *Pagamento:*\nPIX — ${label}: ${notif.pix_key}${beneficiary}`
+  } else if (notif.pm_type === 'boleto') {
+    paymentSection = `\n\n💳 *Pagamento:*\nBoleto:\n${notif.boleto_code}`
+  }
+
+  return `📅 *Lembrete de Vencimento — BillSync*\n\nConta: *${notif.bill_name}*\nValor: R$ ${amount}\nVencimento: *${relative} (${dueFmt})*${paymentSection}`
 }
