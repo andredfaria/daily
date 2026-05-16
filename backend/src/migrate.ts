@@ -94,23 +94,34 @@ SET FOREIGN_KEY_CHECKS = 1;
         const dropId  = olderIsThe13 ? pair.id12  : pair.id13
         const dropNum = olderIsThe13 ? pair.num12 : pair.num13
 
-        // Se ambos tiverem checklist, remove o do duplicado antes (unique key)
-        const [clRows]: any = await pool.query(
-          `SELECT COUNT(*) AS cnt FROM checklists WHERE user_id IN (?, ?)`,
-          [keepId, dropId]
-        )
-        if (clRows[0].cnt === 2) {
-          await pool.query(`DELETE FROM checklists WHERE user_id = ?`, [dropId])
+        const conn = await pool.getConnection()
+        try {
+          await conn.beginTransaction()
+
+          // Se ambos tiverem checklist, remove o do duplicado antes (unique key)
+          const [clRows]: any = await conn.query(
+            `SELECT COUNT(*) AS cnt FROM checklists WHERE user_id IN (?, ?)`,
+            [keepId, dropId]
+          )
+          if (clRows[0].cnt === 2) {
+            await conn.query(`DELETE FROM checklists WHERE user_id = ?`, [dropId])
+          }
+
+          // notifications nao tem user_id — segue via bills → bill_occurrences → notifications
+          await conn.query(`UPDATE bills                 SET user_id      = ? WHERE user_id      = ?`, [keepId,  dropId])
+          await conn.query(`UPDATE checklists            SET user_id      = ? WHERE user_id      = ?`, [keepId,  dropId])
+          await conn.query(`UPDATE checklist_daily_polls SET user_id      = ? WHERE user_id      = ?`, [keepId,  dropId])
+          await conn.query(`UPDATE otp_codes             SET phone_number = ? WHERE phone_number = ?`, [keepNum, dropNum])
+          await conn.query(`DELETE FROM users WHERE id = ?`, [dropId])
+
+          await conn.commit()
+          console.log(`[migrate] mesclado ${dropNum} → ${keepNum}`)
+        } catch (err) {
+          await conn.rollback()
+          throw err
+        } finally {
+          conn.release()
         }
-
-        await pool.query(`UPDATE bills                SET user_id      = ? WHERE user_id      = ?`, [keepId,  dropId])
-        await pool.query(`UPDATE notifications        SET user_id      = ? WHERE user_id      = ?`, [keepId,  dropId])
-        await pool.query(`UPDATE checklists           SET user_id      = ? WHERE user_id      = ?`, [keepId,  dropId])
-        await pool.query(`UPDATE checklist_daily_polls SET user_id     = ? WHERE user_id      = ?`, [keepId,  dropId])
-        await pool.query(`UPDATE otp_codes            SET phone_number = ? WHERE phone_number = ?`, [keepNum, dropNum])
-        await pool.query(`DELETE FROM users WHERE id = ?`, [dropId])
-
-        console.log(`[migrate] mesclado ${dropNum} → ${keepNum}`)
       }
 
       console.log(`[migrate] 004: ${pairs.length} par(es) processado(s)`)
