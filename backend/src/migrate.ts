@@ -7,7 +7,11 @@ function splitStatements(sql: string): string[] {
     .filter(s => s.length > 0 && !s.startsWith('--'))
 }
 
-const MIGRATIONS = [
+type SqlMigration = { name: string; statements: string[] }
+type JsMigration = { name: string; run: () => Promise<void> }
+type Migration = SqlMigration | JsMigration
+
+const MIGRATIONS: Migration[] = [
   {
     name: '003_checklists',
     statements: splitStatements(`
@@ -64,34 +68,111 @@ CREATE TABLE IF NOT EXISTS checklist_daily_polls (
 SET FOREIGN_KEY_CHECKS = 1;
 `),
   },
+  {
+    name: '004_merge_duplicate_phones',
+    run: async () => {
+      const [pairs]: any = await pool.query(`
+        SELECT
+          u13.id          AS id13,
+          u13.whatsapp_number AS num13,
+          u13.created_at  AS created13,
+          u12.id          AS id12,
+          u12.whatsapp_number AS num12,
+          u12.created_at  AS created12
+        FROM users u13
+        JOIN users u12 ON (
+          CHAR_LENGTH(u13.whatsapp_number) = 13
+          AND CHAR_LENGTH(u12.whatsapp_number) = 12
+          AND CONCAT(SUBSTRING(u13.whatsapp_number, 1, 4), SUBSTRING(u13.whatsapp_number, 6)) = u12.whatsapp_number
+        )
+      `)
+
+      for (const pair of pairs) {
+        const olderIsThe13 = new Date(pair.created13) <= new Date(pair.created12)
+        const keepId  = olderIsThe13 ? pair.id13  : pair.id12
+        const keepNum = olderIsThe13 ? pair.num13 : pair.num12
+        const dropId  = olderIsThe13 ? pair.id12  : pair.id13
+        const dropNum = olderIsThe13 ? pair.num12 : pair.num13
+
+        // Se ambos tiverem checklist, remove o do duplicado antes (unique key)
+        const [clRows]: any = await pool.query(
+          `SELECT COUNT(*) AS cnt FROM checklists WHERE user_id IN (?, ?)`,
+          [keepId, dropId]
+        )
+        if (clRows[0].cnt === 2) {
+          await pool.query(`DELETE FROM checklists WHERE user_id = ?`, [dropId])
+        }
+
+        await pool.query(`UPDATE bills                SET user_id      = ? WHERE user_id      = ?`, [keepId,  dropId])
+        await pool.query(`UPDATE notifications        SET user_id      = ? WHERE user_id      = ?`, [keepId,  dropId])
+        await pool.query(`UPDATE checklists           SET user_id      = ? WHERE user_id      = ?`, [keepId,  dropId])
+        await pool.query(`UPDATE checklist_daily_polls SET user_id     = ? WHERE user_id      = ?`, [keepId,  dropId])
+        await pool.query(`UPDATE otp_codes            SET phone_number = ? WHERE phone_number = ?`, [keepNum, dropNum])
+        await pool.query(`DELETE FROM users WHERE id = ?`, [dropId])
+
+        console.log(`[migrate] mesclado ${dropNum} → ${keepNum}`)
+      }
+
+      console.log(`[migrate] 004: ${pairs.length} par(es) processado(s)`)
+    },
+  },
 ]
 
 export async function runMigrations(): Promise<void> {
+  // Garante que migration_log existe
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS migration_log (
+      name    VARCHAR(100) NOT NULL,
+      ran_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `)
+
+  // Bootstrap: se checklist_daily_polls ja existe mas 003 nao esta no log, registra
   try {
-    const [rows]: any = await pool.query(
+    const [tableExists]: any = await pool.query(
       `SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = ? AND table_name = 'checklist_daily_polls'`,
-      [process.env.DB_NAME || 'daily'],
+      [process.env.DB_NAME || 'daily']
     )
-    if (rows[0].cnt > 0) {
-      console.log('[migrate] checklist_daily_polls ja existe — pulando')
-      return
+    if (tableExists[0].cnt > 0) {
+      await pool.query(
+        `INSERT IGNORE INTO migration_log (name) VALUES ('003_checklists')`
+      )
     }
   } catch {
-    console.log('[migrate] nao foi possivel verificar — tentando criar mesmo assim')
+    // ignora — tenta rodar mesmo assim
   }
 
   for (const migration of MIGRATIONS) {
+    const [logRows]: any = await pool.query(
+      `SELECT COUNT(*) AS cnt FROM migration_log WHERE name = ?`,
+      [migration.name]
+    )
+    if (logRows[0].cnt > 0) {
+      console.log(`[migrate] ${migration.name} ja executada — pulando`)
+      continue
+    }
+
     console.log(`[migrate] executando ${migration.name}...`)
-    for (let i = 0; i < migration.statements.length; i++) {
-      const stmt = migration.statements[i]
-      try {
-        await pool.query(stmt + ';')
-      } catch (err: any) {
-        console.error(`[migrate] erro na statement ${i + 1} de ${migration.name}:`, err.message)
-        console.error(`[migrate] sql: ${stmt.slice(0, 80)}...`)
-        throw err
+
+    if ('statements' in migration) {
+      for (let i = 0; i < migration.statements.length; i++) {
+        const stmt = migration.statements[i]
+        try {
+          await pool.query(stmt + ';')
+        } catch (err: any) {
+          console.error(`[migrate] erro na statement ${i + 1} de ${migration.name}:`, err.message)
+          console.error(`[migrate] sql: ${stmt.slice(0, 80)}...`)
+          throw err
+        }
       }
     }
+
+    if ('run' in migration) {
+      await migration.run()
+    }
+
+    await pool.query(`INSERT INTO migration_log (name) VALUES (?)`, [migration.name])
     console.log(`[migrate] ${migration.name} concluida`)
   }
 }
