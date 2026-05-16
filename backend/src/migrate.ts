@@ -105,6 +105,7 @@ SET FOREIGN_KEY_CHECKS = 1;
           )
           if (clRows[0].cnt === 2) {
             await conn.query(`DELETE FROM checklists WHERE user_id = ?`, [dropId])
+            console.warn(`[migrate] aviso: historico de checklist_daily_polls de ${dropNum} descartado (conflito de checklist unico)`)
           }
 
           // notifications nao tem user_id — segue via bills → bill_occurrences → notifications
