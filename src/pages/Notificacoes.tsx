@@ -436,6 +436,7 @@ const Notificacoes: React.FC = () => {
   }, [showError])
 
   useEffect(() => {
+    notificationsApi.materialize(30).catch(() => {})
     fetchUpcoming()
     fetchHistory()
   }, [fetchUpcoming, fetchHistory])
@@ -570,14 +571,38 @@ const Notificacoes: React.FC = () => {
 
       {tab === 'upcoming' && (
         <div className="space-y-2">
+          {/* Janela de 30 dias */}
+          <div className="flex items-center gap-2 px-1">
+            <span className="material-symbols-outlined text-sm text-on-surface-variant">calendar_month</span>
+            <span className="text-xs text-on-surface-variant">
+              Próximos <strong className="text-on-surface">30 dias</strong> · Alerta configurado por conta em{' '}
+              <strong className="text-on-surface">Configurações → Antecedência</strong>
+            </span>
+          </div>
+
           {loadingUpcoming ? (
             Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
           ) : upcoming.length === 0 ? (
-            <EmptyState
-              icon="notifications_off"
-              title="Nenhum envio agendado"
-              description="Notificações são geradas automaticamente conforme as contas se aproximam do vencimento."
-            />
+            <div className="glass-card rounded-2xl border border-outline-variant/50 p-8 text-center">
+              <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-3 block">
+                notifications_off
+              </span>
+              <h3 className="text-base font-semibold text-on-surface mb-2">Nenhum envio nos próximos 30 dias</h3>
+              <p className="text-sm text-on-surface-variant mb-4">
+                Notificações são geradas automaticamente quando uma conta se aproxima do vencimento,
+                conforme a antecedência definida em cada conta.
+              </p>
+              <div className="inline-flex flex-col gap-1.5 text-left bg-surface-container rounded-xl px-4 py-3 text-xs text-on-surface-variant">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm text-primary">info</span>
+                  <span>Sem contas ativas com vencimento nos próximos 30 dias</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm text-primary">info</span>
+                  <span>Ou todas as contas próximas já foram pagas</span>
+                </div>
+              </div>
+            </div>
           ) : (
             <>
               <p className="text-xs text-on-surface-variant">

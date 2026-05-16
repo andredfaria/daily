@@ -73,4 +73,9 @@ export const notificationsApi = {
   cancel: async (id: string): Promise<void> => {
     await client.delete(`/notifications/${id}`)
   },
+
+  materialize: async (days = 30): Promise<{ created: number; days: number }> => {
+    const res = await client.post<{ created: number; days: number }>(`/notifications/materialize?days=${days}`)
+    return res.data
+  },
 }

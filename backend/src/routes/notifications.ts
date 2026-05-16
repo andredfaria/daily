@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
 import { runDispatch, sendSingleNotification } from '../dispatcher'
+import { materializeForUser, getTodaySaoPaulo } from '../services/notificationMaterializer'
 
 const router = Router()
 
@@ -208,6 +209,26 @@ router.delete('/:id', async (req: Request, res: Response) => {
     }
     await pool.query('DELETE FROM notifications WHERE id = ?', [req.params.id])
     res.status(204).send()
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// POST /api/notifications/materialize
+// Gera notificações para os próximos N dias (padrão 30) sem disparar envio.
+router.post('/materialize', async (req: Request, res: Response) => {
+  try {
+    const days = Math.min(Number(req.query.days ?? 30), 90)
+    const today = getTodaySaoPaulo()
+    let created = 0
+    for (let i = 0; i < days; i++) {
+      const d = new Date(today + 'T00:00:00')
+      d.setDate(d.getDate() + i)
+      const dateStr = d.toISOString().slice(0, 10)
+      created += await materializeForUser(req.userId!, dateStr)
+    }
+    res.json({ created, days })
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })
