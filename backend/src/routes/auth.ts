@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
-import { fetchWhatsAppName, resolveWhatsAppNumber, sendWhatsAppText, WhatsAppNumberNotFoundError } from '../services/waha'
+import { fetchWhatsAppName, resolveWhatsAppNumber, sendWhatsAppText, WhatsAppNumberNotFoundError, buildPhoneCandidates } from '../services/waha'
 import { authMiddleware } from '../middleware/auth'
 
 const router = Router()
@@ -122,13 +122,15 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
     try {
       resolvedNumber = await resolveWhatsAppNumber(digits)
     } catch {
-      // Número não encontrado no WhatsApp — usa os dígitos originais para lookup no banco
+      // WAHA indisponível — fallback por variante de string
     }
 
-    // Find or create user — busca pelo numero original e pelo resolvido
+    // Busca usuario por todos os candidatos: digits, resolved e variante com/sem 9
+    const candidates = buildPhoneCandidates(digits, resolvedNumber)
+    const placeholders = candidates.map(() => '?').join(', ')
     const [userRows]: any = await pool.query(
-      `SELECT * FROM users WHERE whatsapp_number IN (?, ?) LIMIT 1`,
-      [digits, resolvedNumber]
+      `SELECT * FROM users WHERE whatsapp_number IN (${placeholders}) LIMIT 1`,
+      candidates
     )
 
     let user: any

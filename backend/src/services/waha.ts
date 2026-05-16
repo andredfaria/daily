@@ -46,6 +46,16 @@ export function generatePhoneVariant(digits: string): string | null {
   return null
 }
 
+/**
+ * Constrói a lista de candidatos de whatsapp_number para busca no banco.
+ * Sempre inclui digits, resolvedNumber e a variante com/sem 9 — sem duplicatas.
+ * Funciona sem WAHA disponível (usa apenas manipulação de string).
+ */
+export function buildPhoneCandidates(digits: string, resolvedNumber: string): string[] {
+  const variant = generatePhoneVariant(digits)
+  return [...new Set([digits, resolvedNumber, ...(variant ? [variant] : [])])]
+}
+
 async function resolveWhatsAppChatId(phone: string): Promise<string> {
   const digits = phone.replace(/\D/g, '')
   const session = process.env.WAHA_SESSION || 'default'
