@@ -136,12 +136,26 @@ ALTER TABLE notifications
 `),
   },
   {
+    name: '006_bills_category',
+    statements: splitStatements(`
+ALTER TABLE bills ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT NULL AFTER name
+`),
+  },
+  {
     name: '007_users_summary_budget',
     statements: splitStatements(`
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS summary_enabled BOOLEAN NOT NULL DEFAULT FALSE AFTER whatsapp_alerts_enabled,
   ADD COLUMN IF NOT EXISTS summary_day_of_week TINYINT UNSIGNED DEFAULT 1 AFTER summary_enabled,
   ADD COLUMN IF NOT EXISTS monthly_budget_limit DECIMAL(10,2) DEFAULT NULL AFTER summary_day_of_week
+`),
+  },
+  {
+    name: '008_checklists_multi',
+    statements: splitStatements(`
+ALTER TABLE checklists DROP INDEX IF EXISTS uq_checklists_user;
+ALTER TABLE checklists ADD COLUMN IF NOT EXISTS recurrence_type ENUM('daily','weekdays','custom') NOT NULL DEFAULT 'daily' AFTER send_time;
+ALTER TABLE checklists ADD COLUMN IF NOT EXISTS recurrence_days JSON DEFAULT NULL AFTER recurrence_type
 `),
   },
 ]
