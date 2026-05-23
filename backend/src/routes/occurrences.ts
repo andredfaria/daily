@@ -1,7 +1,35 @@
 import { Router, Request, Response } from 'express'
+import axios from 'axios'
 import pool from '../db'
 
 const router = Router()
+
+// Cache simples em memória para status do WAHA (TTL 30s)
+let wahaStatusCache: { connected: boolean; timestamp: number } | null = null
+const WAHA_CACHE_TTL_MS = 30_000
+
+async function checkWahaConnected(): Promise<boolean> {
+  const now = Date.now()
+  if (wahaStatusCache && (now - wahaStatusCache.timestamp) < WAHA_CACHE_TTL_MS) {
+    return wahaStatusCache.connected
+  }
+  try {
+    const session = process.env.WAHA_SESSION || 'default'
+    const { data } = await axios.get(
+      `${process.env.WAHA_URL || 'http://localhost:3000'}/api/sessions/${session}`,
+      {
+        headers: { 'X-Api-Key': process.env.WAHA_API_KEY || '' },
+        timeout: 3000,
+      }
+    )
+    const connected = data?.status === 'WORKING'
+    wahaStatusCache = { connected, timestamp: now }
+    return connected
+  } catch {
+    wahaStatusCache = { connected: false, timestamp: now }
+    return false
+  }
+}
 
 // GET /api/occurrences/stats  (antes de /:id para não colidir)
 router.get('/stats', async (req: Request, res: Response) => {
@@ -38,11 +66,13 @@ router.get('/stats', async (req: Request, res: Response) => {
       [now, weekEnd, req.userId]
     )
 
+    const waha_connected = await checkWahaConnected()
+
     res.json({
       active_bills: billCount.active_bills,
       due_this_week: dueWeek.due_this_week,
       paid_this_month: countRows.paid_count ?? 0,
-      waha_connected: false,
+      waha_connected,
       monthly_paid_amount: Number(countRows.monthly_paid_amount) || 0,
       monthly_pending_amount: Number(countRows.monthly_pending_amount) || 0,
       monthly_overdue_amount: Number(countRows.monthly_overdue_amount) || 0,
@@ -82,7 +112,9 @@ router.get('/upcoming', async (req: Request, res: Response) => {
 // GET /api/occurrences
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { status, bill_id, from, to, limit = 200, offset = 0 } = req.query
+    const { status, bill_id, from, to } = req.query
+    const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 500)
+    const offset = Math.max(Number(req.query.offset) || 0, 0)
     const conditions: string[] = []
     const values: any[] = []
 
@@ -95,7 +127,7 @@ router.get('/', async (req: Request, res: Response) => {
     if (to) { conditions.push('o.due_date <= ?'); values.push(to) }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-    values.push(Number(limit), Number(offset))
+    values.push(limit, offset)
 
     const [rows] = await pool.query(
       `SELECT o.*, b.name AS bill_name
