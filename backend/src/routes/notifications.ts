@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
-import { runDispatch, sendSingleNotification } from '../dispatcher'
+import { runDispatchForUser, sendSingleNotification } from '../dispatcher'
 import { materializeForUser, getTodaySaoPaulo } from '../services/notificationMaterializer'
 
 const router = Router()
@@ -181,9 +181,9 @@ router.post('/:id/resend', async (req: Request, res: Response) => {
 
 // POST /api/notifications/dispatch
 // Dispara o envio das notificações do dia imediatamente (manual/debug).
-router.post('/dispatch', async (_req: Request, res: Response) => {
+router.post('/dispatch', async (req: Request, res: Response) => {
   try {
-    const result = await runDispatch()
+    const result = await runDispatchForUser(req.userId!)
     res.json(result)
   } catch (err: any) {
     res.status(500).json({ error: err.message })
