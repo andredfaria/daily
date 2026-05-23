@@ -9,10 +9,19 @@ declare global {
   }
 }
 
+const SERVICE_ALLOWED_PATHS = [
+  '/api/notifications',
+  '/api/webhooks',
+]
+
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  // Allow n8n service-to-service calls via API key
+  // Allow n8n service-to-service calls via API key — escopo restrito
   const apiKey = req.headers['x-api-key']
   if (process.env.N8N_API_KEY && apiKey === process.env.N8N_API_KEY) {
+    const allowed = SERVICE_ALLOWED_PATHS.some(prefix => req.path.startsWith(prefix))
+    if (!allowed) {
+      return res.status(403).json({ error: 'Service account não tem acesso a este recurso' })
+    }
     req.userId = '__service__'
     return next()
   }
