@@ -1,10 +1,12 @@
 import client from './client'
-import type { Checklist, ChecklistDashboardData, ChecklistPollNotif } from '../types'
+import type { Checklist, ChecklistDashboardData, ChecklistPollNotif, ChecklistRecurrenceType } from '../types'
 
 export interface CreateChecklistPayload {
   name?: string
   send_time?: number
   timezone?: string
+  recurrence_type?: ChecklistRecurrenceType
+  recurrence_days?: number[]
   items: { text: string }[]
 }
 
@@ -12,12 +14,14 @@ export interface UpdateChecklistPayload {
   name?: string
   send_time?: number
   timezone?: string
+  recurrence_type?: ChecklistRecurrenceType
+  recurrence_days?: number[] | null
   items?: { text: string }[]
 }
 
 export const checklistsApi = {
-  get: async (): Promise<Checklist | null> => {
-    const res = await client.get<Checklist | null>('/checklists')
+  get: async (): Promise<Checklist[]> => {
+    const res = await client.get<Checklist[]>('/checklists')
     return res.data
   },
 

@@ -7,9 +7,32 @@ const router = Router()
 
 // -------- Helpers --------
 
-async function getChecklist(userId: string) {
+async function getAllChecklists(userId: string) {
   const [rows]: any = await pool.query(
-    'SELECT id, user_id, name, send_time, timezone, is_active, created_at, updated_at FROM checklists WHERE user_id = ?',
+    'SELECT id, user_id, name, send_time, recurrence_type, recurrence_days, timezone, is_active, created_at, updated_at FROM checklists WHERE user_id = ? ORDER BY created_at ASC',
+    [userId],
+  )
+  return rows as any[]
+}
+
+async function getChecklistById(id: string, userId: string) {
+  const [rows]: any = await pool.query(
+    'SELECT id, user_id, name, send_time, recurrence_type, recurrence_days, timezone, is_active, created_at, updated_at FROM checklists WHERE id = ? AND user_id = ?',
+    [id, userId],
+  )
+  if (!rows.length) return null
+  return rows[0]
+}
+
+async function getMostRecentChecklist(userId: string) {
+  const [rows]: any = await pool.query(
+    `SELECT c.id, c.user_id, c.name, c.send_time, c.recurrence_type, c.recurrence_days, c.timezone, c.is_active, c.created_at, c.updated_at
+     FROM checklists c
+     LEFT JOIN checklist_daily_polls cdp ON cdp.checklist_id = c.id
+     WHERE c.user_id = ?
+     GROUP BY c.id
+     ORDER BY MAX(cdp.poll_date) DESC, c.created_at ASC
+     LIMIT 1`,
     [userId],
   )
   if (!rows.length) return null
@@ -24,14 +47,14 @@ async function getItems(checklistId: string) {
   return rows
 }
 
-// -------- GET /api/checklists - retorna o checklist do usuário (1 por usuário no MVP) --------
+// -------- GET /api/checklists - retorna todos os checklists do usuário --------
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const checklist = await getChecklist(req.userId!)
-    if (!checklist) return res.json(null)
-
-    checklist.items = await getItems(checklist.id)
-    res.json(checklist)
+    const checklists = await getAllChecklists(req.userId!)
+    for (const c of checklists) {
+      c.items = await getItems(c.id)
+    }
+    res.json(checklists)
   } catch (err: any) {
     console.error('[checklists] GET /', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -41,12 +64,7 @@ router.get('/', async (req: Request, res: Response) => {
 // -------- POST /api/checklists - cria checklist com itens --------
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const existing = await getChecklist(req.userId!)
-    if (existing) {
-      return res.status(409).json({ error: 'Usuário já possui um checklist. Edite o existente.' })
-    }
-
-    const { name, send_time, timezone, items } = req.body
+    const { name, send_time, timezone, recurrence_type, recurrence_days, items } = req.body
 
     if (!items || !Array.isArray(items) || items.length < 2 || items.length > 12) {
       return res.status(400).json({ error: 'Checklist deve ter entre 2 e 12 itens.' })
@@ -60,10 +78,13 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Itens duplicados não são permitidos.' })
     }
 
+    const rType = recurrence_type || 'daily'
+    const rDays = recurrence_days ? JSON.stringify(recurrence_days) : null
+
     const checklistId = uuidv4()
     await pool.query(
-      'INSERT INTO checklists (id, user_id, name, send_time, timezone) VALUES (?, ?, ?, ?, ?)',
-      [checklistId, req.userId!, name || 'Checklist Diário', send_time ?? 9, timezone || 'America/Sao_Paulo'],
+      'INSERT INTO checklists (id, user_id, name, send_time, recurrence_type, recurrence_days, timezone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [checklistId, req.userId!, name || 'Checklist Diário', send_time ?? 9, rType, rDays, timezone || 'America/Sao_Paulo'],
     )
 
     const itemValues = texts.map((text: string, i: number) => [uuidv4(), checklistId, text, i])
@@ -72,7 +93,7 @@ router.post('/', async (req: Request, res: Response) => {
       [itemValues],
     )
 
-    const checklist = await getChecklist(req.userId!)
+    const checklist = await getChecklistById(checklistId, req.userId!)
     checklist.items = await getItems(checklistId)
     res.status(201).json(checklist)
   } catch (err: any) {
@@ -90,7 +111,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     )
     if (!ownership.length) return res.status(404).json({ error: 'Checklist não encontrado.' })
 
-    const { name, send_time, timezone, items } = req.body
+    const { name, send_time, timezone, recurrence_type, recurrence_days, items } = req.body
 
     if (items) {
       if (!Array.isArray(items) || items.length < 2 || items.length > 12) {
@@ -110,6 +131,8 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (name !== undefined) { updates.push('name = ?'); values.push(name) }
     if (send_time !== undefined) { updates.push('send_time = ?'); values.push(send_time) }
     if (timezone !== undefined) { updates.push('timezone = ?'); values.push(timezone) }
+    if (recurrence_type !== undefined) { updates.push('recurrence_type = ?'); values.push(recurrence_type) }
+    if (recurrence_days !== undefined) { updates.push('recurrence_days = ?'); values.push(JSON.stringify(recurrence_days)) }
 
     const hasChanges = updates.length > 0 || !!items
     if (hasChanges) {
@@ -125,7 +148,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       await pool.query('INSERT INTO checklist_items (id, checklist_id, text, sort_order) VALUES ?', [itemValues])
     }
 
-    const checklist = await getChecklist(req.userId!)
+    const checklist = await getChecklistById(req.params.id, req.userId!)
     checklist.items = await getItems(req.params.id)
     res.json(checklist)
   } catch (err: any) {
@@ -216,7 +239,7 @@ router.get('/polls', async (req: Request, res: Response) => {
 // -------- GET /api/checklists/dashboard - dados do dashboard do checklist --------
 router.get('/dashboard', async (req: Request, res: Response) => {
   try {
-    const checklist = await getChecklist(req.userId!)
+    const checklist = await getMostRecentChecklist(req.userId!)
     if (!checklist) return res.json({ checklist: null, today: null, history: [] })
 
     const today = getTodaySaoPaulo()
@@ -263,7 +286,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
 // -------- POST /api/checklists/send-now - envio manual/teste --------
 router.post('/send-now', async (req: Request, res: Response) => {
   try {
-    const checklist = await getChecklist(req.userId!)
+    const checklist = await getMostRecentChecklist(req.userId!)
     if (!checklist) {
       return res.status(404).json({ error: 'Nenhum checklist cadastrado.' })
     }

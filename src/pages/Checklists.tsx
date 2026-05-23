@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { checklistsApi, CreateChecklistPayload, UpdateChecklistPayload } from '../api/checklists'
-import type { ChecklistDashboardData } from '../types'
+import type { Checklist, ChecklistDashboardData, ChecklistRecurrenceType } from '../types'
 import { useToast } from '../context/ToastContext'
 import { SkeletonStatCard } from '../components/ui/Skeleton'
 
@@ -10,6 +10,14 @@ const toDateStr = (v: unknown): string => {
   if (v instanceof Date) return v.toISOString().slice(0, 10)
   return String(v).slice(0, 10)
 }
+
+const RECURRENCE_LABELS: Record<ChecklistRecurrenceType, string> = {
+  daily: 'Todos os dias',
+  weekdays: 'Dias úteis (Seg–Sex)',
+  custom: 'Personalizado',
+}
+
+const DAYS_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 // -------- Progress Bar --------
 const ProgressBar: React.FC<{ pct: number; size?: 'sm' | 'lg' }> = ({ pct, size = 'lg' }) => {
@@ -24,7 +32,7 @@ const ProgressBar: React.FC<{ pct: number; size?: 'sm' | 'lg' }> = ({ pct, size 
   )
 }
 
-// -------- Stat Card (reused pattern from Dashboard) --------
+// -------- Stat Card --------
 interface StatCardProps {
   icon: string
   label: string
@@ -44,96 +52,190 @@ const StatCard: React.FC<StatCardProps> = ({ icon, label, value, iconColor, icon
   </div>
 )
 
+// -------- Checklist Card (list view) --------
+interface ChecklistCardProps {
+  checklist: Checklist
+  onEdit: (c: Checklist) => void
+  onDelete: (c: Checklist) => void
+  onSendNow: (c: Checklist) => void
+  sending: boolean
+}
+const ChecklistCard: React.FC<ChecklistCardProps> = ({ checklist, onEdit, onDelete, onSendNow, sending }) => {
+  const recLabel = RECURRENCE_LABELS[checklist.recurrence_type] ?? 'Todos os dias'
+  const customDays = checklist.recurrence_type === 'custom' && checklist.recurrence_days
+    ? checklist.recurrence_days.map((d) => DAYS_LABELS[d]).join(', ')
+    : null
+
+  return (
+    <div className="glass-card rounded-2xl border border-outline-variant/50 p-5 animate-fadeIn">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-on-surface truncate">{checklist.name}</h3>
+          <p className="text-xs text-on-surface-variant mt-0.5">
+            {checklist.items.length} itens · às <strong>{String(checklist.send_time).padStart(2, '0')}h</strong>
+          </p>
+          <p className="text-xs text-on-surface-variant">
+            {customDays ?? recLabel}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => onSendNow(checklist)}
+            disabled={sending}
+            title="Enviar agora"
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
+          >
+            {sending ? (
+              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <span className="material-symbols-outlined text-base">send</span>
+            )}
+          </button>
+          <button
+            onClick={() => onEdit(checklist)}
+            title="Editar"
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">edit</span>
+          </button>
+          <button
+            onClick={() => onDelete(checklist)}
+            title="Excluir"
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">delete</span>
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {checklist.items.slice(0, 4).map((item) => (
+          <span key={item.id} className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container border border-outline-variant/30 text-on-surface-variant">
+            {item.text}
+          </span>
+        ))}
+        {checklist.items.length > 4 && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container border border-outline-variant/30 text-on-surface-variant">
+            +{checklist.items.length - 4} mais
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // -------- Checklist Page --------
 const Checklists: React.FC = () => {
   const { success, error: showError } = useToast()
 
+  const [checklists, setChecklists] = useState<Checklist[]>([])
   const [dashboard, setDashboard] = useState<ChecklistDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  // Edit / Create state
-  const [editing, setEditing] = useState(false)
+  // Which checklist is being edited (null = creating new)
+  const [editTarget, setEditTarget] = useState<Checklist | null | 'new'>('new')
+  const [showForm, setShowForm] = useState(false)
+
+  // Form state
   const [formName, setFormName] = useState('')
   const [formItems, setFormItems] = useState<string[]>(['', ''])
   const [formSendTime, setFormSendTime] = useState(9)
-  const [formTimezone, setFormTimezone] = useState('America/Sao_Paulo')
+  const [formTimezone] = useState('America/Sao_Paulo')
+  const [formRecurrenceType, setFormRecurrenceType] = useState<ChecklistRecurrenceType>('daily')
+  const [formRecurrenceDays, setFormRecurrenceDays] = useState<number[]>([])
 
   // Delete confirm
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Checklist | null>(null)
 
   // Send now
-  const [sending, setSending] = useState(false)
+  const [sendingId, setSendingId] = useState<string | null>(null)
 
-  const fetchDashboard = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const data = await checklistsApi.dashboard()
-      setDashboard(data)
-      if (data.checklist) {
-        setFormName(data.checklist.name)
-        setFormItems(data.checklist.items.map((i) => i.text))
-        setFormSendTime(data.checklist.send_time)
-        setFormTimezone(data.checklist.timezone)
-      }
+      const [list, dash] = await Promise.all([
+        checklistsApi.get(),
+        checklistsApi.dashboard(),
+      ])
+      setChecklists(list)
+      setDashboard(dash)
     } catch {
-      showError('Erro ao carregar dados do checklist.')
+      showError('Erro ao carregar dados dos checklists.')
     } finally {
       setLoading(false)
     }
   }, [showError])
 
   useEffect(() => {
-    fetchDashboard()
-  }, [fetchDashboard])
+    fetchData()
+  }, [fetchData])
+
+  // -------- Populate form when editing --------
+  const openEdit = (c: Checklist) => {
+    setEditTarget(c)
+    setFormName(c.name)
+    setFormItems(c.items.map((i) => i.text))
+    setFormSendTime(c.send_time)
+    setFormRecurrenceType(c.recurrence_type ?? 'daily')
+    setFormRecurrenceDays(c.recurrence_days ?? [])
+    setShowForm(true)
+  }
+
+  const openNew = () => {
+    setEditTarget('new')
+    setFormName('')
+    setFormItems(['', ''])
+    setFormSendTime(9)
+    setFormRecurrenceType('daily')
+    setFormRecurrenceDays([])
+    setShowForm(true)
+  }
 
   // -------- Item management --------
   const updateItem = (index: number, value: string) => {
-    setFormItems((prev) => {
-      const next = [...prev]
-      next[index] = value
-      return next
-    })
+    setFormItems((prev) => { const next = [...prev]; next[index] = value; return next })
+  }
+  const addItem = () => setFormItems((prev) => (prev.length < 12 ? [...prev, ''] : prev))
+  const removeItem = (index: number) => setFormItems((prev) => (prev.length > 2 ? prev.filter((_, i) => i !== index) : prev))
+
+  const toggleDay = (day: number) => {
+    setFormRecurrenceDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
+    )
   }
 
-  const addItem = () => {
-    setFormItems((prev) => (prev.length < 12 ? [...prev, ''] : prev))
-  }
-
-  const removeItem = (index: number) => {
-    setFormItems((prev) => (prev.length > 2 ? prev.filter((_, i) => i !== index) : prev))
-  }
-
-  // -------- Save / Create / Delete --------
+  // -------- Save --------
   const handleSave = async () => {
     const texts = formItems.map((t) => t.trim()).filter(Boolean)
-    if (texts.length < 2) {
-      showError('Adicione pelo menos 2 itens.')
-      return
+    if (texts.length < 2) { showError('Adicione pelo menos 2 itens.'); return }
+    if (texts.length > 12) { showError('Máximo de 12 itens.'); return }
+    if (new Set(texts.map((t) => t.toLowerCase())).size !== texts.length) {
+      showError('Itens duplicados não são permitidos.'); return
     }
-    if (texts.length > 12) {
-      showError('Máximo de 12 itens.')
-      return
-    }
-    const unique = new Set(texts.map((t) => t.toLowerCase()))
-    if (unique.size !== texts.length) {
-      showError('Itens duplicados não são permitidos.')
-      return
+    if (formRecurrenceType === 'custom' && formRecurrenceDays.length === 0) {
+      showError('Selecione ao menos um dia para recorrência personalizada.'); return
     }
 
     setSaving(true)
     try {
-      const payload = { name: formName || 'Checklist Diário', send_time: formSendTime, timezone: formTimezone, items: texts.map((t) => ({ text: t })) }
+      const payload = {
+        name: formName || 'Checklist Diário',
+        send_time: formSendTime,
+        timezone: formTimezone,
+        recurrence_type: formRecurrenceType,
+        recurrence_days: formRecurrenceType === 'custom' ? formRecurrenceDays : undefined,
+        items: texts.map((t) => ({ text: t })),
+      }
 
-      if (dashboard?.checklist) {
-        await checklistsApi.update(dashboard.checklist.id, payload as UpdateChecklistPayload)
-        success('Checklist atualizado!')
-      } else {
+      if (editTarget === 'new') {
         await checklistsApi.create(payload as CreateChecklistPayload)
         success('Checklist criado!')
+      } else {
+        await checklistsApi.update((editTarget as Checklist).id, payload as UpdateChecklistPayload)
+        success('Checklist atualizado!')
       }
-      setEditing(false)
-      await fetchDashboard()
+      setShowForm(false)
+      await fetchData()
     } catch (err: any) {
       showError(err.response?.data?.error ?? 'Erro ao salvar checklist.')
     } finally {
@@ -141,33 +243,33 @@ const Checklists: React.FC = () => {
     }
   }
 
-  const handleSendNow = async (force = false) => {
-    setSending(true)
-    try {
-      await checklistsApi.sendNow(force)
-      success('Checklist enviado com sucesso!')
-      await fetchDashboard()
-    } catch (err: any) {
-      const msg = err.response?.data?.error ?? 'Erro ao enviar checklist.'
-      showError(msg)
-    } finally {
-      setSending(false)
-    }
-  }
-
+  // -------- Delete --------
   const handleDelete = async () => {
-    if (!dashboard?.checklist) return
+    if (!deleteTarget) return
     setSaving(true)
     try {
-      await checklistsApi.delete(dashboard.checklist.id)
+      await checklistsApi.delete(deleteTarget.id)
       success('Checklist excluído.')
-      setConfirmDelete(false)
-      setDashboard(null)
-      setEditing(false)
+      setDeleteTarget(null)
+      await fetchData()
     } catch {
       showError('Erro ao excluir checklist.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // -------- Send now --------
+  const handleSendNow = async (c: Checklist, force = false) => {
+    setSendingId(c.id)
+    try {
+      await checklistsApi.sendNow(force)
+      success('Checklist enviado!')
+      await fetchData()
+    } catch (err: any) {
+      showError(err.response?.data?.error ?? 'Erro ao enviar checklist.')
+    } finally {
+      setSendingId(null)
     }
   }
 
@@ -188,26 +290,28 @@ const Checklists: React.FC = () => {
     )
   }
 
-  const checklist = dashboard?.checklist
+  const dashChecklist = dashboard?.checklist
   const today = dashboard?.today
   const history = dashboard?.history ?? []
 
   // -------- Today's Poll Section --------
   const renderTodaySection = () => {
+    if (!dashChecklist) return null
     if (!today) {
       return (
         <div className="glass-card rounded-2xl border border-outline-variant/50 p-6 text-center">
           <span className="material-symbols-outlined text-3xl text-on-surface-variant mb-2 block">today</span>
           <p className="text-on-surface font-semibold mb-1">Nenhum envio hoje</p>
           <p className="text-sm text-on-surface-variant mb-4">
-            O checklist será enviado automaticamente às <strong>{String(checklist!.send_time).padStart(2, '0')}h</strong>.
+            O checklist <strong>{dashChecklist.name}</strong> será enviado às{' '}
+            <strong>{String(dashChecklist.send_time).padStart(2, '0')}h</strong>.
           </p>
           <button
-            onClick={() => handleSendNow(false)}
-            disabled={sending}
+            onClick={() => handleSendNow(dashChecklist, false)}
+            disabled={!!sendingId}
             className="btn-primary mx-auto"
           >
-            {sending ? (
+            {sendingId ? (
               <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
             ) : (
               <span className="material-symbols-outlined text-lg">send</span>
@@ -230,12 +334,12 @@ const Checklists: React.FC = () => {
           <div className="flex items-center gap-3">
             <span className="text-2xl font-bold text-primary">{today.completion_pct}%</span>
             <button
-              onClick={() => handleSendNow(true)}
-              disabled={sending}
-              title="Reenviar checklist (substitui envio atual)"
+              onClick={() => handleSendNow(dashChecklist, true)}
+              disabled={!!sendingId}
+              title="Reenviar checklist"
               className="w-11 h-11 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
             >
-              {sending ? (
+              {sendingId ? (
                 <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
               ) : (
                 <span className="material-symbols-outlined text-lg">refresh</span>
@@ -260,12 +364,12 @@ const Checklists: React.FC = () => {
     )
   }
 
-  // -------- History Section --------
+  // -------- History --------
   const renderHistory = () => {
     if (!history.length) return null
     return (
       <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
-        <h3 className="text-base font-semibold text-on-surface mb-4">Últimos 14 Dias</h3>
+        <h3 className="text-base font-semibold text-on-surface mb-4">Ultimos 14 Dias</h3>
         <div className="space-y-3">
           {history.map((day) => {
             const dateStr = toDateStr(day.poll_date)
@@ -273,34 +377,30 @@ const Checklists: React.FC = () => {
               ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }).format(new Date(dateStr + 'T00:00:00'))
               : '—'
             return (
-            <div key={dateStr} className="flex items-center gap-3">
-              <span className="text-xs text-on-surface-variant w-24 flex-shrink-0">
-                {dateLabel}
-              </span>
-              <div className="flex-1">
-                <ProgressBar pct={day.completion_pct} size="sm" />
+              <div key={dateStr} className="flex items-center gap-3">
+                <span className="text-xs text-on-surface-variant w-24 flex-shrink-0">{dateLabel}</span>
+                <div className="flex-1"><ProgressBar pct={day.completion_pct} size="sm" /></div>
+                <span className="text-xs font-medium text-on-surface-variant w-10 text-right">{day.completion_pct}%</span>
               </div>
-              <span className="text-xs font-medium text-on-surface-variant w-10 text-right">
-                {day.completion_pct}%
-              </span>
-            </div>
-          )})}
+            )
+          })}
         </div>
       </div>
     )
   }
 
-  // -------- Item Editor --------
+  // -------- Editor --------
   const renderEditor = () => {
     const texts = formItems.map((t) => t.trim()).filter(Boolean)
     const validCount = texts.length
     const hasDuplicates = new Set(texts.map((t) => t.toLowerCase())).size !== validCount
+    const isEdit = editTarget !== 'new'
 
     return (
       <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-on-surface">
-            {checklist ? 'Editar Checklist' : 'Criar Checklist'}
+            {isEdit ? 'Editar Checklist' : 'Novo Checklist'}
           </h3>
           <span className={`text-xs font-medium ${validCount > 12 ? 'text-error' : 'text-on-surface-variant'}`}>
             {validCount}/12 itens
@@ -342,7 +442,6 @@ const Checklists: React.FC = () => {
           ))}
         </div>
 
-        {/* Add Item Button */}
         {formItems.length < 12 && (
           <button onClick={addItem} className="btn-ghost text-sm mb-4">
             <span className="material-symbols-outlined text-lg">add</span>
@@ -351,12 +450,12 @@ const Checklists: React.FC = () => {
         )}
 
         {hasDuplicates && (
-          <p className="text-xs text-error mb-3">Itens duplicados não são permitidos.</p>
+          <p className="text-xs text-error mb-3">Itens duplicados nao sao permitidos.</p>
         )}
 
         {/* Send Time */}
         <div className="mb-4">
-          <label className="label mb-1">Horário de Envio</label>
+          <label className="label mb-1">Horario de Envio</label>
           <select
             className="input-field"
             value={formSendTime}
@@ -367,6 +466,42 @@ const Checklists: React.FC = () => {
             ))}
           </select>
         </div>
+
+        {/* Recurrence */}
+        <div className="mb-4">
+          <label className="label mb-1">Recorrencia</label>
+          <select
+            className="input-field"
+            value={formRecurrenceType}
+            onChange={(e) => setFormRecurrenceType(e.target.value as ChecklistRecurrenceType)}
+          >
+            {(Object.keys(RECURRENCE_LABELS) as ChecklistRecurrenceType[]).map((key) => (
+              <option key={key} value={key}>{RECURRENCE_LABELS[key]}</option>
+            ))}
+          </select>
+        </div>
+
+        {formRecurrenceType === 'custom' && (
+          <div className="mb-4">
+            <label className="label mb-2">Dias da Semana</label>
+            <div className="flex flex-wrap gap-2">
+              {DAYS_LABELS.map((label, day) => (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => toggleDay(day)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                    formRecurrenceDays.includes(day)
+                      ? 'bg-primary text-on-primary border-primary'
+                      : 'bg-surface-container text-on-surface-variant border-outline-variant/30 hover:border-primary/50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-3 pt-4 border-t border-outline-variant/30">
@@ -380,143 +515,130 @@ const Checklists: React.FC = () => {
             ) : (
               <span className="material-symbols-outlined text-lg">save</span>
             )}
-            {checklist ? 'Salvar Checklist' : 'Criar Checklist'}
+            {isEdit ? 'Salvar Checklist' : 'Criar Checklist'}
           </button>
-          {checklist && (
-            <button onClick={() => setEditing(false)} className="btn-ghost text-sm">
-              Cancelar
-            </button>
-          )}
-          {checklist && !confirmDelete && (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="ml-auto text-sm text-error hover:text-error/80 transition-colors flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-lg">delete</span>
-              Excluir
-            </button>
-          )}
-          {confirmDelete && (
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs text-on-surface-variant">Tem certeza?</span>
-              <button
-                onClick={handleDelete}
-                disabled={saving}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-error/10 text-error border border-error/30 hover:bg-error/20 transition-colors"
-              >
-                {saving ? 'Excluindo...' : 'Sim, Excluir'}
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-container text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-high transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          )}
+          <button onClick={() => setShowForm(false)} className="btn-ghost text-sm">
+            Cancelar
+          </button>
         </div>
       </div>
     )
   }
 
-  // -------- Checklist Items Panel --------
-  const renderItemsList = () => {
-    if (!checklist) return null
-    return (
-      <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-base font-semibold text-on-surface">{checklist.name}</h3>
-            <p className="text-xs text-on-surface-variant mt-0.5">
-              {checklist.items.length} itens · Envio às <strong>{String(checklist.send_time).padStart(2, '0')}h</strong>
-            </p>
-          </div>
-          <button
-            onClick={() => setEditing(true)}
-            className="btn-ghost text-xs py-1.5 px-3"
-          >
-            <span className="material-symbols-outlined text-base">edit</span>
-            Editar Checklist
-          </button>
-        </div>
-        <div className="space-y-1.5">
-          {checklist.items.map((item, i) => (
-            <div key={item.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-surface-container/50 border border-outline-variant/20">
-              <span className="text-[10px] font-bold text-on-surface-variant/50 w-4 text-right flex-shrink-0">{i + 1}</span>
-              <span className="text-sm text-on-surface">{item.text}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  // -------- Main Render --------
+  // -------- Main --------
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-on-surface">Checklists</h2>
+        {!showForm && (
+          <button onClick={openNew} className="btn-primary">
+            <span className="material-symbols-outlined text-lg">add</span>
+            Novo Checklist
+          </button>
+        )}
       </div>
 
-      {/* If no checklist, show creator */}
-      {!checklist && !editing && (
+      {/* Form (create or edit) */}
+      {showForm && renderEditor()}
+
+      {/* Empty state */}
+      {!showForm && checklists.length === 0 && (
         <div className="glass-card rounded-2xl border border-outline-variant/50 p-12 text-center">
           <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-3 block">checklist</span>
           <p className="text-on-surface font-semibold mb-1">Nenhum checklist criado</p>
           <p className="text-sm text-on-surface-variant mb-4">
-            Crie um checklist diário para receber no WhatsApp e acompanhar seu progresso.
+            Crie um checklist para receber no WhatsApp e acompanhar seu progresso.
           </p>
-          <button onClick={() => setEditing(true)} className="btn-primary mx-auto">
+          <button onClick={openNew} className="btn-primary mx-auto">
             <span className="material-symbols-outlined text-lg">add</span>
             Criar Checklist
           </button>
         </div>
       )}
 
-      {/* Editor mode */}
-      {editing && renderEditor()}
-
-      {/* View mode */}
-      {checklist && !editing && (
+      {/* Checklists list */}
+      {!showForm && checklists.length > 0 && (
         <>
-          {/* Stats row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard icon="checklist" label="Itens" value={checklist.items.length} iconColor="text-primary" iconBg="bg-primary/15" />
-            <StatCard
-              icon="schedule"
-              label="Horário de Envio"
-              value={`${String(checklist.send_time).padStart(2, '0')}h`}
-              iconColor="text-yellow-400"
-              iconBg="bg-yellow-400/15"
-            />
-            <StatCard
-              icon="today"
-              label="Conclusão Hoje"
-              value={today ? `${today.completion_pct}%` : '—'}
-              iconColor={today && today.completion_pct >= 100 ? 'text-tertiary' : 'text-on-surface-variant'}
-              iconBg={today && today.completion_pct >= 100 ? 'bg-tertiary/15' : 'bg-surface-container-high'}
-            />
-            <StatCard
-              icon="bar_chart"
-              label="Dias Registrados"
-              value={history.length}
-              iconColor="text-primary"
-              iconBg="bg-primary/15"
-            />
+          {/* Stats from most recent checklist with activity */}
+          {dashChecklist && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <StatCard icon="checklist" label="Itens" value={dashChecklist.items.length} iconColor="text-primary" iconBg="bg-primary/15" />
+              <StatCard
+                icon="schedule"
+                label="Horario de Envio"
+                value={`${String(dashChecklist.send_time).padStart(2, '0')}h`}
+                iconColor="text-yellow-400"
+                iconBg="bg-yellow-400/15"
+              />
+              <StatCard
+                icon="today"
+                label="Conclusao Hoje"
+                value={today ? `${today.completion_pct}%` : '—'}
+                iconColor={today && today.completion_pct >= 100 ? 'text-tertiary' : 'text-on-surface-variant'}
+                iconBg={today && today.completion_pct >= 100 ? 'bg-tertiary/15' : 'bg-surface-container-high'}
+              />
+              <StatCard
+                icon="bar_chart"
+                label="Dias Registrados"
+                value={history.length}
+                iconColor="text-primary"
+                iconBg="bg-primary/15"
+              />
+            </div>
+          )}
+
+          {/* Checklist cards grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {checklists.map((c) => (
+              <ChecklistCard
+                key={c.id}
+                checklist={c}
+                onEdit={openEdit}
+                onDelete={setDeleteTarget}
+                onSendNow={(cl) => handleSendNow(cl, false)}
+                sending={sendingId === c.id}
+              />
+            ))}
           </div>
 
-          {/* Main grid: items list + today + history */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Items list */}
-            <div>{renderItemsList()}</div>
-            {/* Today + History */}
-            <div className="xl:col-span-2 space-y-6">
-              {renderTodaySection()}
-              {renderHistory()}
+          {/* Dashboard activity for most recent */}
+          {dashChecklist && (
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2 space-y-6">
+                {renderTodaySection()}
+                {renderHistory()}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="glass-card rounded-2xl border border-outline-variant/50 p-6 max-w-sm w-full mx-4 animate-fadeIn">
+            <h3 className="text-base font-semibold text-on-surface mb-2">Excluir Checklist</h3>
+            <p className="text-sm text-on-surface-variant mb-6">
+              Tem certeza que deseja excluir <strong>{deleteTarget.name}</strong>? Esta acao nao pode ser desfeita.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleDelete}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-error/10 text-error border border-error/30 hover:bg-error/20 transition-colors"
+              >
+                {saving ? 'Excluindo...' : 'Sim, Excluir'}
+              </button>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-surface-container text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-high transition-colors"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   )

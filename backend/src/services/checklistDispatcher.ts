@@ -87,10 +87,18 @@ export async function sendDailyPoll(
   }
 }
 
+function shouldSendToday(recurrenceType: string, recurrenceDays: number[] | null): boolean {
+  const dayOfWeek = new Date().getDay() // 0=Dom, 6=Sáb
+  if (recurrenceType === 'daily') return true
+  if (recurrenceType === 'weekdays') return dayOfWeek >= 1 && dayOfWeek <= 5
+  if (recurrenceType === 'custom' && recurrenceDays) return recurrenceDays.includes(dayOfWeek)
+  return true
+}
+
 export async function sendPollsForHour(hour: number): Promise<void> {
   try {
     const [rows]: any = await pool.query(
-      `SELECT c.id, c.user_id
+      `SELECT c.id, c.user_id, c.recurrence_type, c.recurrence_days
        FROM checklists c
        JOIN users u ON u.id = c.user_id
        WHERE c.send_time = ? AND c.is_active = 1 AND u.is_active = 1 AND u.whatsapp_alerts_enabled = 1`,
@@ -106,6 +114,14 @@ export async function sendPollsForHour(hour: number): Promise<void> {
 
     for (const row of rows) {
       try {
+        const rDays = Array.isArray(row.recurrence_days)
+          ? row.recurrence_days
+          : (row.recurrence_days ? JSON.parse(row.recurrence_days) : null)
+
+        if (!shouldSendToday(row.recurrence_type || 'daily', rDays)) {
+          console.log(`[checklistDispatcher] checklist ${row.id} não enviado hoje (recurrence=${row.recurrence_type})`)
+          continue
+        }
         await sendDailyPoll(row.id, row.user_id)
       } catch (err: any) {
         console.error(`[checklistDispatcher] erro checklist ${row.id}:`, err.message)
