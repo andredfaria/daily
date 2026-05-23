@@ -138,7 +138,8 @@ const Historico: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedMonth, setSelectedMonth] = useState<string>('')
   const [animatedRows, _setAnimatedRows] = useState<Set<string>>(new Set())
-  const { error: showError } = useToast()
+  const [exporting, setExporting] = useState(false)
+  const { error: showError, success: showSuccess } = useToast()
   const navigate = useNavigate()
 
   const fetchOccurrences = useCallback(async () => {
@@ -152,6 +153,22 @@ const Historico: React.FC = () => {
       setLoading(false)
     }
   }, [showError])
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      await occurrencesApi.exportCsv({
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        from: selectedMonth ? `${selectedMonth}-01` : undefined,
+        to: selectedMonth ? `${selectedMonth}-31` : undefined,
+      })
+      showSuccess('CSV exportado com sucesso')
+    } catch {
+      showError('Erro ao exportar CSV')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   useEffect(() => {
     fetchOccurrences()
@@ -232,6 +249,24 @@ const Historico: React.FC = () => {
           <h2 className="text-lg font-bold text-on-surface">Histórico de Pagamentos</h2>
           <p className="text-xs text-on-surface-variant mt-0.5">{totalFiltered} registros encontrados</p>
         </div>
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="
+            flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold
+            bg-surface-container border border-outline-variant/50 text-on-surface-variant
+            hover:text-on-surface hover:bg-surface-container-high
+            active:scale-95 transition-all duration-200
+            disabled:opacity-50 disabled:cursor-not-allowed
+          "
+        >
+          {exporting ? (
+            <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+          ) : (
+            <span className="material-symbols-outlined text-base">download</span>
+          )}
+          {exporting ? 'Exportando…' : 'Exportar CSV'}
+        </button>
       </div>
 
       {/* Filter Bar */}

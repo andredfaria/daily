@@ -145,6 +145,69 @@ router.get('/', async (req: Request, res: Response) => {
   }
 })
 
+// GET /api/occurrences/export?from=YYYY-MM-DD&to=YYYY-MM-DD&status=paid
+router.get('/export', async (req: Request, res: Response) => {
+  try {
+    const { status, bill_id, from, to } = req.query
+    const conditions: string[] = []
+    const values: any[] = []
+
+    conditions.push('b.user_id = ?')
+    values.push(req.userId)
+
+    if (status) { conditions.push('o.status = ?'); values.push(status) }
+    if (bill_id) { conditions.push('o.bill_id = ?'); values.push(bill_id) }
+    if (from) { conditions.push('o.due_date >= ?'); values.push(from) }
+    if (to) { conditions.push('o.due_date <= ?'); values.push(to) }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+
+    const [rows]: any = await pool.query(
+      `SELECT o.due_date, b.name AS bill_name, o.amount, o.status,
+              o.paid_at, o.confirmation_source
+       FROM bill_occurrences o
+       LEFT JOIN bills b ON b.id = o.bill_id
+       ${where}
+       ORDER BY o.due_date DESC
+       LIMIT 5000`,
+      values
+    )
+
+    const header = 'Conta,Valor (R$),Vencimento,Status,Pago Em,Origem\n'
+    const csvRows = rows.map((r: any) => {
+      const dueDate = r.due_date instanceof Date
+        ? r.due_date.toISOString().slice(0, 10)
+        : String(r.due_date).slice(0, 10)
+      const paidAt = r.paid_at
+        ? (r.paid_at instanceof Date ? r.paid_at.toISOString().slice(0, 10) : String(r.paid_at).slice(0, 10))
+        : ''
+      const amount = Number(r.amount).toFixed(2).replace('.', ',')
+      const statusLabel: Record<string, string> = {
+        paid: 'Pago', pending: 'Pendente', overdue: 'Atrasado', cancelled: 'Cancelado',
+      }
+      const safeStr = (s: string) => `"${String(s ?? '').replace(/"/g, '""')}"`
+      return [
+        safeStr(r.bill_name ?? ''),
+        amount,
+        dueDate,
+        statusLabel[r.status] ?? r.status,
+        paidAt,
+        r.confirmation_source ?? '',
+      ].join(',')
+    })
+
+    const csv = header + csvRows.join('\n')
+    const filename = `billsync-historico-${new Date().toISOString().slice(0, 10)}.csv`
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.send('﻿' + csv) // BOM para Excel reconhecer UTF-8
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
 // GET /api/occurrences/:id
 router.get('/:id', async (req: Request, res: Response) => {
   try {
