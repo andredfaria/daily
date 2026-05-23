@@ -17,6 +17,16 @@ function getCurrentHourSaoPaulo(): number {
   return parseInt(hourPart?.value ?? '0', 10) % 24
 }
 
+function getCurrentDayOfWeekSaoPaulo(): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    weekday: 'short',
+  }).formatToParts(new Date())
+  const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+  const weekday = parts.find(p => p.type === 'weekday')?.value ?? 'Sun'
+  return weekdayMap[weekday] ?? 0
+}
+
 export async function initScheduler(): Promise<void> {
   cron.schedule('0 * * * *', async () => {
     const hour = getCurrentHourSaoPaulo()
@@ -53,17 +63,19 @@ export async function initScheduler(): Promise<void> {
       console.error('[scheduler] erro no tick de checklists:', err.message)
     }
 
-    // --- Resumo semanal ---
-    try {
-      const dayOfWeek = new Date().getDay() // 0=Dom, 1=Seg, ...
-      const [summaryUsers]: any = await pool.query(
-        `SELECT id FROM users WHERE summary_enabled = 1 AND summary_day_of_week = ? AND is_active = 1 AND whatsapp_alerts_enabled = 1`,
-        [dayOfWeek]
-      )
-      for (const { id } of summaryUsers) {
-        try { await sendWeeklySummary(id) } catch (e: any) { console.error('[scheduler] summary erro:', e.message) }
-      }
-    } catch (e: any) { console.error('[scheduler] summary tick erro:', e.message) }
+    // --- Resumo semanal (apenas às 8h BRT) ---
+    if (hour === 8) {
+      try {
+        const dayOfWeek = getCurrentDayOfWeekSaoPaulo()
+        const [summaryUsers]: any = await pool.query(
+          `SELECT id FROM users WHERE summary_enabled = 1 AND summary_day_of_week = ? AND is_active = 1 AND whatsapp_alerts_enabled = 1`,
+          [dayOfWeek]
+        )
+        for (const { id } of summaryUsers) {
+          try { await sendWeeklySummary(id) } catch (e: any) { console.error('[scheduler] summary erro:', e.message) }
+        }
+      } catch (e: any) { console.error('[scheduler] summary tick erro:', e.message) }
+    }
 
     // --- Alerta de orçamento (executa às 9h) ---
     if (hour === 9) {

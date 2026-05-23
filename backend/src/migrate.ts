@@ -135,6 +135,15 @@ ALTER TABLE notifications
   MODIFY COLUMN status ENUM('scheduled','processing','sent','failed','skipped') NOT NULL DEFAULT 'scheduled'
 `),
   },
+  {
+    name: '007_users_summary_budget',
+    statements: splitStatements(`
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS summary_enabled BOOLEAN NOT NULL DEFAULT FALSE AFTER whatsapp_alerts_enabled,
+  ADD COLUMN IF NOT EXISTS summary_day_of_week TINYINT UNSIGNED DEFAULT 1 AFTER summary_enabled,
+  ADD COLUMN IF NOT EXISTS monthly_budget_limit DECIMAL(10,2) DEFAULT NULL AFTER summary_day_of_week
+`),
+  },
 ]
 
 export async function runMigrations(): Promise<void> {
