@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { billsApi } from '../api/bills'
-import type { PaymentMethod, PixKeyType, RecurrenceType } from '../types'
+import type { BillCategory, PaymentMethod, PixKeyType, RecurrenceType } from '../types'
 import { useToast } from '../context/ToastContext'
 
 // --- Types ---
@@ -165,6 +165,7 @@ const BillForm: React.FC = () => {
 
   // Form state
   const [name, setName] = useState('')
+  const [category, setCategory] = useState<BillCategory | ''>('')
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('monthly')
@@ -187,6 +188,7 @@ const BillForm: React.FC = () => {
       setFetchLoading(true)
       const bill = await billsApi.get(id)
       setName(bill.name)
+      setCategory(bill.category ?? '')
       setDescription(bill.description ?? '')
       setAmount(bill.amount.toString())
       setRecurrenceType(bill.recurrence_type)
@@ -230,7 +232,8 @@ const BillForm: React.FC = () => {
       errs.amount = 'Valor inválido'
     }
     if (!recurrenceType) errs.recurrence_type = 'Recorrência é obrigatória'
-    if (recurrenceType === 'monthly' && (!dayOfMonth || dayOfMonth < 1 || dayOfMonth > 31)) {
+    const dayOfMonthTypes: RecurrenceType[] = ['monthly', 'quarterly', 'semiannual', 'annual']
+    if (dayOfMonthTypes.includes(recurrenceType) && (!dayOfMonth || dayOfMonth < 1 || dayOfMonth > 31)) {
       errs.recurrence_day_of_month = 'Dia inválido (1-31)'
     }
     if (recurrenceType === 'once' && !dueDate) errs.due_date = 'Data de vencimento obrigatória'
@@ -267,13 +270,16 @@ const BillForm: React.FC = () => {
 
     setLoading(true)
     try {
+      const needsDayOfMonth = ['monthly', 'quarterly', 'semiannual', 'annual'].includes(recurrenceType)
+      const needsDayOfWeek = ['weekly', 'biweekly'].includes(recurrenceType)
       const payload = {
         name: name.trim(),
+        category: category || undefined,
         description: description.trim() || undefined,
         amount: parseFloat(amount.replace(',', '.')),
         recurrence_type: recurrenceType,
-        recurrence_day_of_month: recurrenceType === 'monthly' ? dayOfMonth : undefined,
-        recurrence_day_of_week: recurrenceType === 'weekly' ? dayOfWeek : undefined,
+        recurrence_day_of_month: needsDayOfMonth ? dayOfMonth : undefined,
+        recurrence_day_of_week: needsDayOfWeek ? dayOfWeek : undefined,
         due_date: recurrenceType === 'once' ? dueDate : undefined,
         days_before_alert: daysBeforeAlert,
         is_active: isActive,
@@ -390,6 +396,26 @@ const BillForm: React.FC = () => {
                 )}
               </div>
 
+              {/* Categoria */}
+              <div>
+                <label className="label">Categoria</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as BillCategory | '')}
+                  className="input-field"
+                >
+                  <option value="">Sem categoria</option>
+                  <option value="moradia">Moradia</option>
+                  <option value="assinaturas">Assinaturas</option>
+                  <option value="serviços">Serviços</option>
+                  <option value="saúde">Saúde</option>
+                  <option value="educação">Educação</option>
+                  <option value="transporte">Transporte</option>
+                  <option value="alimentação">Alimentação</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </div>
+
               {/* Descrição */}
               <div>
                 <label className="label">Descrição</label>
@@ -435,12 +461,16 @@ const BillForm: React.FC = () => {
                 >
                   <option value="monthly">Mensal</option>
                   <option value="weekly">Semanal</option>
+                  <option value="biweekly">Quinzenal</option>
+                  <option value="quarterly">Trimestral</option>
+                  <option value="semiannual">Semestral</option>
+                  <option value="annual">Anual</option>
                   <option value="once">Avulsa</option>
                 </select>
               </div>
 
               {/* Dynamic field based on recurrence type */}
-              {recurrenceType === 'monthly' && (
+              {['monthly', 'quarterly', 'semiannual', 'annual'].includes(recurrenceType) && (
                 <div>
                   <label className="label">Dia do Mês *</label>
                   <input
@@ -457,7 +487,7 @@ const BillForm: React.FC = () => {
                 </div>
               )}
 
-              {recurrenceType === 'weekly' && (
+              {['weekly', 'biweekly'].includes(recurrenceType) && (
                 <div>
                   <label className="label">Dia da Semana</label>
                   <div className="flex gap-2 flex-wrap">

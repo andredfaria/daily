@@ -39,10 +39,38 @@ function generateWeeklyDates(dayOfWeek: number, count = 12): string[] {
   return dates
 }
 
+function generateBiweeklyDates(dayOfWeek: number, count = 12): string[] {
+  const dates: string[] = []
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const daysUntilTarget = (dayOfWeek - now.getDay() + 7) % 7 || 14
+  const first = new Date(now)
+  first.setDate(now.getDate() + daysUntilTarget)
+  for (let i = 0; i < count; i++) {
+    const d = new Date(first)
+    d.setDate(first.getDate() + i * 14)
+    dates.push(toDateString(d))
+  }
+  return dates
+}
+
+function generateNMonthlyDates(dayOfMonth: number, monthStep: number, count = 6): string[] {
+  const dates: string[] = []
+  const now = new Date()
+  for (let i = 0; i < count; i++) {
+    const totalMonths = now.getMonth() + i * monthStep
+    const year = now.getFullYear() + Math.floor(totalMonths / 12)
+    const month = totalMonths % 12
+    const cappedDay = Math.min(dayOfMonth, lastDayOfMonth(year, month))
+    dates.push(`${year}-${String(month + 1).padStart(2, '0')}-${String(cappedDay).padStart(2, '0')}`)
+  }
+  return dates
+}
+
 export async function generateOccurrencesForBill(
   billId: string,
   bill: {
-    recurrence_type: 'monthly' | 'weekly' | 'once'
+    recurrence_type: 'monthly' | 'weekly' | 'once' | 'biweekly' | 'quarterly' | 'semiannual' | 'annual'
     recurrence_day_of_month?: number | null
     recurrence_day_of_week?: number | null
     due_date?: string | null
@@ -60,6 +88,18 @@ export async function generateOccurrencesForBill(
   } else if (bill.recurrence_type === 'weekly') {
     if (bill.recurrence_day_of_week == null) return
     targetDates = generateWeeklyDates(bill.recurrence_day_of_week)
+  } else if (bill.recurrence_type === 'biweekly') {
+    if (bill.recurrence_day_of_week == null) return
+    targetDates = generateBiweeklyDates(bill.recurrence_day_of_week)
+  } else if (bill.recurrence_type === 'quarterly') {
+    if (!bill.recurrence_day_of_month) return
+    targetDates = generateNMonthlyDates(bill.recurrence_day_of_month, 3)
+  } else if (bill.recurrence_type === 'semiannual') {
+    if (!bill.recurrence_day_of_month) return
+    targetDates = generateNMonthlyDates(bill.recurrence_day_of_month, 6)
+  } else if (bill.recurrence_type === 'annual') {
+    if (!bill.recurrence_day_of_month) return
+    targetDates = generateNMonthlyDates(bill.recurrence_day_of_month, 12, 3)
   }
 
   if (!targetDates.length) return
@@ -89,7 +129,7 @@ export async function generateOccurrencesForBill(
 export async function regenerateOccurrencesForBill(
   billId: string,
   bill: {
-    recurrence_type: 'monthly' | 'weekly' | 'once'
+    recurrence_type: 'monthly' | 'weekly' | 'once' | 'biweekly' | 'quarterly' | 'semiannual' | 'annual'
     recurrence_day_of_month?: number | null
     recurrence_day_of_week?: number | null
     due_date?: string | null

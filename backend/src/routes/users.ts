@@ -24,6 +24,7 @@ router.patch('/me', async (req: Request, res: Response) => {
       'name', 'whatsapp_number', 'timezone', 'is_active',
       'notification_time', 'whatsapp_alerts_enabled',
       'weekly_summary_enabled', 'default_days_before_alert',
+      'summary_enabled', 'summary_day_of_week', 'monthly_budget_limit',
     ]
     const fields: string[] = []
     const values: any[] = []
@@ -48,6 +49,32 @@ router.patch('/me', async (req: Request, res: Response) => {
         }
         fields.push(`${key} = ?`)
         values.push(d)
+        continue
+      }
+
+      if (key === 'summary_day_of_week') {
+        const dow = Number(req.body[key])
+        if (!Number.isInteger(dow) || dow < 0 || dow > 6) {
+          return res.status(400).json({ error: 'summary_day_of_week deve ser um inteiro entre 0 e 6' })
+        }
+        fields.push(`${key} = ?`)
+        values.push(dow)
+        continue
+      }
+
+      if (key === 'monthly_budget_limit') {
+        const val = req.body[key]
+        if (val === null || val === '') {
+          fields.push(`${key} = ?`)
+          values.push(null)
+          continue
+        }
+        const num = Number(val)
+        if (isNaN(num) || num < 0) {
+          return res.status(400).json({ error: 'monthly_budget_limit deve ser um número maior ou igual a zero' })
+        }
+        fields.push(`${key} = ?`)
+        values.push(num)
         continue
       }
 

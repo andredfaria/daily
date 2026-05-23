@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { billsApi } from '../api/bills'
-import type { Bill, RecurrenceType } from '../types'
+import type { Bill, BillCategory, RecurrenceType } from '../types'
 import {
   formatBRL,
   formatDate,
   getBillIcon,
+  getCategoryLabel,
   getRecurrenceBadgeColor,
   getRecurrenceLabel,
   getRecurrenceShortLabel,
@@ -17,6 +18,7 @@ import { useToast } from '../context/ToastContext'
 // --- Filter types ---
 type RecurrenceFilter = 'all' | RecurrenceType
 type ActiveFilter = 'all' | 'active' | 'inactive'
+type CategoryFilter = 'all' | BillCategory
 
 // --- Bill Card ---
 interface BillCardProps {
@@ -64,6 +66,11 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, t
           <div>
             <h3 className="text-sm font-semibold text-on-surface leading-tight">{bill.name}</h3>
             <p className="text-xs text-on-surface-variant mt-0.5">{recurrenceDetail}</p>
+            {bill.category && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-surface-variant text-on-surface-variant mt-0.5 inline-block">
+                {getCategoryLabel(bill.category)}
+              </span>
+            )}
             {bill.description && (
               <p className="text-xs text-on-surface-variant/70 mt-0.5 line-clamp-1">{bill.description}</p>
             )}
@@ -162,6 +169,7 @@ const Contas: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [recurrenceFilter, setRecurrenceFilter] = useState<RecurrenceFilter>('all')
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('active')
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')
   const [deleteTarget, setDeleteTarget] = useState<Bill | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
@@ -218,7 +226,8 @@ const Contas: React.FC = () => {
       activeFilter === 'all' ||
       (activeFilter === 'active' && b.is_active) ||
       (activeFilter === 'inactive' && !b.is_active)
-    return recMatch && activeMatch
+    const categoryMatch = categoryFilter === 'all' || b.category === categoryFilter
+    return recMatch && activeMatch && categoryMatch
   })
 
   const totalAmount = filtered.reduce((s, b) => s + Number(b.amount), 0)
@@ -227,7 +236,23 @@ const Contas: React.FC = () => {
     { value: 'all', label: 'Todas' },
     { value: 'monthly', label: 'Mensal' },
     { value: 'weekly', label: 'Semanal' },
+    { value: 'biweekly', label: 'Quinzenal' },
+    { value: 'quarterly', label: 'Trimestral' },
+    { value: 'semiannual', label: 'Semestral' },
+    { value: 'annual', label: 'Anual' },
     { value: 'once', label: 'Avulsa' },
+  ]
+
+  const categoryFilters: { value: CategoryFilter; label: string }[] = [
+    { value: 'all', label: 'Categorias' },
+    { value: 'moradia', label: 'Moradia' },
+    { value: 'assinaturas', label: 'Assinaturas' },
+    { value: 'serviços', label: 'Serviços' },
+    { value: 'saúde', label: 'Saúde' },
+    { value: 'educação', label: 'Educação' },
+    { value: 'transporte', label: 'Transporte' },
+    { value: 'alimentação', label: 'Alimentação' },
+    { value: 'outro', label: 'Outro' },
   ]
 
   const activeFilters: { value: ActiveFilter; label: string }[] = [
@@ -291,6 +316,17 @@ const Contas: React.FC = () => {
             </button>
           ))}
         </div>
+
+        {/* Category filter select */}
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
+          className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface-container text-on-surface-variant border-none outline-none cursor-pointer hover:text-on-surface transition-colors"
+        >
+          {categoryFilters.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
 
         <span className="text-xs text-on-surface-variant ml-auto">
           {filtered.length} conta{filtered.length !== 1 ? 's' : ''}

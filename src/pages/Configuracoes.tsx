@@ -13,6 +13,13 @@ interface NotificationSettings {
   notification_time: number
 }
 
+interface SummaryBudgetSettings {
+  summary_enabled: boolean
+  summary_day_of_week: number
+  monthly_budget_limit: string
+}
+
+const DAYS_OF_WEEK = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 const Configuracoes: React.FC = () => {
   const [user, setUser] = useState<User | null>(null)
@@ -29,6 +36,13 @@ const Configuracoes: React.FC = () => {
     notification_time: 8,
   })
   const [savingNotif, setSavingNotif] = useState(false)
+
+  const [summarySettings, setSummarySettings] = useState<SummaryBudgetSettings>({
+    summary_enabled: false,
+    summary_day_of_week: 1,
+    monthly_budget_limit: '',
+  })
+  const [savingSummary, setSavingSummary] = useState(false)
 
   const [wahaStatus, setWahaStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading')
   const [reconnecting, setReconnecting] = useState(false)
@@ -63,6 +77,11 @@ const Configuracoes: React.FC = () => {
         days_before: u.default_days_before_alert ?? 3,
         notification_time: u.notification_time ?? 8,
       })
+      setSummarySettings({
+        summary_enabled: u.summary_enabled ?? false,
+        summary_day_of_week: u.summary_day_of_week ?? 1,
+        monthly_budget_limit: u.monthly_budget_limit != null ? String(u.monthly_budget_limit) : '',
+      })
     } catch {
       const placeholder: User = {
         id: '1',
@@ -74,6 +93,9 @@ const Configuracoes: React.FC = () => {
         weekly_summary_enabled: false,
         default_days_before_alert: 3,
         notification_time: 8,
+        summary_enabled: false,
+        summary_day_of_week: 1,
+        monthly_budget_limit: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
@@ -150,6 +172,25 @@ const Configuracoes: React.FC = () => {
       showError('Erro ao salvar configurações.')
     } finally {
       setSavingNotif(false)
+    }
+  }
+
+  const handleSaveSummaryBudget = async () => {
+    setSavingSummary(true)
+    const prev = { ...summarySettings }
+    try {
+      const budgetVal = summarySettings.monthly_budget_limit.trim()
+      await client.patch('/users/me', {
+        summary_enabled: summarySettings.summary_enabled,
+        summary_day_of_week: summarySettings.summary_day_of_week,
+        monthly_budget_limit: budgetVal === '' ? null : Number(budgetVal),
+      })
+      success('Resumo e orçamento salvos!')
+    } catch {
+      setSummarySettings(prev)
+      showError('Erro ao salvar configurações de resumo.')
+    } finally {
+      setSavingSummary(false)
     }
   }
 
@@ -324,6 +365,69 @@ const Configuracoes: React.FC = () => {
                 </div>
               </div>
             ) : null}
+            {/* Summary & Budget Card */}
+          <div className="section-card">
+            <div className="flex items-center gap-2 mb-5">
+              <span className="material-symbols-outlined text-primary">bar_chart</span>
+              <h3 className="text-base font-semibold text-on-surface">Resumo e Orcamento</h3>
+            </div>
+
+            <div className="space-y-4">
+              <ToggleRow
+                label="Resumo semanal"
+                description="Receber resumo via WhatsApp no dia configurado"
+                checked={summarySettings.summary_enabled}
+                onChange={(v) => setSummarySettings((prev) => ({ ...prev, summary_enabled: v }))}
+              />
+
+              {summarySettings.summary_enabled && (
+                <div>
+                  <label className="label">Dia do resumo</label>
+                  <select
+                    value={summarySettings.summary_day_of_week}
+                    onChange={(e) =>
+                      setSummarySettings((prev) => ({ ...prev, summary_day_of_week: Number(e.target.value) }))
+                    }
+                    className="input-field mt-1"
+                  >
+                    {DAYS_OF_WEEK.map((day, idx) => (
+                      <option key={idx} value={idx}>{day}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-outline-variant/30">
+                <label className="label">Limite mensal (R$)</label>
+                <p className="text-xs text-on-surface-variant mb-2">
+                  Receba um alerta quando suas contas pendentes ultrapassarem este valor. Deixe vazio para desativar.
+                </p>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={summarySettings.monthly_budget_limit}
+                  onChange={(e) =>
+                    setSummarySettings((prev) => ({ ...prev, monthly_budget_limit: e.target.value }))
+                  }
+                  className="input-field"
+                  placeholder="Ex: 2000.00"
+                />
+              </div>
+
+              <button
+                onClick={handleSaveSummaryBudget}
+                disabled={savingSummary}
+                className="btn-primary w-full justify-center mt-2"
+              >
+                {savingSummary ? (
+                  <span className="w-4 h-4 border-2 border-on-primary-fixed border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <span className="material-symbols-outlined text-lg">save</span>
+                )}
+                Salvar
+              </button>
+            </div>
           </div>
         </div>
 

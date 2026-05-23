@@ -57,19 +57,45 @@ export const getRecurrenceLabel = (type: string, day?: number, weekday?: number)
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
     return weekday !== undefined ? `Toda ${days[weekday]}` : 'Semanal'
   }
+  if (type === 'biweekly') return 'Quinzenal'
+  if (type === 'quarterly') return day ? `Trimestral (dia ${day})` : 'Trimestral'
+  if (type === 'semiannual') return day ? `Semestral (dia ${day})` : 'Semestral'
+  if (type === 'annual') return day ? `Anual (dia ${day})` : 'Anual'
   return 'Avulso'
 }
 
 export const getRecurrenceBadgeColor = (type: string): string => {
   if (type === 'monthly') return 'bg-primary/20 text-primary'
   if (type === 'weekly') return 'bg-secondary-container text-on-secondary-container'
+  if (type === 'biweekly') return 'bg-secondary-container text-on-secondary-container'
+  if (type === 'quarterly') return 'bg-tertiary/20 text-tertiary'
+  if (type === 'semiannual') return 'bg-tertiary/20 text-tertiary'
+  if (type === 'annual') return 'bg-tertiary/20 text-tertiary'
   return 'bg-surface-variant text-on-surface-variant'
 }
 
 export const getRecurrenceShortLabel = (type: string): string => {
   if (type === 'monthly') return 'MENSAL'
   if (type === 'weekly') return 'SEMANAL'
+  if (type === 'biweekly') return 'QUINZENAL'
+  if (type === 'quarterly') return 'TRIMESTRAL'
+  if (type === 'semiannual') return 'SEMESTRAL'
+  if (type === 'annual') return 'ANUAL'
   return 'AVULSO'
+}
+
+export const getCategoryLabel = (category?: string): string => {
+  const labels: Record<string, string> = {
+    moradia: 'Moradia',
+    assinaturas: 'Assinaturas',
+    'serviços': 'Serviços',
+    'saúde': 'Saúde',
+    'educação': 'Educação',
+    transporte: 'Transporte',
+    'alimentação': 'Alimentação',
+    outro: 'Outro',
+  }
+  return category ? (labels[category] ?? category) : ''
 }
 
 export const buildMessagePreview = (notif: NotificationEnriched): string => {

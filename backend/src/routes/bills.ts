@@ -57,7 +57,7 @@ router.post('/', async (req: Request, res: Response) => {
     const {
       name, description, amount, recurrence_type,
       recurrence_day_of_month, recurrence_day_of_week,
-      due_date, days_before_alert, is_active = true,
+      due_date, days_before_alert, is_active = true, category,
     } = req.body
 
     // B4 — validação de campos obrigatórios
@@ -67,7 +67,7 @@ router.post('/', async (req: Request, res: Response) => {
     if (amount === undefined || amount === null || isNaN(Number(amount)) || Number(amount) < 0) {
       return res.status(400).json({ error: 'Campo obrigatório: amount (número >= 0)' })
     }
-    const validRecurrenceTypes = ['monthly', 'weekly', 'once']
+    const validRecurrenceTypes = ['monthly', 'weekly', 'once', 'biweekly', 'quarterly', 'semiannual', 'annual']
     if (!recurrence_type || !validRecurrenceTypes.includes(recurrence_type)) {
       return res.status(400).json({ error: `Campo obrigatório: recurrence_type (${validRecurrenceTypes.join(', ')})` })
     }
@@ -86,13 +86,13 @@ router.post('/', async (req: Request, res: Response) => {
 
     await pool.query(
       `INSERT INTO bills
-        (id, user_id, name, description, amount, recurrence_type,
+        (id, user_id, name, category, description, amount, recurrence_type,
          recurrence_day_of_month, recurrence_day_of_week, due_date,
          days_before_alert, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, req.userId,
-        name, description ?? null, amount, recurrence_type,
+        name, category ?? null, description ?? null, amount, recurrence_type,
         recurrence_day_of_month ?? null, recurrence_day_of_week ?? null,
         due_date ?? null, days_before_alert, is_active ? 1 : 0, now, now,
       ]
@@ -126,7 +126,7 @@ router.post('/', async (req: Request, res: Response) => {
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const allowed = [
-      'name', 'description', 'amount', 'recurrence_type',
+      'name', 'category', 'description', 'amount', 'recurrence_type',
       'recurrence_day_of_month', 'recurrence_day_of_week',
       'due_date', 'days_before_alert', 'is_active',
     ]

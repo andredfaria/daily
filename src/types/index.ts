@@ -1,4 +1,5 @@
-export type RecurrenceType = 'monthly' | 'weekly' | 'once'
+export type RecurrenceType = 'monthly' | 'weekly' | 'once' | 'biweekly' | 'quarterly' | 'semiannual' | 'annual'
+export type BillCategory = 'moradia' | 'assinaturas' | 'serviços' | 'saúde' | 'educação' | 'transporte' | 'alimentação' | 'outro'
 export type OccurrenceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled'
 export type NotificationStatus = 'scheduled' | 'sent' | 'failed' | 'skipped'
 export type PaymentMethodType = 'pix' | 'boleto'
@@ -21,6 +22,7 @@ export interface Bill {
   id: string
   user_id: string
   name: string
+  category?: BillCategory
   description?: string
   amount: number
   recurrence_type: RecurrenceType
@@ -97,6 +99,9 @@ export interface User {
   weekly_summary_enabled: boolean
   default_days_before_alert: number
   notification_time: number
+  summary_enabled: boolean
+  summary_day_of_week: number
+  monthly_budget_limit: number | null
   created_at: string
   updated_at: string
 }
@@ -108,11 +113,15 @@ export interface ChecklistItem {
   sort_order: number
 }
 
+export type ChecklistRecurrenceType = 'daily' | 'weekdays' | 'custom'
+
 export interface Checklist {
   id: string
   user_id: string
   name: string
   send_time: number
+  recurrence_type: ChecklistRecurrenceType
+  recurrence_days: number[] | null
   timezone: string
   is_active: boolean
   items: ChecklistItem[]

@@ -4,6 +4,8 @@ import pool from './db'
 import { runDispatchForUser } from './dispatcher'
 import { materializeForUser, getTodaySaoPaulo } from './services/notificationMaterializer'
 import { sendPollsForHour } from './services/checklistDispatcher'
+import { sendWeeklySummary } from './services/summaryService'
+import { checkBudgetAlert } from './services/budgetAlertService'
 
 function getCurrentHourSaoPaulo(): number {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -49,6 +51,30 @@ export async function initScheduler(): Promise<void> {
       await sendPollsForHour(hour)
     } catch (err: any) {
       console.error('[scheduler] erro no tick de checklists:', err.message)
+    }
+
+    // --- Resumo semanal ---
+    try {
+      const dayOfWeek = new Date().getDay() // 0=Dom, 1=Seg, ...
+      const [summaryUsers]: any = await pool.query(
+        `SELECT id FROM users WHERE summary_enabled = 1 AND summary_day_of_week = ? AND is_active = 1 AND whatsapp_alerts_enabled = 1`,
+        [dayOfWeek]
+      )
+      for (const { id } of summaryUsers) {
+        try { await sendWeeklySummary(id) } catch (e: any) { console.error('[scheduler] summary erro:', e.message) }
+      }
+    } catch (e: any) { console.error('[scheduler] summary tick erro:', e.message) }
+
+    // --- Alerta de orçamento (executa às 9h) ---
+    if (hour === 9) {
+      try {
+        const [budgetUsers]: any = await pool.query(
+          `SELECT id FROM users WHERE monthly_budget_limit IS NOT NULL AND is_active = 1`
+        )
+        for (const { id } of budgetUsers) {
+          try { await checkBudgetAlert(id) } catch (e: any) { console.error('[scheduler] budget erro:', e.message) }
+        }
+      } catch (e: any) { console.error('[scheduler] budget tick erro:', e.message) }
     }
   }, { timezone: 'America/Sao_Paulo' })
 
