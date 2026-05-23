@@ -51,6 +51,17 @@ router.patch('/me', async (req: Request, res: Response) => {
         continue
       }
 
+      if (key === 'timezone') {
+        const tz = String(req.body[key])
+        const validTimezones: string[] = (Intl as any).supportedValuesOf('timeZone')
+        if (!validTimezones.includes(tz)) {
+          return res.status(400).json({ error: `timezone inválido: "${tz}"` })
+        }
+        fields.push(`${key} = ?`)
+        values.push(tz)
+        continue
+      }
+
       fields.push(`${key} = ?`)
       values.push(req.body[key])
     }
