@@ -69,6 +69,13 @@ SET FOREIGN_KEY_CHECKS = 1;
 `),
   },
   {
+    name: '005_notifications_status_processing',
+    statements: splitStatements(`
+ALTER TABLE notifications
+  MODIFY COLUMN status ENUM('scheduled','processing','sent','failed','skipped') NOT NULL DEFAULT 'scheduled'
+`),
+  },
+  {
     name: '004_merge_duplicate_phones',
     run: async () => {
       const [pairs]: any = await pool.query(`

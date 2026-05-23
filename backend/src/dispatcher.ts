@@ -15,11 +15,20 @@ function wahaClient() {
   })
 }
 
+function getTodayStringBRT(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date())
+  const p: Record<string, string> = {}
+  parts.forEach(({ type, value }) => { p[type] = value })
+  return `${p.year}-${p.month}-${p.day}`
+}
+
 function buildRelativeDate(dueDate: string): string {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const due = new Date(dueDate)
-  due.setHours(0, 0, 0, 0)
+  const todayStr = getTodayStringBRT()
+  const today = new Date(todayStr + 'T00:00:00')
+  const due = new Date(dueDate + 'T00:00:00')
   const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
   if (diffDays === 0) return 'hoje'
@@ -65,6 +74,20 @@ function buildMessage(billName: string, amount: number, dueDate: string, pm: any
 }
 
 export async function sendSingleNotification(notifId: string): Promise<'sent' | 'failed' | 'skipped'> {
+  // Claim atômico — só prossegue se conseguir mudar de 'scheduled' para 'processing'
+  const [claimResult]: any = await pool.query(
+    `UPDATE notifications SET status = 'processing' WHERE id = ? AND status = 'scheduled'`,
+    [notifId]
+  )
+  if (claimResult.affectedRows === 0) {
+    // Outra instância já pegou ou a notificação não existe mais em 'scheduled'
+    const [check]: any = await pool.query(`SELECT status FROM notifications WHERE id = ?`, [notifId])
+    const currentStatus = check[0]?.status
+    if (currentStatus === 'sent' || currentStatus === 'skipped') return 'skipped'
+    // Em processamento por outro worker ou status inesperado — evita duplicata
+    return 'skipped'
+  }
+
   const [notifRows]: any = await pool.query(
     `SELECT n.id, n.bill_occurrence_id, n.type,
             o.due_date, o.amount, o.status AS occurrence_status,
@@ -179,7 +202,7 @@ export async function runDispatchForUser(userId: string): Promise<{ sent: number
          JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
          JOIN bills b ON b.id = o.bill_id
          SET n.status='failed', n.error_detail='Sessão WAHA inativa'
-         WHERE b.user_id = ? AND n.status='scheduled' AND n.scheduled_for = CURDATE()`,
+         WHERE b.user_id = ? AND n.status IN ('scheduled', 'processing') AND n.scheduled_for = CURDATE()`,
         [userId]
       )
       stats.failed = updateResult.affectedRows ?? 0
@@ -192,7 +215,7 @@ export async function runDispatchForUser(userId: string): Promise<{ sent: number
        JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
        JOIN bills b ON b.id = o.bill_id
        SET n.status='failed', n.error_detail=?
-       WHERE b.user_id = ? AND n.status='scheduled' AND n.scheduled_for = CURDATE()`,
+       WHERE b.user_id = ? AND n.status IN ('scheduled', 'processing') AND n.scheduled_for = CURDATE()`,
       [`Erro ao verificar sessão WAHA: ${err.message}`, userId]
     )
     stats.failed = updateResult.affectedRows ?? 0
@@ -203,7 +226,7 @@ export async function runDispatchForUser(userId: string): Promise<{ sent: number
     `SELECT n.id FROM notifications n
      JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
      JOIN bills b ON b.id = o.bill_id
-     WHERE b.user_id = ? AND n.status = 'scheduled' AND n.scheduled_for = CURDATE()`,
+     WHERE b.user_id = ? AND n.status IN ('scheduled', 'processing') AND n.scheduled_for = CURDATE()`,
     [userId]
   )
 
@@ -235,7 +258,7 @@ export async function runDispatch(): Promise<{ sent: number; failed: number; ski
     return totals
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = getTodayStringBRT()
   for (const { id: userId } of users) {
     try {
       await materializeForUser(userId, today)
