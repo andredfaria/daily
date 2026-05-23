@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express'
+import cors from 'cors'
 import * as dotenv from 'dotenv'
 import path from 'path'
 
@@ -21,6 +22,13 @@ import { configureWahaWebhook } from './services/waha'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 4000
+
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGIN || (process.env.NODE_ENV === 'production' ? false : 'http://localhost:5173'),
+  credentials: true,
+  methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Api-Key'],
+}))
 
 app.use(express.json())
 
