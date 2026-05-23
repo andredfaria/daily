@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
+import { randomInt } from 'crypto'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { fetchWhatsAppName, resolveWhatsAppNumber, sendWhatsAppText, WhatsAppNumberNotFoundError, buildPhoneCandidates } from '../services/waha'
@@ -39,7 +40,7 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       }
     }
 
-    const code = String(Math.floor(100000 + Math.random() * 900000))
+    const code = String(randomInt(100000, 1000000))
 
     if (devBypass) {
       // Clear previous unused OTPs so attempts/expiry never block local testing
