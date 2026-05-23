@@ -1,9 +1,18 @@
 import { Router, Request, Response } from 'express'
 import crypto from 'crypto'
+import rateLimit from 'express-rate-limit'
 import pool from '../db'
 import { wahaClient } from '../services/waha'
 
 const router = Router()
+
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,  // 1 minuto
+  max: 100,             // máximo 100 req/min por IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas requisições. Tente novamente em breve.' },
+})
 
 const HMAC_KEY = process.env.WHATSAPP_HOOK_HMAC_KEY || ''
 const IS_PROD = process.env.NODE_ENV === 'production'
@@ -27,7 +36,7 @@ function verifyHmac(payload: string, headerHmac: string): boolean {
 
 // POST /api/webhooks/waha-poll
 // Recebe eventos poll.vote e poll.vote.failed do WAHA
-router.post('/waha-poll', async (req: Request, res: Response) => {
+router.post('/waha-poll', webhookLimiter, async (req: Request, res: Response) => {
   try {
     console.log('[webhook] payload raw:', JSON.stringify(req.body))
     const payload = JSON.stringify(req.body)
