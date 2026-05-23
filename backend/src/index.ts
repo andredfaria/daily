@@ -24,6 +24,29 @@ const PORT = Number(process.env.PORT) || 4000
 
 app.use(express.json())
 
+// Security headers
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('X-XSS-Protection', '0') // Desabilitado intencionalmente — browsers modernos não usam e pode introduzir vulnerabilidades
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data:",
+      "connect-src 'self'",
+      "font-src 'self'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ')
+  )
+  next()
+})
+
 app.use((req: Request, _res: Response, next: NextFunction) => {
   console.log(`[req] ${req.method} ${req.path}`)
   next()
