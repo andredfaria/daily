@@ -111,7 +111,9 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (send_time !== undefined) { updates.push('send_time = ?'); values.push(send_time) }
     if (timezone !== undefined) { updates.push('timezone = ?'); values.push(timezone) }
 
-    if (updates.length > 0) {
+    const hasChanges = updates.length > 0 || !!items
+    if (hasChanges) {
+      updates.push('updated_at = NOW()')
       values.push(req.params.id)
       await pool.query(`UPDATE checklists SET ${updates.join(', ')} WHERE id = ?`, values)
     }
