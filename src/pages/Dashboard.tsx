@@ -128,6 +128,26 @@ const DonutChart: React.FC<DonutChartProps> = ({ paid, pending, overdue }) => {
   )
 }
 
+// --- WAHA Status Badge ---
+interface WahaStatusBadgeProps {
+  connected: boolean | null
+}
+
+const WahaStatusBadge: React.FC<WahaStatusBadgeProps> = ({ connected }) => {
+  if (connected === null) return (
+    <span className="flex items-center gap-1 text-xs text-on-surface-variant">
+      <span className="w-2 h-2 rounded-full bg-outline animate-pulse" />
+      Verificando WhatsApp...
+    </span>
+  )
+  return (
+    <span className={`flex items-center gap-1 text-xs font-medium ${connected ? 'text-tertiary' : 'text-error'}`}>
+      <span className={`w-2 h-2 rounded-full ${connected ? 'bg-tertiary' : 'bg-error'}`} />
+      WhatsApp {connected ? 'conectado' : 'desconectado'}
+    </span>
+  )
+}
+
 // --- Stat Card ---
 interface StatCardProps {
   icon: string
@@ -356,10 +376,13 @@ const Dashboard: React.FC = () => {
 
       {/* Row 1 — Contas */}
       <div>
-        <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide mb-3 flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-sm text-primary">receipt_long</span>
-          Contas a Pagar
-        </p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-sm text-primary">receipt_long</span>
+            Contas a Pagar
+          </p>
+          <WahaStatusBadge connected={loading ? null : (stats?.waha_connected ?? null)} />
+        </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {loading ? (
             Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)
