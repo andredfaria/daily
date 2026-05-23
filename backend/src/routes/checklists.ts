@@ -286,12 +286,21 @@ router.get('/dashboard', async (req: Request, res: Response) => {
 // -------- POST /api/checklists/send-now - envio manual/teste --------
 router.post('/send-now', async (req: Request, res: Response) => {
   try {
-    const checklist = await getMostRecentChecklist(req.userId!)
-    if (!checklist) {
-      return res.status(404).json({ error: 'Nenhum checklist cadastrado.' })
-    }
+    const { force, checklistId: requestedId } = req.body
 
-    const force = req.body.force === true
+    let checklist
+    if (requestedId) {
+      // Verificar ownership do checklist específico
+      const [rows]: any = await pool.query(
+        'SELECT id, user_id FROM checklists WHERE id = ? AND user_id = ?',
+        [requestedId, req.userId!]
+      )
+      if (!rows.length) return res.status(404).json({ error: 'Checklist não encontrado.' })
+      checklist = rows[0]
+    } else {
+      checklist = await getMostRecentChecklist(req.userId!)
+      if (!checklist) return res.status(404).json({ error: 'Nenhum checklist cadastrado.' })
+    }
 
     try {
       await sendDailyPoll(checklist.id, req.userId!, { force })

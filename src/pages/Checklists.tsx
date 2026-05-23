@@ -263,7 +263,7 @@ const Checklists: React.FC = () => {
   const handleSendNow = async (c: Checklist, force = false) => {
     setSendingId(c.id)
     try {
-      await checklistsApi.sendNow(force)
+      await checklistsApi.sendNow(force, c.id)
       success('Checklist enviado!')
       await fetchData()
     } catch (err: any) {

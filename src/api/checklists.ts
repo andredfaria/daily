@@ -44,8 +44,8 @@ export const checklistsApi = {
     return res.data
   },
 
-  sendNow: async (force = false): Promise<void> => {
-    await client.post('/checklists/send-now', { force })
+  sendNow: async (force = false, checklistId?: string): Promise<void> => {
+    await client.post('/checklists/send-now', { force, checklistId })
   },
 
   polls: async (params: {
