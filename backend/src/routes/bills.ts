@@ -228,7 +228,8 @@ router.patch('/:billId/payment-methods/:methodId', async (req: Request, res: Res
     if (!fields.length) return res.status(400).json({ error: 'No fields to update' })
 
     values.push(req.params.methodId)
-    await pool.query(`UPDATE payment_methods SET ${fields.join(', ')} WHERE id = ?`, values)
+    values.push(req.params.billId)
+    await pool.query(`UPDATE payment_methods SET ${fields.join(', ')} WHERE id = ? AND bill_id = ?`, values)
 
     const [rows]: any = await pool.query(
       'SELECT * FROM payment_methods WHERE id = ?', [req.params.methodId]
@@ -246,7 +247,7 @@ router.delete('/:billId/payment-methods/:methodId', async (req: Request, res: Re
     const [billRows]: any = await pool.query('SELECT id FROM bills WHERE id = ? AND user_id = ?', [req.params.billId, req.userId])
     if (!billRows.length) return res.status(404).json({ error: 'Conta não encontrada' })
 
-    await pool.query('DELETE FROM payment_methods WHERE id = ?', [req.params.methodId])
+    await pool.query('DELETE FROM payment_methods WHERE id = ? AND bill_id = ?', [req.params.methodId, req.params.billId])
     res.status(204).send()
   } catch (err: any) {
     console.error(err)
