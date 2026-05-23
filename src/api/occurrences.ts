@@ -63,7 +63,9 @@ export const occurrencesApi = {
     const a = document.createElement('a')
     a.href = url
     a.download = `billsync-historico-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 100)
   },
 }

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format, parseISO, startOfMonth } from 'date-fns'
+import { endOfMonth, format, parseISO, startOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { occurrencesApi } from '../api/occurrences'
 import type { BillOccurrence, OccurrenceStatus } from '../types'
@@ -160,7 +160,9 @@ const Historico: React.FC = () => {
       await occurrencesApi.exportCsv({
         status: statusFilter === 'all' ? undefined : statusFilter,
         from: selectedMonth ? `${selectedMonth}-01` : undefined,
-        to: selectedMonth ? `${selectedMonth}-31` : undefined,
+        to: selectedMonth
+          ? format(endOfMonth(parseISO(`${selectedMonth}-01`)), 'yyyy-MM-dd')
+          : undefined,
       })
       showSuccess('CSV exportado com sucesso')
     } catch {
