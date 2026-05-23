@@ -6,14 +6,23 @@ import { wahaClient } from '../services/waha'
 const router = Router()
 
 const HMAC_KEY = process.env.WHATSAPP_HOOK_HMAC_KEY || ''
+const IS_PROD = process.env.NODE_ENV === 'production'
 
 function verifyHmac(payload: string, headerHmac: string): boolean {
   if (!HMAC_KEY) {
-    console.warn('[webhook] WHATSAPP_HOOK_HMAC_KEY não configurado — pulando verificação')
+    if (IS_PROD) {
+      // Bloqueia em produção — configuração inválida
+      return false
+    }
+    console.warn('[webhook] WHATSAPP_HOOK_HMAC_KEY não configurado — pulando verificação (dev)')
     return true
   }
   const computed = crypto.createHmac('sha256', HMAC_KEY).update(payload).digest('hex')
-  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(headerHmac))
+  try {
+    return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(headerHmac))
+  } catch {
+    return false
+  }
 }
 
 // POST /api/webhooks/waha-poll
@@ -24,7 +33,13 @@ router.post('/waha-poll', async (req: Request, res: Response) => {
     const payload = JSON.stringify(req.body)
     const headerHmac = req.headers['x-webhook-hmac'] as string | undefined
 
-    if (headerHmac && !verifyHmac(payload, headerHmac)) {
+    // Se chave configurada: sempre verificar. Se prod sem chave: bloquear com 500.
+    const hmacRequired = !!HMAC_KEY || IS_PROD
+    if (hmacRequired && !verifyHmac(payload, headerHmac || '')) {
+      if (!HMAC_KEY && IS_PROD) {
+        console.error('[webhook] WHATSAPP_HOOK_HMAC_KEY não configurado em produção — rejeitando')
+        return res.status(500).json({ error: 'Servidor mal configurado' })
+      }
       console.warn('[webhook] HMAC inválido — requisição rejeitada')
       return res.status(401).json({ error: 'HMAC inválido' })
     }
