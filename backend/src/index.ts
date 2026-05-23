@@ -55,7 +55,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1')
-    res.json({ status: 'ok', db: 'connected', version: '0.1.0', timestamp: new Date().toISOString() })
+    res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() })
   } catch (err: any) {
     console.error('[health] falha na conexão com banco:', err.message)
     res.status(503).json({ status: 'degraded', db: 'error', error: err.message })
