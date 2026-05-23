@@ -60,6 +60,27 @@ router.post('/', async (req: Request, res: Response) => {
       due_date, days_before_alert, is_active = true,
     } = req.body
 
+    // B4 — validação de campos obrigatórios
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      return res.status(400).json({ error: 'Campo obrigatório: name' })
+    }
+    if (amount === undefined || amount === null || isNaN(Number(amount)) || Number(amount) < 0) {
+      return res.status(400).json({ error: 'Campo obrigatório: amount (número >= 0)' })
+    }
+    const validRecurrenceTypes = ['monthly', 'weekly', 'once']
+    if (!recurrence_type || !validRecurrenceTypes.includes(recurrence_type)) {
+      return res.status(400).json({ error: `Campo obrigatório: recurrence_type (${validRecurrenceTypes.join(', ')})` })
+    }
+    if (recurrence_type === 'monthly' && (recurrence_day_of_month === undefined || recurrence_day_of_month === null)) {
+      return res.status(400).json({ error: 'recurrence_day_of_month é obrigatório para recorrência mensal' })
+    }
+    if (recurrence_type === 'weekly' && (recurrence_day_of_week === undefined || recurrence_day_of_week === null)) {
+      return res.status(400).json({ error: 'recurrence_day_of_week é obrigatório para recorrência semanal' })
+    }
+    if (recurrence_type === 'once' && !due_date) {
+      return res.status(400).json({ error: 'due_date é obrigatório para recorrência pontual' })
+    }
+
     const id = uuidv4()
     const now = new Date()
 
@@ -80,13 +101,19 @@ router.post('/', async (req: Request, res: Response) => {
     const [rows]: any = await pool.query('SELECT * FROM bills WHERE id = ?', [id])
     const bill = rows[0]
 
-    generateOccurrencesForBill(id, {
-      recurrence_type: bill.recurrence_type,
-      recurrence_day_of_month: bill.recurrence_day_of_month,
-      recurrence_day_of_week: bill.recurrence_day_of_week,
-      due_date: bill.due_date,
-      amount: bill.amount,
-    }).catch((err: any) => console.error('[bills] erro ao gerar ocorrências:', err.message))
+    // B6 — aguardar geração de ocorrências; em caso de falha, logar e avisar no body
+    try {
+      await generateOccurrencesForBill(id, {
+        recurrence_type: bill.recurrence_type,
+        recurrence_day_of_month: bill.recurrence_day_of_month,
+        recurrence_day_of_week: bill.recurrence_day_of_week,
+        due_date: bill.due_date,
+        amount: bill.amount,
+      })
+    } catch (err: any) {
+      console.error('[bills] erro ao gerar ocorrências:', err.message)
+      return res.status(201).json({ ...bill, _warning: 'Conta criada, mas falha ao gerar ocorrências. Verifique os logs.' })
+    }
 
     res.status(201).json(bill)
   } catch (err: any) {
