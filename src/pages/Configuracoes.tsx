@@ -365,7 +365,9 @@ const Configuracoes: React.FC = () => {
                 </div>
               </div>
             ) : null}
-            {/* Summary & Budget Card */}
+          </div>
+
+          {/* Summary & Budget Card */}
           <div className="section-card">
             <div className="flex items-center gap-2 mb-5">
               <span className="material-symbols-outlined text-primary">bar_chart</span>
