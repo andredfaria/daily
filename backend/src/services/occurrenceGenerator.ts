@@ -118,9 +118,9 @@ export async function generateOccurrencesForBill(
   const toInsert = targetDates.filter(d => !existingDates.has(d))
   if (!toInsert.length) return
 
-  const values = toInsert.map(d => [uuidv4(), billId, d, bill.amount, 'pending', new Date(), new Date()])
+  const values = toInsert.map(d => [uuidv4(), billId, d, bill.amount, new Date(), new Date()])
   await pool.query(
-    `INSERT INTO bill_occurrences (id, bill_id, due_date, amount, status, created_at, updated_at) VALUES ?`,
+    `INSERT INTO bill_occurrences (id, bill_id, due_date, amount, created_at, updated_at) VALUES ?`,
     [values]
   )
   console.log(`[occurrences] geradas ${toInsert.length} ocorrência(s) para bill ${billId}`)
@@ -138,7 +138,7 @@ export async function regenerateOccurrencesForBill(
 ): Promise<void> {
   const today = toDateString(new Date())
   await pool.query(
-    `DELETE FROM bill_occurrences WHERE bill_id = ? AND status = 'pending' AND due_date >= ?`,
+    `DELETE FROM bill_occurrences WHERE bill_id = ? AND due_date >= ?`,
     [billId, today]
   )
   await generateOccurrencesForBill(billId, bill)
