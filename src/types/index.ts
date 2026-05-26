@@ -1,10 +1,8 @@
 export type RecurrenceType = 'monthly' | 'weekly' | 'once' | 'biweekly' | 'quarterly' | 'semiannual' | 'annual'
 export type BillCategory = 'moradia' | 'assinaturas' | 'serviços' | 'saúde' | 'educação' | 'transporte' | 'alimentação' | 'outro'
-export type OccurrenceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled'
 export type NotificationStatus = 'scheduled' | 'sent' | 'failed' | 'skipped'
 export type PaymentMethodType = 'pix' | 'boleto'
 export type PixKeyType = 'cpf' | 'email' | 'phone' | 'random'
-export type ConfirmationSource = 'whatsapp' | 'web' | 'manual'
 
 export interface PaymentMethod {
   id: string
@@ -43,9 +41,6 @@ export interface BillOccurrence {
   bill_name?: string
   due_date: string
   amount: number
-  status: OccurrenceStatus
-  paid_at?: string
-  confirmation_source?: ConfirmationSource
   whatsapp_msg?: string
   created_at: string
   updated_at: string
@@ -156,12 +151,5 @@ export interface ChecklistDashboardData {
 export interface DashboardStats {
   active_bills: number
   due_this_week: number
-  paid_this_month: number
   waha_connected: boolean
-  monthly_paid_amount: number
-  monthly_pending_amount: number
-  monthly_overdue_amount: number
-  paid_count: number
-  pending_count: number
-  overdue_count: number
 }

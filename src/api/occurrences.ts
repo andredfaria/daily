@@ -1,8 +1,7 @@
 import client from './client'
-import type { BillOccurrence, OccurrenceStatus } from '../types'
+import type { BillOccurrence } from '../types'
 
 export interface ListOccurrencesParams {
-  status?: OccurrenceStatus
   bill_id?: string
   from?: string
   to?: string
@@ -28,19 +27,6 @@ export const occurrencesApi = {
     return res.data
   },
 
-  markAsPaid: async (
-    id: string,
-    payload?: { paid_via?: string; confirmation_source?: string },
-  ): Promise<BillOccurrence> => {
-    const res = await client.patch<BillOccurrence>(`/occurrences/${id}/pay`, payload ?? {})
-    return res.data
-  },
-
-  updateStatus: async (id: string, status: OccurrenceStatus): Promise<BillOccurrence> => {
-    const res = await client.patch<BillOccurrence>(`/occurrences/${id}`, { status })
-    return res.data
-  },
-
   getDashboardStats: async () => {
     const res = await client.get('/occurrences/stats')
     return res.data
@@ -48,7 +34,6 @@ export const occurrencesApi = {
 
   exportCsv: async (params?: ListOccurrencesParams): Promise<void> => {
     const query = new URLSearchParams()
-    if (params?.status) query.set('status', params.status)
     if (params?.from) query.set('from', params.from)
     if (params?.to) query.set('to', params.to)
     if (params?.bill_id) query.set('bill_id', params.bill_id)
