@@ -159,6 +159,12 @@ ALTER TABLE checklists ADD COLUMN IF NOT EXISTS recurrence_days JSON DEFAULT NUL
 `),
   },
   {
+    name: '009_users_onboarding',
+    statements: splitStatements(`
+ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE AFTER is_active
+`),
+  },
+  {
     name: '010_remove_payment_fields',
     statements: splitStatements(`
 ALTER TABLE bill_occurrences DROP INDEX IF EXISTS idx_occ_status_due;
