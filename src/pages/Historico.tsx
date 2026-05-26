@@ -3,39 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { endOfMonth, format, parseISO, startOfMonth } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { occurrencesApi } from '../api/occurrences'
-import type { BillOccurrence, OccurrenceStatus } from '../types'
+import type { BillOccurrence } from '../types'
 import {
   formatBRL,
   formatDate,
   getBillIcon,
   getRecurrenceShortLabel,
 } from '../utils/format'
-import StatusBadge from '../components/ui/StatusBadge'
 import { SkeletonRow } from '../components/ui/Skeleton'
 import { useToast } from '../context/ToastContext'
-
-type StatusFilter = 'all' | OccurrenceStatus
-
-const statusFilters: { value: StatusFilter; label: string }[] = [
-  { value: 'all', label: 'Todos' },
-  { value: 'paid', label: 'Pago' },
-  { value: 'pending', label: 'Pendente' },
-  { value: 'overdue', label: 'Atrasado' },
-  { value: 'cancelled', label: 'Cancelado' },
-]
-
-const getConfirmationBadge = (
-  source?: string,
-): { label: string; icon: string; color: string } | null => {
-  if (!source) return null
-  if (source === 'whatsapp')
-    return { label: 'VIA WHATSAPP', icon: 'chat', color: 'bg-tertiary/10 text-tertiary border-tertiary/20' }
-  if (source === 'web')
-    return { label: 'VIA WEB', icon: 'language', color: 'bg-primary/10 text-primary border-primary/20' }
-  if (source === 'manual')
-    return { label: 'MANUAL', icon: 'edit', color: 'bg-outline/10 text-outline border-outline/20' }
-  return null
-}
 
 interface OccurrenceRowProps {
   occurrence: BillOccurrence
@@ -47,17 +23,6 @@ const HistoryRow: React.FC<OccurrenceRowProps> = ({ occurrence, animateRow }) =>
   const recurrenceLabel = occurrence.bill
     ? getRecurrenceShortLabel(occurrence.bill.recurrence_type)
     : null
-  const confirmBadge = getConfirmationBadge(occurrence.confirmation_source)
-  const isOverdue = occurrence.status === 'overdue'
-  const isPaid = occurrence.status === 'paid'
-
-  const leftBarColor = isPaid
-    ? 'bg-tertiary'
-    : isOverdue
-    ? 'bg-error'
-    : occurrence.status === 'pending'
-    ? 'bg-yellow-400'
-    : 'bg-outline'
 
   return (
     <div
@@ -68,15 +33,10 @@ const HistoryRow: React.FC<OccurrenceRowProps> = ({ occurrence, animateRow }) =>
         ${animateRow ? 'animate-slideIn' : ''}
       `}
     >
-      {/* Left bar */}
-      <div className={`w-1 h-12 rounded-full flex-shrink-0 ${leftBarColor}`} />
-
-      {/* Icon */}
+      <div className="w-1 h-12 rounded-full flex-shrink-0 bg-primary/40" />
       <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
         <span className="material-symbols-outlined text-primary text-lg">{icon}</span>
       </div>
-
-      {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <p className="text-sm font-semibold text-on-surface truncate">
@@ -90,33 +50,11 @@ const HistoryRow: React.FC<OccurrenceRowProps> = ({ occurrence, animateRow }) =>
         </div>
         <div className="flex items-center gap-3 text-xs text-on-surface-variant">
           <span>Vence: {formatDate(occurrence.due_date)}</span>
-          {occurrence.paid_at && (
-            <>
-              <span className="text-outline">·</span>
-              <span>Pago: {formatDate(occurrence.paid_at)}</span>
-            </>
-          )}
         </div>
       </div>
-
-      {/* Confirmation badge */}
-      {confirmBadge && (
-        <span className={`
-          hidden sm:flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-full border flex-shrink-0
-          ${confirmBadge.color}
-        `}>
-          <span className="material-symbols-outlined text-xs">{confirmBadge.icon}</span>
-          {confirmBadge.label}
-        </span>
-      )}
-
-      {/* Amount */}
       <div className="text-right flex-shrink-0">
         <p className="text-sm font-bold text-on-surface">{formatBRL(occurrence.amount)}</p>
       </div>
-
-      {/* Status */}
-      <StatusBadge status={occurrence.status} />
     </div>
   )
 }
@@ -126,16 +64,13 @@ interface MonthGroup {
   label: string
   date: Date
   occurrences: BillOccurrence[]
-  totalPaid: number
-  totalPending: number
-  totalOverdue: number
+  totalAmount: number
 }
 
 const Historico: React.FC = () => {
   const [occurrences, setOccurrences] = useState<BillOccurrence[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedMonth, setSelectedMonth] = useState<string>('')
   const [animatedRows, _setAnimatedRows] = useState<Set<string>>(new Set())
   const [exporting, setExporting] = useState(false)
@@ -158,7 +93,6 @@ const Historico: React.FC = () => {
     setExporting(true)
     try {
       await occurrencesApi.exportCsv({
-        status: statusFilter === 'all' ? undefined : statusFilter,
         from: selectedMonth ? `${selectedMonth}-01` : undefined,
         to: selectedMonth
           ? format(endOfMonth(parseISO(`${selectedMonth}-01`)), 'yyyy-MM-dd')
@@ -176,24 +110,20 @@ const Historico: React.FC = () => {
     fetchOccurrences()
   }, [fetchOccurrences])
 
-  // Group occurrences by month
   const monthGroups = useMemo<MonthGroup[]>(() => {
     const filtered = occurrences.filter((o) => {
       const searchMatch =
         !search ||
         o.bill?.name?.toLowerCase().includes(search.toLowerCase())
 
-      const statusMatch = statusFilter === 'all' || o.status === statusFilter
-
       const monthMatch = !selectedMonth || (() => {
         const d = parseISO(o.due_date)
         return format(d, 'yyyy-MM') === selectedMonth
       })()
 
-      return searchMatch && statusMatch && monthMatch
+      return searchMatch && monthMatch
     })
 
-    // Sort by due_date desc
     const sorted = [...filtered].sort(
       (a, b) => parseISO(b.due_date).getTime() - parseISO(a.due_date).getTime(),
     )
@@ -209,21 +139,16 @@ const Historico: React.FC = () => {
           label: format(startOfMonth(d), "MMMM yyyy", { locale: ptBR }),
           date: startOfMonth(d),
           occurrences: [],
-          totalPaid: 0,
-          totalPending: 0,
-          totalOverdue: 0,
+          totalAmount: 0,
         }
       }
       groups[key].occurrences.push(o)
-      if (o.status === 'paid') groups[key].totalPaid += o.amount
-      if (o.status === 'pending') groups[key].totalPending += o.amount
-      if (o.status === 'overdue') groups[key].totalOverdue += o.amount
+      groups[key].totalAmount += o.amount
     })
 
     return Object.values(groups).sort((a, b) => b.date.getTime() - a.date.getTime())
-  }, [occurrences, search, statusFilter, selectedMonth])
+  }, [occurrences, search, selectedMonth])
 
-  // Available months for filter
   const availableMonths = useMemo(() => {
     const months = new Set(
       occurrences.map((o) => format(parseISO(o.due_date), 'yyyy-MM')),
@@ -248,7 +173,7 @@ const Historico: React.FC = () => {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-on-surface">Histórico de Pagamentos</h2>
+          <h2 className="text-lg font-bold text-on-surface">Histórico de Vencimentos</h2>
           <p className="text-xs text-on-surface-variant mt-0.5">{totalFiltered} registros encontrados</p>
         </div>
         <button
@@ -302,25 +227,6 @@ const Historico: React.FC = () => {
             ))}
           </select>
         </div>
-
-        {/* Status chips */}
-        <div className="flex flex-wrap gap-2">
-          {statusFilters.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setStatusFilter(f.value)}
-              className={`
-                px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200
-                ${statusFilter === f.value
-                  ? 'bg-primary text-on-primary-fixed shadow-sm'
-                  : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
-                }
-              `}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Timeline */}
@@ -354,23 +260,9 @@ const Historico: React.FC = () => {
                 <h3 className="text-sm font-bold text-on-surface capitalize">
                   {group.label}
                 </h3>
-                <div className="flex items-center gap-3 text-xs text-on-surface-variant">
-                  {group.totalPaid > 0 && (
-                    <span className="text-tertiary font-semibold">
-                      {formatBRL(group.totalPaid)} pago
-                    </span>
-                  )}
-                  {group.totalPending > 0 && (
-                    <span className="text-yellow-400 font-semibold">
-                      {formatBRL(group.totalPending)} pendente
-                    </span>
-                  )}
-                  {group.totalOverdue > 0 && (
-                    <span className="text-error font-semibold">
-                      {formatBRL(group.totalOverdue)} atrasado
-                    </span>
-                  )}
-                </div>
+                <span className="text-xs text-on-surface-variant font-semibold">
+                  {formatBRL(group.totalAmount)}
+                </span>
               </div>
 
               {/* Rows */}
