@@ -158,6 +158,15 @@ ALTER TABLE checklists ADD COLUMN IF NOT EXISTS recurrence_type ENUM('daily','we
 ALTER TABLE checklists ADD COLUMN IF NOT EXISTS recurrence_days JSON DEFAULT NULL AFTER recurrence_type
 `),
   },
+  {
+    name: '010_remove_payment_fields',
+    statements: splitStatements(`
+ALTER TABLE bill_occurrences DROP INDEX IF EXISTS idx_occ_status_due;
+ALTER TABLE bill_occurrences DROP COLUMN IF EXISTS status;
+ALTER TABLE bill_occurrences DROP COLUMN IF EXISTS paid_at;
+ALTER TABLE bill_occurrences DROP COLUMN IF EXISTS confirmation_source
+`),
+  },
 ]
 
 export async function runMigrations(): Promise<void> {
