@@ -61,11 +61,6 @@ router.post('/waha-poll', webhookLimiter, async (req: Request, res: Response) =>
       return res.status(200).json({ ok: true })
     }
 
-    if (event === 'message') {
-      await handlePaymentConfirmation(req.body)
-      return res.json({ ok: true })
-    }
-
     if (event === 'poll.vote.failed') {
       console.log('[webhook] poll.vote.failed recebido')
       // RN-Risco-1: tentar reenviar mensagem de apology
@@ -184,73 +179,5 @@ async function handlePollVoteFailed(data: any): Promise<void> {
   }
 }
 
-const PAYMENT_KEYWORDS = ['pago', 'paguei', 'paga', 'ok', 'sim', 'feito', 'realizado', 'efetuado']
-
-async function handlePaymentConfirmation(data: any): Promise<void> {
-  const from: string | undefined = data.payload?.from ?? data.from
-  if (!from) {
-    console.log('[webhook] message sem campo from — ignorado')
-    return
-  }
-
-  const body: string = (data.payload?.body ?? data.body ?? '').trim().toLowerCase()
-  const isPaymentConfirmation = PAYMENT_KEYWORDS.some(kw => body === kw || body.startsWith(kw + ' '))
-  if (!isPaymentConfirmation) {
-    console.log(`[webhook] message recebida mas não é confirmação de pagamento: "${body}"`)
-    return
-  }
-
-  const phone = from.split('@')[0]
-
-  // Buscar usuário com tolerância à variante do dígito 9 (Brasil)
-  const phoneVariant =
-    phone.length === 12
-      ? phone.slice(0, 4) + '9' + phone.slice(4)
-      : phone.length === 13
-        ? phone.slice(0, 4) + phone.slice(5)
-        : phone
-
-  const [userRows]: any = await pool.query(
-    `SELECT id FROM users WHERE whatsapp_number = ? OR whatsapp_number = ? LIMIT 1`,
-    [phone, phoneVariant],
-  )
-
-  if (!userRows.length) {
-    console.log(`[webhook] usuário não encontrado para ${phone}`)
-    return
-  }
-
-  const userId = userRows[0].id
-
-  // Ocorrência pendente mais antiga que já foi notificada
-  const [occRows]: any = await pool.query(
-    `SELECT DISTINCT o.id
-     FROM bill_occurrences o
-     JOIN bills b ON b.id = o.bill_id
-     JOIN notifications n ON n.bill_occurrence_id = o.id
-     WHERE b.user_id = ?
-       AND o.status = 'pending'
-       AND n.status IN ('sent', 'scheduled')
-     ORDER BY o.due_date ASC
-     LIMIT 1`,
-    [userId],
-  )
-
-  if (!occRows.length) {
-    console.log(`[webhook] nenhuma ocorrência pendente encontrada para usuário ${userId}`)
-    return
-  }
-
-  const occurrenceId = occRows[0].id
-  const now = new Date()
-  await pool.query(
-    `UPDATE bill_occurrences
-     SET status = 'paid', paid_at = ?, confirmation_source = 'whatsapp', updated_at = ?
-     WHERE id = ?`,
-    [now, now, occurrenceId],
-  )
-
-  console.log(`[webhook] pagamento confirmado via WhatsApp: ocorrência ${occurrenceId} para usuário ${userId}`)
-}
 
 export default router
