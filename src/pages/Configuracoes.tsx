@@ -17,6 +17,7 @@ interface SummaryBudgetSettings {
   summary_enabled: boolean
   summary_day_of_week: number
   monthly_budget_limit: string
+  monthly_summary_enabled: boolean
 }
 
 const DAYS_OF_WEEK = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -41,6 +42,7 @@ const Configuracoes: React.FC = () => {
     summary_enabled: false,
     summary_day_of_week: 1,
     monthly_budget_limit: '',
+    monthly_summary_enabled: false,
   })
   const [savingSummary, setSavingSummary] = useState(false)
 
@@ -81,6 +83,7 @@ const Configuracoes: React.FC = () => {
         summary_enabled: u.summary_enabled ?? false,
         summary_day_of_week: u.summary_day_of_week ?? 1,
         monthly_budget_limit: u.monthly_budget_limit != null ? String(u.monthly_budget_limit) : '',
+        monthly_summary_enabled: u.monthly_summary_enabled ?? true,
       })
     } catch {
       const placeholder: User = {
@@ -185,6 +188,7 @@ const Configuracoes: React.FC = () => {
         summary_enabled: summarySettings.summary_enabled,
         summary_day_of_week: summarySettings.summary_day_of_week,
         monthly_budget_limit: budgetVal === '' ? null : Number(budgetVal),
+        monthly_summary_enabled: summarySettings.monthly_summary_enabled,
       })
       success('Resumo e orçamento salvos!')
     } catch {
@@ -381,6 +385,13 @@ const Configuracoes: React.FC = () => {
                 description="Receber resumo via WhatsApp no dia configurado"
                 checked={summarySettings.summary_enabled}
                 onChange={(v) => setSummarySettings((prev) => ({ ...prev, summary_enabled: v }))}
+              />
+
+              <ToggleRow
+                label="Resumo mensal no WhatsApp"
+                description="Receba um fechamento do mês anterior no dia 1, com total por categoria e comparação com o orçamento."
+                checked={summarySettings.monthly_summary_enabled}
+                onChange={(v: boolean) => setSummarySettings((s) => ({ ...s, monthly_summary_enabled: v }))}
               />
 
               {summarySettings.summary_enabled && (
