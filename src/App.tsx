@@ -10,6 +10,7 @@ import Notificacoes from './pages/Notificacoes'
 import Configuracoes from './pages/Configuracoes'
 import Login from './pages/Login'
 import Checklists from './pages/Checklists'
+import Analise from './pages/Analise'
 
 // Protects all children — redirects to /login if not authenticated
 const ProtectedRoute: React.FC = () => {
@@ -44,6 +45,7 @@ const App: React.FC = () => {
               <Route element={<Layout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/contas" element={<Contas />} />
+                <Route path="/analise" element={<Analise />} />
                 <Route path="/contas/nova" element={<BillForm />} />
                 <Route path="/contas/:id/editar" element={<BillForm />} />
                 <Route path="/checklists" element={<Checklists />} />
