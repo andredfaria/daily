@@ -95,6 +95,7 @@ const Configuracoes: React.FC = () => {
         notification_time: 8,
         summary_enabled: false,
         summary_day_of_week: 1,
+        monthly_summary_enabled: false,
         monthly_budget_limit: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

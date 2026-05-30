@@ -96,6 +96,7 @@ export interface User {
   notification_time: number
   summary_enabled: boolean
   summary_day_of_week: number
+  monthly_summary_enabled: boolean
   monthly_budget_limit: number | null
   created_at: string
   updated_at: string
@@ -152,4 +153,29 @@ export interface DashboardStats {
   active_bills: number
   due_this_week: number
   waha_connected: boolean
+}
+
+export interface CategoryBreakdown {
+  category: string
+  total: number
+  count: number
+  pct: number
+}
+
+export interface ByCategoryResponse {
+  from: string
+  to: string
+  total: number
+  categorias: CategoryBreakdown[]
+}
+
+export interface ProjectionMonth {
+  ano: number
+  mes: number
+  label: string
+  total: number
+}
+
+export interface ProjectionResponse {
+  meses: ProjectionMonth[]
 }
