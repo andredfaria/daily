@@ -100,6 +100,7 @@ const Configuracoes: React.FC = () => {
         summary_day_of_week: 1,
         monthly_summary_enabled: false,
         monthly_budget_limit: null,
+        onboarding_completed: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
