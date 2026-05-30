@@ -90,7 +90,7 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
 
   const [notifRows]: any = await pool.query(
     `SELECT n.id, n.bill_occurrence_id, n.type,
-            o.due_date, o.amount, o.status AS occurrence_status,
+            o.due_date, o.amount,
             b.name AS bill_name,
             u.whatsapp_number, u.whatsapp_alerts_enabled,
             pm.type AS pm_type, pm.pix_key_type, pm.pix_key, pm.pix_beneficiary, pm.boleto_code
@@ -105,12 +105,6 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
 
   if (!notifRows.length) throw new Error(`Notificação ${notifId} não encontrada`)
   const notif = notifRows[0]
-
-  if (notif.occurrence_status === 'paid' || notif.occurrence_status === 'cancelled') {
-    await pool.query(`UPDATE notifications SET status='skipped' WHERE id=?`, [notifId])
-    console.log(`[dispatcher] ⏭ ignorado: ${notif.bill_name} (${notifId}) — ocorrência ${notif.occurrence_status}`)
-    return 'skipped'
-  }
 
   if (!notif.whatsapp_number) {
     const detail = 'Nenhum usuário com WhatsApp configurado'
