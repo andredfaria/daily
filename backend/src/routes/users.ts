@@ -25,6 +25,8 @@ router.patch('/me', async (req: Request, res: Response) => {
       'notification_time', 'whatsapp_alerts_enabled',
       'weekly_summary_enabled', 'default_days_before_alert',
       'summary_enabled', 'summary_day_of_week', 'monthly_budget_limit',
+      'monthly_summary_enabled',
+      'onboarding_completed',
     ]
     const fields: string[] = []
     const values: any[] = []

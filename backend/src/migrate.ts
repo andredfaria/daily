@@ -173,6 +173,13 @@ ALTER TABLE bill_occurrences DROP COLUMN IF EXISTS paid_at;
 ALTER TABLE bill_occurrences DROP COLUMN IF EXISTS confirmation_source
 `),
   },
+  {
+    name: '011_users_monthly_summary',
+    statements: splitStatements(`
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS monthly_summary_enabled BOOLEAN NOT NULL DEFAULT TRUE AFTER summary_day_of_week
+`),
+  },
 ]
 
 export async function runMigrations(): Promise<void> {
