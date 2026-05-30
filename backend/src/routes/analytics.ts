@@ -1,0 +1,55 @@
+import { Router, Request, Response } from 'express'
+import { gastosPorCategoria, projecaoMensal } from '../services/financialAnalytics'
+
+const router = Router()
+
+function mesAtualRange(): { from: string; to: string } {
+  const now = new Date()
+  const first = new Date(now.getFullYear(), now.getMonth(), 1)
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const toStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return { from: toStr(first), to: toStr(last) }
+}
+
+// GET /api/analytics/by-category?from=&to=
+router.get('/by-category', async (req: Request, res: Response) => {
+  try {
+    const def = mesAtualRange()
+    const from = (req.query.from as string) || def.from
+    const to = (req.query.to as string) || def.to
+
+    const categorias = await gastosPorCategoria(req.userId!, from, to)
+    const total = categorias.reduce((acc, c) => acc + c.total, 0)
+    const comPct = categorias.map((c) => ({
+      ...c,
+      pct: total > 0 ? Math.round((c.total / total) * 1000) / 10 : 0,
+    }))
+
+    res.json({ from, to, total, categorias: comPct })
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// GET /api/analytics/projection?months=6
+router.get('/projection', async (req: Request, res: Response) => {
+  try {
+    const months = Number(req.query.months) || 6
+    const dados = await projecaoMensal(req.userId!, months)
+    const nomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    const meses = dados.map((d) => ({
+      ano: d.ano,
+      mes: d.mes,
+      label: `${nomes[d.mes - 1]}/${d.ano}`,
+      total: d.total,
+    }))
+    res.json({ meses })
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+export default router
