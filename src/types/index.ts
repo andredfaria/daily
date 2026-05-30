@@ -98,6 +98,7 @@ export interface User {
   summary_day_of_week: number
   monthly_summary_enabled: boolean
   monthly_budget_limit: number | null
+  onboarding_completed: boolean
   created_at: string
   updated_at: string
 }
