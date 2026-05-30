@@ -30,7 +30,6 @@ export async function materializeForUser(userId: string, targetDate?: string): P
      JOIN users u ON u.id = b.user_id
      WHERE u.id = ?
        AND b.is_active = 1
-       AND o.status = 'pending'
        AND (
          o.due_date = ?
          OR DATE_SUB(o.due_date, INTERVAL COALESCE(b.days_before_alert, u.default_days_before_alert, 3) DAY) = ?
