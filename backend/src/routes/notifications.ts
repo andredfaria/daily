@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import pool from '../db'
 import { runDispatchForUser, sendSingleNotification } from '../dispatcher'
 import { materializeForUser, getTodaySaoPaulo } from '../services/notificationMaterializer'
+import { decryptPix } from '../services/pixCrypto'
 
 const router = Router()
 

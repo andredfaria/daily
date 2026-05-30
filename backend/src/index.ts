@@ -20,6 +20,7 @@ import { authMiddleware } from './middleware/auth'
 import { initScheduler } from './scheduler'
 import { runMigrations } from './migrate'
 import { configureWahaWebhook } from './services/waha'
+import { backfillPixEncryption } from './services/pixCrypto'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 4000
@@ -105,6 +106,7 @@ process.on('unhandledRejection', (reason) => {
 async function start() {
   try {
     await runMigrations()
+    await backfillPixEncryption()
   } catch (err: any) {
     console.error('[start] erro na migração:', err.message)
     process.exit(1)
