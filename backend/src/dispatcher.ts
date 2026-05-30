@@ -3,6 +3,7 @@ import pool from './db'
 import axios from 'axios'
 import { materializeForUser } from './services/notificationMaterializer'
 import { sendWhatsAppText, WhatsAppNumberNotFoundError } from './services/waha'
+import { decryptPix } from './services/pixCrypto'
 
 function wahaClient() {
   return axios.create({
@@ -138,7 +139,7 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
   }
 
   const pm = notif.pm_type
-    ? { type: notif.pm_type, pix_key_type: notif.pix_key_type, pix_key: notif.pix_key,
+    ? { type: notif.pm_type, pix_key_type: notif.pix_key_type, pix_key: decryptPix(notif.pix_key),
         pix_beneficiary: notif.pix_beneficiary, boleto_code: notif.boleto_code }
     : null
 

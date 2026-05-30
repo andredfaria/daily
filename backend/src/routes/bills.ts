@@ -2,8 +2,15 @@ import { Router, Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { generateOccurrencesForBill, regenerateOccurrencesForBill } from '../services/occurrenceGenerator'
+import { encryptPix, decryptPix } from '../services/pixCrypto'
 
 const router = Router()
+
+// Decifra pix_key de um método de pagamento antes de devolver ao dono.
+function decryptMethod(m: any): any {
+  if (!m) return m
+  return { ...m, pix_key: decryptPix(m.pix_key) }
+}
 
 // GET /api/bills
 router.get('/', async (req: Request, res: Response) => {
@@ -23,7 +30,7 @@ router.get('/', async (req: Request, res: Response) => {
     const byBill: Record<string, any[]> = {}
     for (const m of methods) {
       if (!byBill[m.bill_id]) byBill[m.bill_id] = []
-      byBill[m.bill_id].push(m)
+      byBill[m.bill_id].push(decryptMethod(m))
     }
 
     res.json(rows.map((b: any) => ({ ...b, payment_methods: byBill[b.id] ?? [] })))
@@ -43,7 +50,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       'SELECT * FROM payment_methods WHERE bill_id = ?',
       [bill.id]
     )
-    bill.payment_methods = methods
+    bill.payment_methods = methods.map(decryptMethod)
     res.json(bill)
   } catch (err: any) {
     console.error(err)
@@ -192,11 +199,11 @@ router.get('/:billId/payment-methods', async (req: Request, res: Response) => {
     const [billRows]: any = await pool.query('SELECT id FROM bills WHERE id = ? AND user_id = ?', [req.params.billId, req.userId])
     if (!billRows.length) return res.status(404).json({ error: 'Conta não encontrada' })
 
-    const [rows] = await pool.query(
+    const [rows]: any = await pool.query(
       'SELECT * FROM payment_methods WHERE bill_id = ?',
       [req.params.billId]
     )
-    res.json(rows)
+    res.json(rows.map(decryptMethod))
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -220,7 +227,7 @@ router.post('/:billId/payment-methods', async (req: Request, res: Response) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, req.params.billId, type,
-        pix_key_type ?? null, pix_key ?? null, pix_beneficiary ?? null,
+        pix_key_type ?? null, encryptPix(pix_key) ?? null, pix_beneficiary ?? null,
         boleto_code ?? null, is_primary ? 1 : 0, new Date(),
       ]
     )
@@ -228,7 +235,7 @@ router.post('/:billId/payment-methods', async (req: Request, res: Response) => {
     const [rows]: any = await pool.query(
       'SELECT * FROM payment_methods WHERE id = ?', [id]
     )
-    res.status(201).json(rows[0])
+    res.status(201).json(decryptMethod(rows[0]))
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -248,7 +255,7 @@ router.patch('/:billId/payment-methods/:methodId', async (req: Request, res: Res
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         fields.push(`${key} = ?`)
-        values.push(req.body[key])
+        values.push(key === 'pix_key' ? encryptPix(req.body[key]) : req.body[key])
       }
     }
 
@@ -261,7 +268,7 @@ router.patch('/:billId/payment-methods/:methodId', async (req: Request, res: Res
     const [rows]: any = await pool.query(
       'SELECT * FROM payment_methods WHERE id = ?', [req.params.methodId]
     )
-    res.json(rows[0])
+    res.json(decryptMethod(rows[0]))
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })

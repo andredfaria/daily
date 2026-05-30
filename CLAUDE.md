@@ -35,6 +35,7 @@ Copy `.env.example` to `.env`. Required vars for local dev:
 - `JWT_SECRET` — signs 30-day session tokens
 - `WAHA_URL`, `WAHA_API_KEY`, `WAHA_SESSION` — WhatsApp gateway
 - `WAHA_WEBHOOK_SECRET` / `WHATSAPP_HOOK_HMAC_KEY` — webhook HMAC verification
+- `PIX_ENCRYPTION_KEY` — AES-256-GCM key for `pix_key` at-rest encryption; **required in production**. In dev, if unset, `pix_key` is stored in plaintext with a warning.
 - `DEV_OTP_BYPASS=true` — skip WAHA for OTP in local dev (code logged to backend stdout)
 
 ## Architecture

@@ -59,7 +59,7 @@ router.get('/', async (req: Request, res: Response) => {
     const where = `WHERE ${conditions.join(' AND ')}`
     values.push(effectiveLimit)
 
-    const [rows] = await pool.query(
+    const [rows]: any = await pool.query(
       `SELECT n.*, b.name AS bill_name, o.due_date, o.amount,
               pm.type AS pm_type, pm.pix_key_type, pm.pix_key,
               pm.pix_beneficiary, pm.boleto_code
@@ -70,7 +70,7 @@ router.get('/', async (req: Request, res: Response) => {
        ${where} ORDER BY n.scheduled_for DESC LIMIT ?`,
       values
     )
-    res.json(rows)
+    res.json(rows.map((r: any) => ({ ...r, pix_key: decryptPix(r.pix_key) })))
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })

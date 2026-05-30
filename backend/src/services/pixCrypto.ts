@@ -9,6 +9,7 @@
 // é mantido em plaintext com aviso — mesmo padrão do HMAC do webhook.
 
 import crypto from 'crypto'
+import pool from '../db'
 
 const PREFIX = 'enc:v1:'
 const ALGO = 'aes-256-gcm'
@@ -70,4 +71,32 @@ export function decryptPix(value: string | null | undefined): string | null {
     console.error('[pixCrypto] falha ao decifrar pix_key:', err.message)
     return null
   }
+}
+
+/**
+ * Cifra pix_keys que ainda estão em plaintext no banco (S10).
+ * Idempotente e auto-curável: roda no boot, só toca linhas não cifradas.
+ * Sem chave configurada, não faz nada (mantém o comportamento de dev).
+ */
+export async function backfillPixEncryption(): Promise<void> {
+  let key: Buffer | null
+  try {
+    key = getKey()
+  } catch {
+    // Em produção sem chave, getKey lança — deixa o erro fluir no boot.
+    throw new Error('PIX_ENCRYPTION_KEY é obrigatória em produção para cifrar dados de pagamento')
+  }
+  if (!key) return
+
+  const [rows]: any = await pool.query(
+    `SELECT id, pix_key FROM payment_methods
+     WHERE pix_key IS NOT NULL AND pix_key <> '' AND pix_key NOT LIKE 'enc:v1:%'`
+  )
+  if (!rows.length) return
+
+  for (const r of rows) {
+    const enc = encryptPix(r.pix_key)
+    await pool.query('UPDATE payment_methods SET pix_key = ? WHERE id = ?', [enc, r.id])
+  }
+  console.log(`[pixCrypto] ${rows.length} pix_key(s) legada(s) cifrada(s) em repouso`)
 }
