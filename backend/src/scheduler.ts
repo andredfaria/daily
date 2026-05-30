@@ -4,7 +4,7 @@ import pool from './db'
 import { runDispatchForUser } from './dispatcher'
 import { materializeForUser, getTodaySaoPaulo } from './services/notificationMaterializer'
 import { sendPollsForHour } from './services/checklistDispatcher'
-import { sendWeeklySummary } from './services/summaryService'
+import { sendWeeklySummary, sendMonthlySummary } from './services/summaryService'
 import { checkBudgetAlert } from './services/budgetAlertService'
 
 function getCurrentHourSaoPaulo(): number {
@@ -15,6 +15,14 @@ function getCurrentHourSaoPaulo(): number {
   }).formatToParts(new Date())
   const hourPart = parts.find(p => p.type === 'hour')
   return parseInt(hourPart?.value ?? '0', 10) % 24
+}
+
+function getCurrentDayOfMonthSaoPaulo(): number {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  return parseInt(parts.find(p => p.type === 'day')?.value ?? '1', 10)
 }
 
 function getCurrentDayOfWeekSaoPaulo(): number {
@@ -75,6 +83,18 @@ export async function initScheduler(): Promise<void> {
           try { await sendWeeklySummary(id) } catch (e: any) { console.error('[scheduler] summary erro:', e.message) }
         }
       } catch (e: any) { console.error('[scheduler] summary tick erro:', e.message) }
+    }
+
+    // --- Sumário mensal (dia 1, 8h BRT) ---
+    if (hour === 8 && getCurrentDayOfMonthSaoPaulo() === 1) {
+      try {
+        const [monthlyUsers]: any = await pool.query(
+          `SELECT id FROM users WHERE monthly_summary_enabled = 1 AND is_active = 1 AND whatsapp_alerts_enabled = 1`
+        )
+        for (const { id } of monthlyUsers) {
+          try { await sendMonthlySummary(id) } catch (e: any) { console.error('[scheduler] monthly summary erro:', e.message) }
+        }
+      } catch (e: any) { console.error('[scheduler] monthly summary tick erro:', e.message) }
     }
 
     // --- Alerta de orçamento (executa às 9h) ---

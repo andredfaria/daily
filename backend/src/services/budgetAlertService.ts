@@ -15,8 +15,8 @@ export async function checkBudgetAlert(userId: string): Promise<void> {
 
   const [[stats]]: any = await pool.query(
     `SELECT SUM(o.amount) AS total
-     FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id
-     WHERE b.user_id = ? AND o.status IN ('pending','overdue') AND o.due_date BETWEEN ? AND ?`,
+       FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id
+      WHERE b.user_id = ? AND b.is_active = 1 AND o.due_date BETWEEN ? AND ?`,
     [userId, firstOfMonth, lastOfMonth]
   )
 
@@ -24,7 +24,7 @@ export async function checkBudgetAlert(userId: string): Promise<void> {
   if (total > budget) {
     const msg =
       `⚠️ *Alerta de Orçamento — BillSync*\n\n` +
-      `Suas contas pendentes este mês somam *R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*, ` +
+      `Suas contas deste mês somam *R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*, ` +
       `acima do limite configurado de *R$ ${budget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*.`
     await sendWhatsAppText(userRows[0].whatsapp_number, msg)
     console.log(`[budgetAlert] alerta enviado para ${userId}`)
