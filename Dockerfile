@@ -25,7 +25,11 @@ RUN npm run build
 # Stage 3 — Imagem final
 # ─────────────────────────────────────────
 FROM nginx:alpine
-RUN apk add --no-cache nodejs
+# libstdc++ é a única dependência de runtime do binário do Node no Alpine
+# (puxa libgcc junto). Evita o 'apk add nodejs' completo, que falhava com I/O error.
+RUN apk add --no-cache libstdc++
+# Reaproveita o Node 20 do stage de build — mesma versão usada na compilação
+COPY --from=backend-builder /usr/local/bin/node /usr/local/bin/node
 
 # Frontend
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
