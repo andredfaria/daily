@@ -1,5 +1,33 @@
 import pool from './db'
 
+async function addColumnIfNotExists(table: string, column: string, definition: string, after?: string): Promise<void> {
+  const [rows]: any = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE table_schema = ? AND table_name = ? AND column_name = ?`,
+    [process.env.DB_NAME || 'daily', table, column]
+  )
+  if (rows[0].cnt > 0) return
+  const afterClause = after ? ` AFTER ${after}` : ''
+  await pool.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}${afterClause}`)
+}
+
+async function dropColumnIfExists(table: string, column: string): Promise<void> {
+  const [rows]: any = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE table_schema = ? AND table_name = ? AND column_name = ?`,
+    [process.env.DB_NAME || 'daily', table, column]
+  )
+  if (rows[0].cnt === 0) return
+  await pool.query(`ALTER TABLE ${table} DROP COLUMN ${column}`)
+}
+
+async function dropIndexIfExists(table: string, index: string): Promise<void> {
+  const [rows]: any = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM information_schema.STATISTICS WHERE table_schema = ? AND table_name = ? AND index_name = ?`,
+    [process.env.DB_NAME || 'daily', table, index]
+  )
+  if (rows[0].cnt === 0) return
+  await pool.query(`ALTER TABLE ${table} DROP INDEX ${index}`)
+}
+
 function splitStatements(sql: string): string[] {
   return sql
     .split(';')
@@ -137,48 +165,46 @@ ALTER TABLE notifications
   },
   {
     name: '006_bills_category',
-    statements: splitStatements(`
-ALTER TABLE bills ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT NULL AFTER name
-`),
+    run: async () => {
+      await addColumnIfNotExists('bills', 'category', 'VARCHAR(50) DEFAULT NULL', 'name')
+    },
   },
   {
     name: '007_users_summary_budget',
-    statements: splitStatements(`
-ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS summary_enabled BOOLEAN NOT NULL DEFAULT FALSE AFTER whatsapp_alerts_enabled,
-  ADD COLUMN IF NOT EXISTS summary_day_of_week TINYINT UNSIGNED DEFAULT 1 AFTER summary_enabled,
-  ADD COLUMN IF NOT EXISTS monthly_budget_limit DECIMAL(10,2) DEFAULT NULL AFTER summary_day_of_week
-`),
+    run: async () => {
+      await addColumnIfNotExists('users', 'summary_enabled', 'BOOLEAN NOT NULL DEFAULT FALSE', 'whatsapp_alerts_enabled')
+      await addColumnIfNotExists('users', 'summary_day_of_week', 'TINYINT UNSIGNED DEFAULT 1', 'summary_enabled')
+      await addColumnIfNotExists('users', 'monthly_budget_limit', 'DECIMAL(10,2) DEFAULT NULL', 'summary_day_of_week')
+    },
   },
   {
     name: '008_checklists_multi',
-    statements: splitStatements(`
-ALTER TABLE checklists DROP INDEX IF EXISTS uq_checklists_user;
-ALTER TABLE checklists ADD COLUMN IF NOT EXISTS recurrence_type ENUM('daily','weekdays','custom') NOT NULL DEFAULT 'daily' AFTER send_time;
-ALTER TABLE checklists ADD COLUMN IF NOT EXISTS recurrence_days JSON DEFAULT NULL AFTER recurrence_type
-`),
+    run: async () => {
+      await dropIndexIfExists('checklists', 'uq_checklists_user')
+      await addColumnIfNotExists('checklists', 'recurrence_type', "ENUM('daily','weekdays','custom') NOT NULL DEFAULT 'daily'", 'send_time')
+      await addColumnIfNotExists('checklists', 'recurrence_days', 'JSON DEFAULT NULL', 'recurrence_type')
+    },
   },
   {
     name: '009_users_onboarding',
-    statements: splitStatements(`
-ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE AFTER is_active
-`),
+    run: async () => {
+      await addColumnIfNotExists('users', 'onboarding_completed', 'BOOLEAN NOT NULL DEFAULT FALSE', 'is_active')
+    },
   },
   {
     name: '010_remove_payment_fields',
-    statements: splitStatements(`
-ALTER TABLE bill_occurrences DROP INDEX IF EXISTS idx_occ_status_due;
-ALTER TABLE bill_occurrences DROP COLUMN IF EXISTS status;
-ALTER TABLE bill_occurrences DROP COLUMN IF EXISTS paid_at;
-ALTER TABLE bill_occurrences DROP COLUMN IF EXISTS confirmation_source
-`),
+    run: async () => {
+      await dropIndexIfExists('bill_occurrences', 'idx_occ_status_due')
+      await dropColumnIfExists('bill_occurrences', 'status')
+      await dropColumnIfExists('bill_occurrences', 'paid_at')
+      await dropColumnIfExists('bill_occurrences', 'confirmation_source')
+    },
   },
   {
     name: '011_users_monthly_summary',
-    statements: splitStatements(`
-ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS monthly_summary_enabled BOOLEAN NOT NULL DEFAULT TRUE AFTER summary_day_of_week
-`),
+    run: async () => {
+      await addColumnIfNotExists('users', 'monthly_summary_enabled', 'BOOLEAN NOT NULL DEFAULT TRUE', 'summary_day_of_week')
+    },
   },
 ]
 
