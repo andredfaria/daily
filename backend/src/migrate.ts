@@ -28,6 +28,15 @@ async function dropIndexIfExists(table: string, index: string): Promise<void> {
   await pool.query(`ALTER TABLE ${table} DROP INDEX ${index}`)
 }
 
+async function addIndexIfNotExists(table: string, index: string, columns: string): Promise<void> {
+  const [rows]: any = await pool.query(
+    `SELECT COUNT(*) AS cnt FROM information_schema.STATISTICS WHERE table_schema = ? AND table_name = ? AND index_name = ?`,
+    [process.env.DB_NAME || 'daily', table, index]
+  )
+  if (rows[0].cnt > 0) return
+  await pool.query(`ALTER TABLE ${table} ADD INDEX ${index} (${columns})`)
+}
+
 function splitStatements(sql: string): string[] {
   return sql
     .split(';')
@@ -180,6 +189,10 @@ ALTER TABLE notifications
   {
     name: '008_checklists_multi',
     run: async () => {
+      // A FK fk_checklists_user depende de um indice em user_id; no MySQL 8 o unico
+      // indice e o uq_checklists_user, entao precisamos criar um indice nao-unico
+      // substituto ANTES de dropar o unico (senao: "needed in a foreign key constraint").
+      await addIndexIfNotExists('checklists', 'idx_checklists_user', 'user_id')
       await dropIndexIfExists('checklists', 'uq_checklists_user')
       await addColumnIfNotExists('checklists', 'recurrence_type', "ENUM('daily','weekdays','custom') NOT NULL DEFAULT 'daily'", 'send_time')
       await addColumnIfNotExists('checklists', 'recurrence_days', 'JSON DEFAULT NULL', 'recurrence_type')
