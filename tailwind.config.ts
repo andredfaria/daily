@@ -47,7 +47,7 @@ const config: Config = {
         'on-tertiary': '#003915',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Inter Variable', 'Inter', 'system-ui', 'sans-serif'],
       },
       backdropBlur: {
         xl: '20px',
