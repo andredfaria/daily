@@ -60,14 +60,16 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       return res.json({ success: true, message: 'Código gerado (dev bypass — veja o log do backend)' })
     }
 
-    const otpText = `🔐 *BillSync* — Seu código de acesso:\n\n*${code}*\n\nVálido por 5 minutos. Não compartilhe.`
+    const otpText = `*${code}* é seu código BillSync. Válido por 5 min.`
     try {
       await sendWhatsAppText(digits, otpText)
     } catch (err) {
       if (err instanceof WhatsAppNumberNotFoundError) {
         return res.status(400).json({ error: 'Número não encontrado no WhatsApp. Verifique o número e tente novamente.' })
       }
-      throw err
+      // Fallback: envia somente o código para facilitar cópia manual
+      console.warn('[auth] falha ao enviar mensagem formatada — tentando fallback com código isolado')
+      await sendWhatsAppText(digits, code)
     }
 
     return res.json({ success: true, message: 'Código enviado via WhatsApp' })
