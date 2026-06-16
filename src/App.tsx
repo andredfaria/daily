@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { ToastProvider } from './context/ToastContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout/Layout'
@@ -11,12 +11,9 @@ import Configuracoes from './pages/Configuracoes'
 import Login from './pages/Login'
 import Checklists from './pages/Checklists'
 import Analise from './pages/Analise'
-import Onboarding from './pages/Onboarding'
-
 // Protects all children — redirects to /login if not authenticated
 const ProtectedRoute: React.FC = () => {
-  const { isAuthenticated, isLoading, user } = useAuth()
-  const location = useLocation()
+  const { isAuthenticated, isLoading } = useAuth()
   if (isLoading) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-background">
@@ -25,10 +22,6 @@ const ProtectedRoute: React.FC = () => {
     )
   }
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  // F10 — força o onboarding no primeiro acesso
-  if (user && !user.onboarding_completed && location.pathname !== '/onboarding') {
-    return <Navigate to="/onboarding" replace />
-  }
   return <Outlet />
 }
 
@@ -48,7 +41,6 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/login" element={<LoginGuard />} />
             <Route element={<ProtectedRoute />}>
-              <Route path="/onboarding" element={<Onboarding />} />
               <Route element={<Layout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/contas" element={<Contas />} />
