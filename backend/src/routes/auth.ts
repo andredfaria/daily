@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 import { randomInt } from 'crypto'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
-import { fetchWhatsAppName, resolveWhatsAppNumber, sendWhatsAppText, WhatsAppNumberNotFoundError, buildPhoneCandidates } from '../services/waha'
+import { fetchWhatsAppName, resolveWhatsAppNumber, sendWhatsAppText, sendWhatsAppOtpButton, WhatsAppNumberNotFoundError, buildPhoneCandidates } from '../services/waha'
 import { authMiddleware } from '../middleware/auth'
 
 const router = Router()
@@ -60,16 +60,23 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       return res.json({ success: true, message: 'Código gerado (dev bypass — veja o log do backend)' })
     }
 
-    const otpText = `*${code}* é seu código BillSync. Válido por 5 min.`
     try {
-      await sendWhatsAppText(digits, otpText)
-    } catch (err) {
-      if (err instanceof WhatsAppNumberNotFoundError) {
+      await sendWhatsAppOtpButton(digits, code)
+    } catch (btnErr) {
+      if (btnErr instanceof WhatsAppNumberNotFoundError) {
         return res.status(400).json({ error: 'Número não encontrado no WhatsApp. Verifique o número e tente novamente.' })
       }
-      // Fallback: envia somente o código para facilitar cópia manual
-      console.warn('[auth] falha ao enviar mensagem formatada — tentando fallback com código isolado')
-      await sendWhatsAppText(digits, code)
+      // Fallback: sendButtons indisponível (tier Core ou deprecated) — envia 2 mensagens de texto
+      console.warn('[auth] sendButtons indisponível — usando fallback de texto')
+      try {
+        await sendWhatsAppText(digits, `Seu código de acesso BillSync (válido por 5 min):`)
+        await sendWhatsAppText(digits, code)
+      } catch (txtErr) {
+        if (txtErr instanceof WhatsAppNumberNotFoundError) {
+          return res.status(400).json({ error: 'Número não encontrado no WhatsApp. Verifique o número e tente novamente.' })
+        }
+        throw txtErr
+      }
     }
 
     return res.json({ success: true, message: 'Código enviado via WhatsApp' })

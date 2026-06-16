@@ -97,6 +97,28 @@ export async function sendWhatsAppText(
   return { id: data.id ?? data.key?.id ?? null }
 }
 
+export async function sendWhatsAppOtpButton(
+  phone: string,
+  code: string,
+): Promise<{ id: string | null }> {
+  const chatId = await resolveWhatsAppChatId(phone)
+  const session = process.env.WAHA_SESSION || 'default'
+  const { data } = await wahaClient().post('/api/sendButtons', {
+    session,
+    chatId,
+    body: `Seu código de acesso BillSync:`,
+    footer: 'Válido por 5 minutos. Não compartilhe.',
+    buttons: [
+      {
+        type: 'copy',
+        text: 'Copiar código',
+        copyCode: code,
+      },
+    ],
+  })
+  return { id: data.id ?? data.key?.id ?? null }
+}
+
 export async function sendWhatsAppPoll(
   phone: string,
   name: string,
