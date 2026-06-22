@@ -11,6 +11,14 @@
     font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
   }
 
+  /* Garante a substituição de ligature dos ícones no Safari/iOS (WebKit antigo
+     exige o prefixo -webkit-; sem isso os nomes aparecem como texto cru). */
+  .material-symbols-outlined {
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+    font-variant-ligatures: normal;
+  }
+
   body {
     background-color: #131318;
     color: #e4e1e9;
