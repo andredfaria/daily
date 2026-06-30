@@ -174,6 +174,28 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 })
 
+// -------- DELETE /api/checklists/:id/history - limpa o histórico de polls --------
+// Apaga todos os checklist_daily_polls do checklist (incluindo o de hoje),
+// mantendo o checklist e seus itens intactos.
+router.delete('/:id/history', async (req: Request, res: Response) => {
+  try {
+    const [ownership]: any = await pool.query(
+      'SELECT id FROM checklists WHERE id = ? AND user_id = ?',
+      [req.params.id, req.userId!],
+    )
+    if (!ownership.length) return res.status(404).json({ error: 'Checklist não encontrado.' })
+
+    const [result]: any = await pool.query(
+      'DELETE FROM checklist_daily_polls WHERE checklist_id = ?',
+      [req.params.id],
+    )
+    res.json({ deleted: result.affectedRows ?? 0 })
+  } catch (err: any) {
+    console.error('[checklists] DELETE /:id/history', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
 // GET /api/checklists/polls
 // Query params:
 //   upcoming=true  — poll de hoje com status=pending (inclui itens)

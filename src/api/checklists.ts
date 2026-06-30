@@ -39,6 +39,11 @@ export const checklistsApi = {
     await client.delete(`/checklists/${id}`)
   },
 
+  clearHistory: async (id: string): Promise<{ deleted: number }> => {
+    const res = await client.delete<{ deleted: number }>(`/checklists/${id}/history`)
+    return res.data
+  },
+
   dashboard: async (): Promise<ChecklistDashboardData> => {
     const res = await client.get<ChecklistDashboardData>('/checklists/dashboard')
     return res.data

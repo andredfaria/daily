@@ -57,10 +57,11 @@ interface ChecklistCardProps {
   checklist: Checklist
   onEdit: (c: Checklist) => void
   onDelete: (c: Checklist) => void
+  onClearHistory: (c: Checklist) => void
   onSendNow: (c: Checklist) => void
   sending: boolean
 }
-const ChecklistCard: React.FC<ChecklistCardProps> = ({ checklist, onEdit, onDelete, onSendNow, sending }) => {
+const ChecklistCard: React.FC<ChecklistCardProps> = ({ checklist, onEdit, onDelete, onClearHistory, onSendNow, sending }) => {
   const recLabel = RECURRENCE_LABELS[checklist.recurrence_type] ?? 'Todos os dias'
   const customDays = checklist.recurrence_type === 'custom' && checklist.recurrence_days
     ? checklist.recurrence_days.map((d) => DAYS_LABELS[d]).join(', ')
@@ -97,6 +98,13 @@ const ChecklistCard: React.FC<ChecklistCardProps> = ({ checklist, onEdit, onDele
             className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
           >
             <span className="material-symbols-outlined text-base">edit</span>
+          </button>
+          <button
+            onClick={() => onClearHistory(checklist)}
+            title="Limpar histórico"
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">restart_alt</span>
           </button>
           <button
             onClick={() => onDelete(checklist)}
@@ -146,6 +154,9 @@ const Checklists: React.FC = () => {
 
   // Delete confirm
   const [deleteTarget, setDeleteTarget] = useState<Checklist | null>(null)
+
+  // Clear history confirm
+  const [clearHistoryTarget, setClearHistoryTarget] = useState<Checklist | null>(null)
 
   // Send now
   const [sendingId, setSendingId] = useState<string | null>(null)
@@ -254,6 +265,22 @@ const Checklists: React.FC = () => {
       await fetchData()
     } catch {
       showError('Erro ao excluir checklist.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // -------- Clear history --------
+  const handleClearHistory = async () => {
+    if (!clearHistoryTarget) return
+    setSaving(true)
+    try {
+      const { deleted } = await checklistsApi.clearHistory(clearHistoryTarget.id)
+      success(deleted > 0 ? `Histórico limpo (${deleted} registros apagados).` : 'Nenhum histórico para limpar.')
+      setClearHistoryTarget(null)
+      await fetchData()
+    } catch {
+      showError('Erro ao limpar histórico.')
     } finally {
       setSaving(false)
     }
@@ -596,6 +623,7 @@ const Checklists: React.FC = () => {
                 checklist={c}
                 onEdit={openEdit}
                 onDelete={setDeleteTarget}
+                onClearHistory={setClearHistoryTarget}
                 onSendNow={(cl) => handleSendNow(cl, false)}
                 sending={sendingId === c.id}
               />
@@ -632,6 +660,33 @@ const Checklists: React.FC = () => {
               </button>
               <button
                 onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-surface-container text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-high transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear history confirm modal */}
+      {clearHistoryTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="glass-card rounded-2xl border border-outline-variant/50 p-6 max-w-sm w-full mx-4 animate-fadeIn">
+            <h3 className="text-base font-semibold text-on-surface mb-2">Limpar Histórico</h3>
+            <p className="text-sm text-on-surface-variant mb-6">
+              Tem certeza que deseja limpar todo o histórico de <strong>{clearHistoryTarget.name}</strong>? Os polls salvos serao apagados, mas o checklist e seus itens continuam. Esta acao nao pode ser desfeita.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleClearHistory}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-error/10 text-error border border-error/30 hover:bg-error/20 transition-colors"
+              >
+                {saving ? 'Limpando...' : 'Sim, Limpar'}
+              </button>
+              <button
+                onClick={() => setClearHistoryTarget(null)}
                 className="px-4 py-2 rounded-lg text-sm font-semibold bg-surface-container text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-high transition-colors"
               >
                 Cancelar
