@@ -6,14 +6,8 @@ import { SkeletonStatCard } from '../components/ui/Skeleton'
 import { ProgressBar } from '../components/checklist/ProgressBar'
 import { StatCard } from '../components/checklist/StatCard'
 import { ChecklistCard } from '../components/checklist/ChecklistCard'
+import { ChecklistHeatmap } from '../components/checklist/ChecklistHeatmap'
 import { RECURRENCE_LABELS, DAYS_LABELS } from '../components/checklist/constants'
-
-// MySQL2 retorna colunas DATE como objetos Date — normaliza para string YYYY-MM-DD
-const toDateStr = (v: unknown): string => {
-  if (!v) return ''
-  if (v instanceof Date) return v.toISOString().slice(0, 10)
-  return String(v).slice(0, 10)
-}
 
 // -------- Checklist Page --------
 const Checklists: React.FC = () => {
@@ -294,25 +288,11 @@ const Checklists: React.FC = () => {
 
   // -------- History --------
   const renderHistory = () => {
-    if (!history.length) return null
+    if (!dashChecklist) return null
     return (
       <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
-        <h3 className="text-base font-semibold text-on-surface mb-4">Ultimos 14 Dias</h3>
-        <div className="space-y-3">
-          {history.map((day) => {
-            const dateStr = toDateStr(day.poll_date)
-            const dateLabel = dateStr
-              ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }).format(new Date(dateStr + 'T00:00:00'))
-              : '—'
-            return (
-              <div key={dateStr} className="flex items-center gap-3">
-                <span className="text-xs text-on-surface-variant w-24 flex-shrink-0">{dateLabel}</span>
-                <div className="flex-1"><ProgressBar pct={day.completion_pct} size="sm" /></div>
-                <span className="text-xs font-medium text-on-surface-variant w-10 text-right">{day.completion_pct}%</span>
-              </div>
-            )
-          })}
-        </div>
+        <h3 className="text-base font-semibold text-on-surface mb-4">Histórico (12 semanas)</h3>
+        <ChecklistHeatmap history={history} />
       </div>
     )
   }
