@@ -3,6 +3,8 @@ import { checklistsApi, CreateChecklistPayload, UpdateChecklistPayload } from '.
 import type { Checklist, ChecklistDashboardData, ChecklistRecurrenceType } from '../types'
 import { useToast } from '../context/ToastContext'
 import { SkeletonStatCard } from '../components/ui/Skeleton'
+import { ProgressBar } from '../components/checklist/ProgressBar'
+import { StatCard } from '../components/checklist/StatCard'
 
 // MySQL2 retorna colunas DATE como objetos Date — normaliza para string YYYY-MM-DD
 const toDateStr = (v: unknown): string => {
@@ -18,39 +20,6 @@ const RECURRENCE_LABELS: Record<ChecklistRecurrenceType, string> = {
 }
 
 const DAYS_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-
-// -------- Progress Bar --------
-const ProgressBar: React.FC<{ pct: number; size?: 'sm' | 'lg' }> = ({ pct, size = 'lg' }) => {
-  const h = size === 'lg' ? 'h-3' : 'h-2'
-  return (
-    <div className={`w-full ${h} rounded-full bg-outline-variant/30 overflow-hidden`}>
-      <div
-        className={`${h} rounded-full transition-all duration-700 ${pct >= 100 ? 'bg-tertiary' : 'bg-primary'}`}
-        style={{ width: `${Math.min(pct, 100)}%` }}
-      />
-    </div>
-  )
-}
-
-// -------- Stat Card --------
-interface StatCardProps {
-  icon: string
-  label: string
-  value: string | number
-  iconColor: string
-  iconBg: string
-}
-const StatCard: React.FC<StatCardProps> = ({ icon, label, value, iconColor, iconBg }) => (
-  <div className="glass-card rounded-2xl border border-outline-variant/50 p-5 animate-fadeIn">
-    <div className="flex items-center justify-between mb-3">
-      <div className={`w-9 h-9 rounded-xl ${iconBg} flex items-center justify-center`}>
-        <span className={`material-symbols-outlined text-lg ${iconColor}`}>{icon}</span>
-      </div>
-    </div>
-    <div className="text-2xl font-bold text-on-surface mb-0.5">{value}</div>
-    <div className="text-xs text-on-surface-variant font-medium">{label}</div>
-  </div>
-)
 
 // -------- Checklist Card (list view) --------
 interface ChecklistCardProps {
