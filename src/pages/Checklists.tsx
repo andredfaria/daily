@@ -7,6 +7,7 @@ import { ProgressBar } from '../components/checklist/ProgressBar'
 import { StatCard } from '../components/checklist/StatCard'
 import { ChecklistCard } from '../components/checklist/ChecklistCard'
 import { ChecklistHeatmap } from '../components/checklist/ChecklistHeatmap'
+import { ChecklistItemRanking } from '../components/checklist/ChecklistItemRanking'
 import { RECURRENCE_LABELS, DAYS_LABELS } from '../components/checklist/constants'
 
 // -------- Checklist Page --------
@@ -536,6 +537,7 @@ const Checklists: React.FC = () => {
                 <div className="xl:col-span-2 space-y-6">
                   {renderTodaySection()}
                   {renderHistory()}
+                  <ChecklistItemRanking itemStats={dashboard?.itemStats ?? []} />
                 </div>
               </div>
             </div>
