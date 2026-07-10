@@ -138,6 +138,20 @@ export interface DailyPoll {
   created_at: string
 }
 
+export interface ChecklistStatsEntry {
+  checklist_id: string
+  week_count: number
+  month_count: number
+  total_count: number
+}
+
+export interface ChecklistItemStat {
+  text: string
+  marked_count: number
+  total_polls: number
+  pct: number
+}
+
 export interface ChecklistDashboardData {
   checklist: Checklist | null
   today: DailyPoll | null
@@ -148,6 +162,7 @@ export interface ChecklistDashboardData {
     completion_pct: number
     status: string
   }>
+  itemStats: ChecklistItemStat[]
 }
 
 export interface DashboardStats {
