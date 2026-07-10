@@ -258,6 +258,36 @@ router.get('/polls', async (req: Request, res: Response) => {
   }
 })
 
+// -------- GET /api/checklists/stats - contadores de conclusão por checklist --------
+router.get('/stats', async (req: Request, res: Response) => {
+  try {
+    const [rows]: any = await pool.query(
+      `SELECT c.id AS checklist_id,
+              SUM(CASE WHEN cdp.completion_pct = 100 AND cdp.poll_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) THEN 1 ELSE 0 END) AS week_count,
+              SUM(CASE WHEN cdp.completion_pct = 100 AND cdp.poll_date >= DATE_SUB(CURDATE(), INTERVAL 29 DAY) THEN 1 ELSE 0 END) AS month_count,
+              SUM(CASE WHEN cdp.completion_pct = 100 THEN 1 ELSE 0 END) AS total_count
+       FROM checklists c
+       LEFT JOIN checklist_daily_polls cdp
+         ON cdp.checklist_id = c.id AND cdp.status IN ('sent', 'completed')
+       WHERE c.user_id = ?
+       GROUP BY c.id`,
+      [req.userId!],
+    )
+
+    const stats = rows.map((r: any) => ({
+      checklist_id: r.checklist_id,
+      week_count: Number(r.week_count) || 0,
+      month_count: Number(r.month_count) || 0,
+      total_count: Number(r.total_count) || 0,
+    }))
+
+    res.json(stats)
+  } catch (err: any) {
+    console.error('[checklists] GET /stats', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
 // -------- GET /api/checklists/dashboard - dados do dashboard do checklist --------
 router.get('/dashboard', async (req: Request, res: Response) => {
   try {
