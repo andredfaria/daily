@@ -39,7 +39,7 @@ function pctToBucket(pct: number | undefined): Bucket {
 
 export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ history, days = 84 }) => {
   const pctByDate = new Map<string, number>()
-  history.forEach((h) => pctByDate.set(toDateStr(h.poll_date), h.completion_pct))
+  history.forEach((h) => pctByDate.set(toDateStr(h.poll_date), Number(h.completion_pct)))
 
   // Gera os últimos `days` dias corridos (mais antigo primeiro), ancorados em hoje.
   const dates: string[] = []
