@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { sendDailyPoll, getTodaySaoPaulo } from '../services/checklistDispatcher'
+import { computeItemStats } from '../services/checklistStats'
 
 const router = Router()
 
@@ -291,8 +292,16 @@ router.get('/stats', async (req: Request, res: Response) => {
 // -------- GET /api/checklists/dashboard - dados do dashboard do checklist --------
 router.get('/dashboard', async (req: Request, res: Response) => {
   try {
-    const checklist = await getMostRecentChecklist(req.userId!)
-    if (!checklist) return res.json({ checklist: null, today: null, history: [] })
+    const { checklistId } = req.query
+
+    let checklist
+    if (checklistId) {
+      checklist = await getChecklistById(String(checklistId), req.userId!)
+      if (!checklist) return res.status(404).json({ error: 'Checklist não encontrado.' })
+    } else {
+      checklist = await getMostRecentChecklist(req.userId!)
+    }
+    if (!checklist) return res.json({ checklist: null, today: null, history: [], itemStats: [] })
 
     const today = getTodaySaoPaulo()
 
@@ -317,7 +326,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
        FROM checklist_daily_polls
        WHERE checklist_id = ?
        ORDER BY poll_date DESC
-       LIMIT 14`,
+       LIMIT 84`,
       [checklist.id],
     )
 
@@ -328,7 +337,20 @@ router.get('/dashboard', async (req: Request, res: Response) => {
 
     const items = await getItems(checklist.id)
 
-    res.json({ checklist: { ...checklist, items }, today: todayPoll, history })
+    const [itemPollRows]: any = await pool.query(
+      `SELECT selected_options
+       FROM checklist_daily_polls
+       WHERE checklist_id = ? AND status IN ('sent', 'completed')
+         AND poll_date >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)`,
+      [checklist.id],
+    )
+    const pollsSelectedOptions: string[][] = itemPollRows.map((r: any) => {
+      const raw = r.selected_options
+      return Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : [])
+    })
+    const itemStats = computeItemStats(items.map((i: any) => i.text), pollsSelectedOptions)
+
+    res.json({ checklist: { ...checklist, items }, today: todayPoll, history, itemStats })
   } catch (err: any) {
     console.error('[checklists] GET /dashboard', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
