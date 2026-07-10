@@ -22,6 +22,7 @@ const Checklists: React.FC = () => {
   const [checklists, setChecklists] = useState<Checklist[]>([])
   const [dashboard, setDashboard] = useState<ChecklistDashboardData | null>(null)
   const [stats, setStats] = useState<ChecklistStatsEntry[]>([])
+  const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -57,12 +58,24 @@ const Checklists: React.FC = () => {
       setChecklists(list)
       setDashboard(dash)
       setStats(statsList)
+      if (dash.checklist) setSelectedChecklistId(dash.checklist.id)
     } catch {
       showError('Erro ao carregar dados dos checklists.')
     } finally {
       setLoading(false)
     }
   }, [showError])
+
+  const handleSelectChecklist = async (id: string) => {
+    if (id === selectedChecklistId) return
+    setSelectedChecklistId(id)
+    try {
+      const dash = await checklistsApi.dashboard(id)
+      setDashboard(dash)
+    } catch {
+      showError('Erro ao carregar dados do checklist.')
+    }
+  }
 
   useEffect(() => {
     fetchData()
@@ -519,12 +532,31 @@ const Checklists: React.FC = () => {
             ))}
           </div>
 
-          {/* Dashboard activity for most recent */}
+          {/* Painel de detalhes do checklist selecionado */}
           {dashChecklist && (
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2 space-y-6">
-                {renderTodaySection()}
-                {renderHistory()}
+            <div className="space-y-4">
+              {checklists.length > 1 && (
+                <div className="flex flex-wrap gap-2">
+                  {checklists.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleSelectChecklist(c.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        selectedChecklistId === c.id
+                          ? 'bg-primary text-on-primary border-primary'
+                          : 'bg-surface-container text-on-surface-variant border-outline-variant/30 hover:border-primary/50'
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2 space-y-6">
+                  {renderTodaySection()}
+                  {renderHistory()}
+                </div>
               </div>
             </div>
           )}
