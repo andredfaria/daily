@@ -1,135 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { checklistsApi, CreateChecklistPayload, UpdateChecklistPayload } from '../api/checklists'
-import type { Checklist, ChecklistDashboardData, ChecklistRecurrenceType } from '../types'
+import type { Checklist, ChecklistDashboardData, ChecklistRecurrenceType, ChecklistStatsEntry } from '../types'
 import { useToast } from '../context/ToastContext'
 import { SkeletonStatCard } from '../components/ui/Skeleton'
-
-// MySQL2 retorna colunas DATE como objetos Date — normaliza para string YYYY-MM-DD
-const toDateStr = (v: unknown): string => {
-  if (!v) return ''
-  if (v instanceof Date) return v.toISOString().slice(0, 10)
-  return String(v).slice(0, 10)
-}
-
-const RECURRENCE_LABELS: Record<ChecklistRecurrenceType, string> = {
-  daily: 'Todos os dias',
-  weekdays: 'Dias úteis (Seg–Sex)',
-  custom: 'Personalizado',
-}
-
-const DAYS_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-
-// -------- Progress Bar --------
-const ProgressBar: React.FC<{ pct: number; size?: 'sm' | 'lg' }> = ({ pct, size = 'lg' }) => {
-  const h = size === 'lg' ? 'h-3' : 'h-2'
-  return (
-    <div className={`w-full ${h} rounded-full bg-outline-variant/30 overflow-hidden`}>
-      <div
-        className={`${h} rounded-full transition-all duration-700 ${pct >= 100 ? 'bg-tertiary' : 'bg-primary'}`}
-        style={{ width: `${Math.min(pct, 100)}%` }}
-      />
-    </div>
-  )
-}
-
-// -------- Stat Card --------
-interface StatCardProps {
-  icon: string
-  label: string
-  value: string | number
-  iconColor: string
-  iconBg: string
-}
-const StatCard: React.FC<StatCardProps> = ({ icon, label, value, iconColor, iconBg }) => (
-  <div className="glass-card rounded-2xl border border-outline-variant/50 p-5 animate-fadeIn">
-    <div className="flex items-center justify-between mb-3">
-      <div className={`w-9 h-9 rounded-xl ${iconBg} flex items-center justify-center`}>
-        <span className={`material-symbols-outlined text-lg ${iconColor}`}>{icon}</span>
-      </div>
-    </div>
-    <div className="text-2xl font-bold text-on-surface mb-0.5">{value}</div>
-    <div className="text-xs text-on-surface-variant font-medium">{label}</div>
-  </div>
-)
-
-// -------- Checklist Card (list view) --------
-interface ChecklistCardProps {
-  checklist: Checklist
-  onEdit: (c: Checklist) => void
-  onDelete: (c: Checklist) => void
-  onClearHistory: (c: Checklist) => void
-  onSendNow: (c: Checklist) => void
-  sending: boolean
-}
-const ChecklistCard: React.FC<ChecklistCardProps> = ({ checklist, onEdit, onDelete, onClearHistory, onSendNow, sending }) => {
-  const recLabel = RECURRENCE_LABELS[checklist.recurrence_type] ?? 'Todos os dias'
-  const customDays = checklist.recurrence_type === 'custom' && checklist.recurrence_days
-    ? checklist.recurrence_days.map((d) => DAYS_LABELS[d]).join(', ')
-    : null
-
-  return (
-    <div className="glass-card rounded-2xl border border-outline-variant/50 p-5 animate-fadeIn">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-on-surface truncate">{checklist.name}</h3>
-          <p className="text-xs text-on-surface-variant mt-0.5">
-            {checklist.items.length} itens · às <strong>{String(checklist.send_time).padStart(2, '0')}h</strong>
-          </p>
-          <p className="text-xs text-on-surface-variant">
-            {customDays ?? recLabel}
-          </p>
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={() => onSendNow(checklist)}
-            disabled={sending}
-            title="Enviar agora"
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
-          >
-            {sending ? (
-              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <span className="material-symbols-outlined text-base">send</span>
-            )}
-          </button>
-          <button
-            onClick={() => onEdit(checklist)}
-            title="Editar"
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors"
-          >
-            <span className="material-symbols-outlined text-base">edit</span>
-          </button>
-          <button
-            onClick={() => onClearHistory(checklist)}
-            title="Limpar histórico"
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors"
-          >
-            <span className="material-symbols-outlined text-base">restart_alt</span>
-          </button>
-          <button
-            onClick={() => onDelete(checklist)}
-            title="Excluir"
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors"
-          >
-            <span className="material-symbols-outlined text-base">delete</span>
-          </button>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {checklist.items.slice(0, 4).map((item) => (
-          <span key={item.id} className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container border border-outline-variant/30 text-on-surface-variant">
-            {item.text}
-          </span>
-        ))}
-        {checklist.items.length > 4 && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container border border-outline-variant/30 text-on-surface-variant">
-            +{checklist.items.length - 4} mais
-          </span>
-        )}
-      </div>
-    </div>
-  )
-}
+import { ProgressBar } from '../components/checklist/ProgressBar'
+import { StatCard } from '../components/checklist/StatCard'
+import { ChecklistCard } from '../components/checklist/ChecklistCard'
+import { ChecklistHeatmap } from '../components/checklist/ChecklistHeatmap'
+import { ChecklistItemRanking } from '../components/checklist/ChecklistItemRanking'
+import { RECURRENCE_LABELS, DAYS_LABELS } from '../components/checklist/constants'
 
 // -------- Checklist Page --------
 const Checklists: React.FC = () => {
@@ -137,6 +16,8 @@ const Checklists: React.FC = () => {
 
   const [checklists, setChecklists] = useState<Checklist[]>([])
   const [dashboard, setDashboard] = useState<ChecklistDashboardData | null>(null)
+  const [stats, setStats] = useState<ChecklistStatsEntry[]>([])
+  const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -164,18 +45,32 @@ const Checklists: React.FC = () => {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
-      const [list, dash] = await Promise.all([
+      const [list, dash, statsList] = await Promise.all([
         checklistsApi.get(),
         checklistsApi.dashboard(),
+        checklistsApi.stats(),
       ])
       setChecklists(list)
       setDashboard(dash)
+      setStats(statsList)
+      if (dash.checklist) setSelectedChecklistId(dash.checklist.id)
     } catch {
       showError('Erro ao carregar dados dos checklists.')
     } finally {
       setLoading(false)
     }
   }, [showError])
+
+  const handleSelectChecklist = async (id: string) => {
+    if (id === selectedChecklistId) return
+    setSelectedChecklistId(id)
+    try {
+      const dash = await checklistsApi.dashboard(id)
+      setDashboard(dash)
+    } catch {
+      showError('Erro ao carregar dados do checklist.')
+    }
+  }
 
   useEffect(() => {
     fetchData()
@@ -320,6 +215,7 @@ const Checklists: React.FC = () => {
   const dashChecklist = dashboard?.checklist
   const today = dashboard?.today
   const history = dashboard?.history ?? []
+  const statsMap = new Map(stats.map((s) => [s.checklist_id, s]))
 
   // -------- Today's Poll Section --------
   const renderTodaySection = () => {
@@ -393,25 +289,11 @@ const Checklists: React.FC = () => {
 
   // -------- History --------
   const renderHistory = () => {
-    if (!history.length) return null
+    if (!dashChecklist) return null
     return (
       <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
-        <h3 className="text-base font-semibold text-on-surface mb-4">Ultimos 14 Dias</h3>
-        <div className="space-y-3">
-          {history.map((day) => {
-            const dateStr = toDateStr(day.poll_date)
-            const dateLabel = dateStr
-              ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }).format(new Date(dateStr + 'T00:00:00'))
-              : '—'
-            return (
-              <div key={dateStr} className="flex items-center gap-3">
-                <span className="text-xs text-on-surface-variant w-24 flex-shrink-0">{dateLabel}</span>
-                <div className="flex-1"><ProgressBar pct={day.completion_pct} size="sm" /></div>
-                <span className="text-xs font-medium text-on-surface-variant w-10 text-right">{day.completion_pct}%</span>
-              </div>
-            )
-          })}
-        </div>
+        <h3 className="text-base font-semibold text-on-surface mb-4">Histórico (12 semanas)</h3>
+        <ChecklistHeatmap history={history} />
       </div>
     )
   }
@@ -621,6 +503,7 @@ const Checklists: React.FC = () => {
               <ChecklistCard
                 key={c.id}
                 checklist={c}
+                stats={statsMap.get(c.id)}
                 onEdit={openEdit}
                 onDelete={setDeleteTarget}
                 onClearHistory={setClearHistoryTarget}
@@ -630,12 +513,32 @@ const Checklists: React.FC = () => {
             ))}
           </div>
 
-          {/* Dashboard activity for most recent */}
+          {/* Painel de detalhes do checklist selecionado */}
           {dashChecklist && (
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2 space-y-6">
-                {renderTodaySection()}
-                {renderHistory()}
+            <div className="space-y-4">
+              {checklists.length > 1 && (
+                <div className="flex flex-wrap gap-2">
+                  {checklists.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleSelectChecklist(c.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        selectedChecklistId === c.id
+                          ? 'bg-primary text-on-primary border-primary'
+                          : 'bg-surface-container text-on-surface-variant border-outline-variant/30 hover:border-primary/50'
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2 space-y-6">
+                  {renderTodaySection()}
+                  {renderHistory()}
+                  <ChecklistItemRanking itemStats={dashboard?.itemStats ?? []} />
+                </div>
               </div>
             </div>
           )}

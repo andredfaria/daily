@@ -1,5 +1,5 @@
 import client from './client'
-import type { Checklist, ChecklistDashboardData, ChecklistPollNotif, ChecklistRecurrenceType } from '../types'
+import type { Checklist, ChecklistDashboardData, ChecklistPollNotif, ChecklistRecurrenceType, ChecklistStatsEntry } from '../types'
 
 export interface CreateChecklistPayload {
   name?: string
@@ -44,8 +44,15 @@ export const checklistsApi = {
     return res.data
   },
 
-  dashboard: async (): Promise<ChecklistDashboardData> => {
-    const res = await client.get<ChecklistDashboardData>('/checklists/dashboard')
+  dashboard: async (checklistId?: string): Promise<ChecklistDashboardData> => {
+    const res = await client.get<ChecklistDashboardData>('/checklists/dashboard', {
+      params: checklistId ? { checklistId } : undefined,
+    })
+    return res.data
+  },
+
+  stats: async (): Promise<ChecklistStatsEntry[]> => {
+    const res = await client.get<ChecklistStatsEntry[]>('/checklists/stats')
     return res.data
   },
 

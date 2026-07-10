@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { sendDailyPoll, getTodaySaoPaulo } from '../services/checklistDispatcher'
+import { computeItemStats } from '../services/checklistStats'
 
 const router = Router()
 
@@ -258,11 +259,49 @@ router.get('/polls', async (req: Request, res: Response) => {
   }
 })
 
+// -------- GET /api/checklists/stats - contadores de conclusão por checklist --------
+router.get('/stats', async (req: Request, res: Response) => {
+  try {
+    const [rows]: any = await pool.query(
+      `SELECT c.id AS checklist_id,
+              SUM(CASE WHEN cdp.completion_pct = 100 AND cdp.poll_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) THEN 1 ELSE 0 END) AS week_count,
+              SUM(CASE WHEN cdp.completion_pct = 100 AND cdp.poll_date >= DATE_SUB(CURDATE(), INTERVAL 29 DAY) THEN 1 ELSE 0 END) AS month_count,
+              SUM(CASE WHEN cdp.completion_pct = 100 THEN 1 ELSE 0 END) AS total_count
+       FROM checklists c
+       LEFT JOIN checklist_daily_polls cdp
+         ON cdp.checklist_id = c.id AND cdp.status IN ('sent', 'completed')
+       WHERE c.user_id = ?
+       GROUP BY c.id`,
+      [req.userId!],
+    )
+
+    const stats = rows.map((r: any) => ({
+      checklist_id: r.checklist_id,
+      week_count: Number(r.week_count) || 0,
+      month_count: Number(r.month_count) || 0,
+      total_count: Number(r.total_count) || 0,
+    }))
+
+    res.json(stats)
+  } catch (err: any) {
+    console.error('[checklists] GET /stats', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
 // -------- GET /api/checklists/dashboard - dados do dashboard do checklist --------
 router.get('/dashboard', async (req: Request, res: Response) => {
   try {
-    const checklist = await getMostRecentChecklist(req.userId!)
-    if (!checklist) return res.json({ checklist: null, today: null, history: [] })
+    const { checklistId } = req.query
+
+    let checklist
+    if (checklistId) {
+      checklist = await getChecklistById(String(checklistId), req.userId!)
+      if (!checklist) return res.status(404).json({ error: 'Checklist não encontrado.' })
+    } else {
+      checklist = await getMostRecentChecklist(req.userId!)
+    }
+    if (!checklist) return res.json({ checklist: null, today: null, history: [], itemStats: [] })
 
     const today = getTodaySaoPaulo()
 
@@ -287,7 +326,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
        FROM checklist_daily_polls
        WHERE checklist_id = ?
        ORDER BY poll_date DESC
-       LIMIT 14`,
+       LIMIT 84`,
       [checklist.id],
     )
 
@@ -298,7 +337,20 @@ router.get('/dashboard', async (req: Request, res: Response) => {
 
     const items = await getItems(checklist.id)
 
-    res.json({ checklist: { ...checklist, items }, today: todayPoll, history })
+    const [itemPollRows]: any = await pool.query(
+      `SELECT selected_options
+       FROM checklist_daily_polls
+       WHERE checklist_id = ? AND status IN ('sent', 'completed')
+         AND poll_date >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)`,
+      [checklist.id],
+    )
+    const pollsSelectedOptions: string[][] = itemPollRows.map((r: any) => {
+      const raw = r.selected_options
+      return Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : [])
+    })
+    const itemStats = computeItemStats(items.map((i: any) => i.text), pollsSelectedOptions)
+
+    res.json({ checklist: { ...checklist, items }, today: todayPoll, history, itemStats })
   } catch (err: any) {
     console.error('[checklists] GET /dashboard', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
