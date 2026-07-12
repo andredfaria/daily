@@ -4,10 +4,7 @@ import type { Checklist, ChecklistDashboardData, ChecklistRecurrenceType, Checkl
 import { useToast } from '../context/ToastContext'
 import { SkeletonStatCard } from '../components/ui/Skeleton'
 import { ProgressBar } from '../components/checklist/ProgressBar'
-import { StatCard } from '../components/checklist/StatCard'
 import { ChecklistCard } from '../components/checklist/ChecklistCard'
-import { ChecklistHeatmap } from '../components/checklist/ChecklistHeatmap'
-import { ChecklistItemRanking } from '../components/checklist/ChecklistItemRanking'
 import { RECURRENCE_LABELS, DAYS_LABELS } from '../components/checklist/constants'
 
 // -------- Checklist Page --------
@@ -17,7 +14,6 @@ const Checklists: React.FC = () => {
   const [checklists, setChecklists] = useState<Checklist[]>([])
   const [dashboard, setDashboard] = useState<ChecklistDashboardData | null>(null)
   const [stats, setStats] = useState<ChecklistStatsEntry[]>([])
-  const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -53,24 +49,12 @@ const Checklists: React.FC = () => {
       setChecklists(list)
       setDashboard(dash)
       setStats(statsList)
-      if (dash.checklist) setSelectedChecklistId(dash.checklist.id)
     } catch {
       showError('Erro ao carregar dados dos checklists.')
     } finally {
       setLoading(false)
     }
   }, [showError])
-
-  const handleSelectChecklist = async (id: string) => {
-    if (id === selectedChecklistId) return
-    setSelectedChecklistId(id)
-    try {
-      const dash = await checklistsApi.dashboard(id)
-      setDashboard(dash)
-    } catch {
-      showError('Erro ao carregar dados do checklist.')
-    }
-  }
 
   useEffect(() => {
     fetchData()
@@ -214,7 +198,6 @@ const Checklists: React.FC = () => {
 
   const dashChecklist = dashboard?.checklist
   const today = dashboard?.today
-  const history = dashboard?.history ?? []
   const statsMap = new Map(stats.map((s) => [s.checklist_id, s]))
 
   // -------- Today's Poll Section --------
@@ -283,17 +266,6 @@ const Checklists: React.FC = () => {
             ))}
           </div>
         )}
-      </div>
-    )
-  }
-
-  // -------- History --------
-  const renderHistory = () => {
-    if (!dashChecklist) return null
-    return (
-      <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
-        <h3 className="text-base font-semibold text-on-surface mb-4">Histórico (12 semanas)</h3>
-        <ChecklistHeatmap history={history} />
       </div>
     )
   }
@@ -469,34 +441,6 @@ const Checklists: React.FC = () => {
       {/* Checklists list */}
       {!showForm && checklists.length > 0 && (
         <>
-          {/* Stats from most recent checklist with activity */}
-          {dashChecklist && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <StatCard icon="checklist" label="Itens" value={dashChecklist.items.length} iconColor="text-primary" iconBg="bg-primary/15" />
-              <StatCard
-                icon="schedule"
-                label="Horario de Envio"
-                value={`${String(dashChecklist.send_time).padStart(2, '0')}h`}
-                iconColor="text-yellow-400"
-                iconBg="bg-yellow-400/15"
-              />
-              <StatCard
-                icon="today"
-                label="Conclusao Hoje"
-                value={today ? `${today.completion_pct}%` : '—'}
-                iconColor={today && today.completion_pct >= 100 ? 'text-tertiary' : 'text-on-surface-variant'}
-                iconBg={today && today.completion_pct >= 100 ? 'bg-tertiary/15' : 'bg-surface-container-high'}
-              />
-              <StatCard
-                icon="bar_chart"
-                label="Dias Registrados"
-                value={history.length}
-                iconColor="text-primary"
-                iconBg="bg-primary/15"
-              />
-            </div>
-          )}
-
           {/* Checklist cards grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {checklists.map((c) => (
@@ -513,35 +457,8 @@ const Checklists: React.FC = () => {
             ))}
           </div>
 
-          {/* Painel de detalhes do checklist selecionado */}
-          {dashChecklist && (
-            <div className="space-y-4">
-              {checklists.length > 1 && (
-                <div className="flex flex-wrap gap-2">
-                  {checklists.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => handleSelectChecklist(c.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                        selectedChecklistId === c.id
-                          ? 'bg-primary text-on-primary border-primary'
-                          : 'bg-surface-container text-on-surface-variant border-outline-variant/30 hover:border-primary/50'
-                      }`}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div className="xl:col-span-2 space-y-6">
-                  {renderTodaySection()}
-                  {renderHistory()}
-                  <ChecklistItemRanking itemStats={dashboard?.itemStats ?? []} />
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Progresso de hoje do checklist mais recente */}
+          {dashChecklist && renderTodaySection()}
         </>
       )}
 
