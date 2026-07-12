@@ -2,13 +2,19 @@ import React, { useEffect, useState } from 'react'
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts'
+import { useNavigate } from 'react-router-dom'
 import { analyticsApi } from '../api/analytics'
+import { checklistsApi } from '../api/checklists'
 import type { ByCategoryResponse, ProjectionResponse, BudgetResponse, OcorrenciaTop } from '../types'
+import type { Checklist, ChecklistDashboardData, ChecklistStatsEntry } from '../types'
 import { categoryColor, categoryLabel } from '../utils/categoryColors'
 import { formatBRL } from '../utils/format'
 import { useToast } from '../context/ToastContext'
 import { BudgetCard } from '../components/analise/BudgetCard'
 import { TopOccurrencesList } from '../components/analise/TopOccurrencesList'
+import { StatCard } from '../components/checklist/StatCard'
+import { ChecklistHeatmap } from '../components/checklist/ChecklistHeatmap'
+import { ChecklistItemRanking } from '../components/checklist/ChecklistItemRanking'
 
 type AnaliseTab = 'financeiro' | 'checklist'
 
@@ -59,6 +65,44 @@ const Analise: React.FC = () => {
     })
     return () => { active = false }
   }, [activeTab, financeiroLoaded, showToast])
+
+  const navigate = useNavigate()
+
+  // --- Aba Checklist ---
+  const [checklists, setChecklists] = useState<Checklist[]>([])
+  const [checklistDashboard, setChecklistDashboard] = useState<ChecklistDashboardData | null>(null)
+  const [, setChecklistStats] = useState<ChecklistStatsEntry[]>([])
+  const [selectedChecklistId, setSelectedChecklistId] = useState<string | null>(null)
+  const [loadingChecklist, setLoadingChecklist] = useState(true)
+  const [checklistLoaded, setChecklistLoaded] = useState(false)
+
+  useEffect(() => {
+    if (activeTab !== 'checklist' || checklistLoaded) return
+    let active = true
+    setLoadingChecklist(true)
+    Promise.all([checklistsApi.get(), checklistsApi.dashboard(), checklistsApi.stats()])
+      .then(([list, dash, stats]) => {
+        if (!active) return
+        setChecklists(list)
+        setChecklistDashboard(dash)
+        setChecklistStats(stats)
+        if (dash.checklist) setSelectedChecklistId(dash.checklist.id)
+      })
+      .catch(() => { if (active) showToast('Erro ao carregar dados do checklist', 'error') })
+      .finally(() => { if (active) { setLoadingChecklist(false); setChecklistLoaded(true) } })
+    return () => { active = false }
+  }, [activeTab, checklistLoaded, showToast])
+
+  const handleSelectChecklist = async (id: string) => {
+    if (id === selectedChecklistId) return
+    setSelectedChecklistId(id)
+    try {
+      const dash = await checklistsApi.dashboard(id)
+      setChecklistDashboard(dash)
+    } catch {
+      showToast('Erro ao carregar dados do checklist', 'error')
+    }
+  }
 
   const pieData = (byCat?.categorias ?? []).map((c) => ({
     name: categoryLabel(c.category),
@@ -167,9 +211,78 @@ const Analise: React.FC = () => {
     </div>
   )
 
-  const renderChecklistTab = () => (
-    <p className="text-sm text-on-surface-variant">Em breve.</p>
-  )
+  const renderChecklistTab = () => {
+    if (loadingChecklist) {
+      return <p className="text-sm text-on-surface-variant">Carregando…</p>
+    }
+    if (checklists.length === 0) {
+      return (
+        <div className="glass-card rounded-2xl border border-outline-variant/50 p-12 text-center">
+          <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-3 block">checklist</span>
+          <p className="text-on-surface font-semibold mb-1">Nenhum checklist cadastrado</p>
+          <p className="text-sm text-on-surface-variant mb-4">Crie um checklist para ver as estatísticas aqui.</p>
+          <button onClick={() => navigate('/checklists')} className="btn-primary mx-auto">
+            <span className="material-symbols-outlined text-lg">add</span>
+            Criar Checklist
+          </button>
+        </div>
+      )
+    }
+
+    const dashChecklist = checklistDashboard?.checklist
+    const today = checklistDashboard?.today
+    const history = checklistDashboard?.history ?? []
+
+    return (
+      <div className="space-y-6">
+        {checklists.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            {checklists.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => handleSelectChecklist(c.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  selectedChecklistId === c.id
+                    ? 'bg-primary text-on-primary border-primary'
+                    : 'bg-surface-container text-on-surface-variant border-outline-variant/30 hover:border-primary/50'
+                }`}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {dashChecklist && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard icon="checklist" label="Itens" value={dashChecklist.items.length} iconColor="text-primary" iconBg="bg-primary/15" />
+            <StatCard
+              icon="schedule"
+              label="Horário de Envio"
+              value={`${String(dashChecklist.send_time).padStart(2, '0')}h`}
+              iconColor="text-yellow-400"
+              iconBg="bg-yellow-400/15"
+            />
+            <StatCard
+              icon="today"
+              label="Conclusão Hoje"
+              value={today ? `${today.completion_pct}%` : '—'}
+              iconColor={today && today.completion_pct >= 100 ? 'text-tertiary' : 'text-on-surface-variant'}
+              iconBg={today && today.completion_pct >= 100 ? 'bg-tertiary/15' : 'bg-surface-container-high'}
+            />
+            <StatCard icon="bar_chart" label="Dias Registrados" value={history.length} iconColor="text-primary" iconBg="bg-primary/15" />
+          </div>
+        )}
+
+        <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
+          <h3 className="text-base font-semibold text-on-surface mb-4">Histórico (12 semanas)</h3>
+          <ChecklistHeatmap history={history} />
+        </div>
+
+        <ChecklistItemRanking itemStats={checklistDashboard?.itemStats ?? []} />
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
