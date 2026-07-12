@@ -80,6 +80,42 @@ export async function projecaoMensal(
   return resultado
 }
 
+// Soma das ocorrências por mês para os últimos N meses, incluindo o mês corrente (parcial)
+export async function historicoMensal(
+  userId: string,
+  meses: number
+): Promise<MesProjecao[]> {
+  const n = Math.min(Math.max(meses, 1), 12)
+  const now = new Date()
+  const first = new Date(now.getFullYear(), now.getMonth() - (n - 1), 1)
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const toStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  const [rows]: any = await pool.query(
+    `SELECT YEAR(o.due_date) AS ano, MONTH(o.due_date) AS mes, SUM(o.amount) AS total
+       FROM bill_occurrences o
+       JOIN bills b ON b.id = o.bill_id
+      WHERE b.user_id = ? AND b.is_active = 1
+        AND o.due_date BETWEEN ? AND ?
+      GROUP BY YEAR(o.due_date), MONTH(o.due_date)
+      ORDER BY ano, mes`,
+    [userId, toStr(first), toStr(last)]
+  )
+
+  const mapa = new Map<string, number>()
+  for (const r of rows) mapa.set(`${r.ano}-${r.mes}`, Number(r.total) || 0)
+
+  const resultado: MesProjecao[] = []
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const ano = d.getFullYear()
+    const mes = d.getMonth() + 1
+    resultado.push({ ano, mes, total: mapa.get(`${ano}-${mes}`) ?? 0 })
+  }
+  return resultado
+}
+
 // Fechamento de um mês específico (1-based)
 export async function fechamentoMensal(
   userId: string,

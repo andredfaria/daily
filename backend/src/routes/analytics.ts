@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express'
-import { gastosPorCategoria, projecaoMensal } from '../services/financialAnalytics'
+import { gastosPorCategoria, projecaoMensal, historicoMensal, fechamentoMensal } from '../services/financialAnalytics'
 
 const router = Router()
 
@@ -38,6 +38,25 @@ router.get('/projection', async (req: Request, res: Response) => {
   try {
     const months = Number(req.query.months) || 6
     const dados = await projecaoMensal(req.userId!, months)
+    const nomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    const meses = dados.map((d) => ({
+      ano: d.ano,
+      mes: d.mes,
+      label: `${nomes[d.mes - 1]}/${d.ano}`,
+      total: d.total,
+    }))
+    res.json({ meses })
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// GET /api/analytics/history?months=6
+router.get('/history', async (req: Request, res: Response) => {
+  try {
+    const months = Number(req.query.months) || 6
+    const dados = await historicoMensal(req.userId!, months)
     const nomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
     const meses = dados.map((d) => ({
       ano: d.ano,
