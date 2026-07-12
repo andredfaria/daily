@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express'
-import { gastosPorCategoria, projecaoMensal, historicoMensal, fechamentoMensal } from '../services/financialAnalytics'
+import { gastosPorCategoria, projecaoMensal, historicoMensal, fechamentoMensal, topOcorrencias } from '../services/financialAnalytics'
 
 const router = Router()
 
@@ -65,6 +65,22 @@ router.get('/history', async (req: Request, res: Response) => {
       total: d.total,
     }))
     res.json({ meses })
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// GET /api/analytics/top-occurrences?from=&to=&limit=5
+router.get('/top-occurrences', async (req: Request, res: Response) => {
+  try {
+    const { from, to } = req.query as { from?: string; to?: string }
+    if (!from || !to) {
+      return res.status(400).json({ error: 'Parâmetros from e to são obrigatórios' })
+    }
+    const limit = Math.min(Math.max(Number(req.query.limit) || 5, 1), 20)
+    const ocorrencias = await topOcorrencias(req.userId!, from, to, limit)
+    res.json({ ocorrencias })
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })

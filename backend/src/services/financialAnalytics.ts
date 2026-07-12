@@ -144,3 +144,43 @@ export async function fechamentoMensal(
     qtdContas,
   }
 }
+
+export interface OcorrenciaTop {
+  id: string
+  bill_id: string
+  bill_name: string
+  category: string
+  amount: number
+  due_date: string
+}
+
+// Maiores ocorrências (contas) por valor num intervalo [from, to]
+export async function topOcorrencias(
+  userId: string,
+  from: string,
+  to: string,
+  limit: number
+): Promise<OcorrenciaTop[]> {
+  const lim = Math.min(Math.max(limit, 1), 20)
+  const [rows]: any = await pool.query(
+    `SELECT o.id, o.bill_id, b.name AS bill_name, COALESCE(b.category, 'outro') AS category,
+            o.amount, o.due_date
+       FROM bill_occurrences o
+       JOIN bills b ON b.id = o.bill_id
+      WHERE b.user_id = ? AND b.is_active = 1
+        AND o.due_date BETWEEN ? AND ?
+      ORDER BY o.amount DESC
+      LIMIT ?`,
+    [userId, from, to, lim]
+  )
+  return rows.map((r: any) => ({
+    id: r.id,
+    bill_id: r.bill_id,
+    bill_name: r.bill_name,
+    category: r.category,
+    amount: Number(r.amount) || 0,
+    due_date: r.due_date instanceof Date
+      ? r.due_date.toISOString().slice(0, 10)
+      : String(r.due_date).slice(0, 10),
+  }))
+}
