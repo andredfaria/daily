@@ -195,3 +195,23 @@ export interface ProjectionMonth {
 export interface ProjectionResponse {
   meses: ProjectionMonth[]
 }
+
+export interface BudgetResponse {
+  total: number
+  orcamento: number | null
+  qtdContas: number
+  porCategoria: Array<{ category: string; total: number }>
+}
+
+export interface OcorrenciaTop {
+  id: string
+  bill_id: string
+  bill_name: string
+  category: string
+  amount: number
+  due_date: string
+}
+
+export interface TopOccurrencesResponse {
+  ocorrencias: OcorrenciaTop[]
+}
