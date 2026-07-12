@@ -87,4 +87,16 @@ router.get('/top-occurrences', async (req: Request, res: Response) => {
   }
 })
 
+// GET /api/analytics/budget — orçamento vs. gasto do mês corrente
+router.get('/budget', async (req: Request, res: Response) => {
+  try {
+    const now = new Date()
+    const dados = await fechamentoMensal(req.userId!, now.getFullYear(), now.getMonth() + 1)
+    res.json(dados)
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
 export default router
