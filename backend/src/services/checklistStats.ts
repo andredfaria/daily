@@ -17,3 +17,28 @@ export function computeItemStats(
   })
   return stats.sort((a, b) => b.pct - a.pct)
 }
+
+export interface ChecklistItemStreak {
+  text: string
+  current: number
+  best: number
+}
+
+export function computeItemStreaks(
+  itemTexts: string[],
+  pollsSelectedOptionsChronological: string[][],
+): ChecklistItemStreak[] {
+  return itemTexts.map((text) => {
+    let current = 0
+    let best = 0
+    for (const options of pollsSelectedOptionsChronological) {
+      if (options.includes(text)) {
+        current += 1
+        best = Math.max(best, current)
+      } else {
+        current = 0
+      }
+    }
+    return { text, current, best }
+  })
+}

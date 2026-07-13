@@ -1,4 +1,4 @@
-import { computeItemStats } from '../checklistStats'
+import { computeItemStats, computeItemStreaks } from '../checklistStats'
 
 describe('computeItemStats', () => {
   it('calcula marked_count, total_polls e pct de cada item', () => {
@@ -31,5 +31,54 @@ describe('computeItemStats', () => {
   it('arredonda pct para o inteiro mais próximo', () => {
     const result = computeItemStats(['X'], [['X'], [], []])
     expect(result[0].pct).toBe(33) // 1/3 = 33.33... -> 33
+  })
+})
+
+describe('computeItemStreaks', () => {
+  it('conta sequência simples sem quebras', () => {
+    const result = computeItemStreaks(['Tomar remédio'], [
+      ['Tomar remédio'],
+      ['Tomar remédio'],
+      ['Tomar remédio'],
+    ])
+    expect(result).toEqual([{ text: 'Tomar remédio', current: 3, best: 3 }])
+  })
+
+  it('quebra a sequência quando o item não é marcado, mas mantém o recorde anterior', () => {
+    const result = computeItemStreaks(['Item'], [
+      ['Item'],
+      ['Item'],
+      [],
+      ['Item'],
+    ])
+    expect(result).toEqual([{ text: 'Item', current: 1, best: 2 }])
+  })
+
+  it('recorde igual à sequência atual quando ela é a maior já vista', () => {
+    const result = computeItemStreaks(['Item'], [
+      ['Item'],
+      [],
+      ['Item'],
+      ['Item'],
+      ['Item'],
+    ])
+    expect(result).toEqual([{ text: 'Item', current: 3, best: 3 }])
+  })
+
+  it('retorna zero para lista de polls vazia', () => {
+    const result = computeItemStreaks(['Item único'], [])
+    expect(result).toEqual([{ text: 'Item único', current: 0, best: 0 }])
+  })
+
+  it('calcula sequências independentes para múltiplos itens no mesmo poll', () => {
+    const result = computeItemStreaks(['A', 'B'], [
+      ['A', 'B'],
+      ['A'],
+      ['A', 'B'],
+    ])
+    expect(result).toEqual([
+      { text: 'A', current: 3, best: 3 },
+      { text: 'B', current: 1, best: 1 },
+    ])
   })
 })
