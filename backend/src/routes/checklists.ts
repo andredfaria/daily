@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { sendDailyPoll, getTodaySaoPaulo } from '../services/checklistDispatcher'
-import { computeItemStats } from '../services/checklistStats'
+import { computeItemStats, computeItemStreaks } from '../services/checklistStats'
 
 const router = Router()
 
@@ -350,7 +350,29 @@ router.get('/dashboard', async (req: Request, res: Response) => {
     })
     const itemStats = computeItemStats(items.map((i: any) => i.text), pollsSelectedOptions)
 
-    res.json({ checklist: { ...checklist, items }, today: todayPoll, history, itemStats })
+    const [streakPollRows]: any = await pool.query(
+      `SELECT selected_options
+         FROM checklist_daily_polls
+        WHERE checklist_id = ? AND status IN ('sent', 'completed')
+        ORDER BY poll_date ASC`,
+      [checklist.id],
+    )
+    const pollsChronological: string[][] = streakPollRows.map((r: any) => {
+      const raw = r.selected_options
+      return Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : [])
+    })
+    const itemStreaks = computeItemStreaks(items.map((i: any) => i.text), pollsChronological)
+    const streaksByText = new Map(itemStreaks.map((s) => [s.text, s]))
+    const itemStatsWithStreak = itemStats.map((stat) => {
+      const streak = streaksByText.get(stat.text)
+      return {
+        ...stat,
+        streak_current: streak?.current ?? 0,
+        streak_best: streak?.best ?? 0,
+      }
+    })
+
+    res.json({ checklist: { ...checklist, items }, today: todayPoll, history, itemStats: itemStatsWithStreak })
   } catch (err: any) {
     console.error('[checklists] GET /dashboard', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
