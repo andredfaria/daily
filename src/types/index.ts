@@ -150,6 +150,8 @@ export interface ChecklistItemStat {
   marked_count: number
   total_polls: number
   pct: number
+  streak_current: number
+  streak_best: number
 }
 
 export interface ChecklistDashboardData {
