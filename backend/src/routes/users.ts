@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
+import { reactivateUserChecklists } from '../services/checklistDispatcher'
 
 const router = Router()
 
@@ -30,6 +31,12 @@ router.patch('/me', async (req: Request, res: Response) => {
     ]
     const fields: string[] = []
     const values: any[] = []
+
+    let reactivating = false
+    if (req.body.is_active === true) {
+      const [[current]]: any = await pool.query('SELECT is_active FROM users WHERE id = ?', [req.userId])
+      reactivating = !!current && !current.is_active
+    }
 
     for (const key of allowed) {
       if (req.body[key] === undefined) continue
@@ -100,6 +107,10 @@ router.patch('/me', async (req: Request, res: Response) => {
       values.push(new Date())
       values.push(req.userId)
       await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    if (reactivating) {
+      await reactivateUserChecklists(req.userId!)
     }
 
     const [rows]: any = await pool.query('SELECT * FROM users WHERE id = ? LIMIT 1', [req.userId])

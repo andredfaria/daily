@@ -179,6 +179,17 @@ const Checklists: React.FC = () => {
     }
   }
 
+  // -------- Reactivate --------
+  const handleReactivateChecklist = async (c: Checklist) => {
+    try {
+      await checklistsApi.update(c.id, { is_active: true })
+      success('Checklist reativado!')
+      await fetchData()
+    } catch {
+      showError('Erro ao reativar checklist.')
+    }
+  }
+
   // -------- Loading state --------
   if (loading) {
     return (
@@ -452,6 +463,7 @@ const Checklists: React.FC = () => {
                 onDelete={setDeleteTarget}
                 onClearHistory={setClearHistoryTarget}
                 onSendNow={(cl) => handleSendNow(cl, false)}
+                onReactivate={handleReactivateChecklist}
                 sending={sendingId === c.id}
               />
             ))}

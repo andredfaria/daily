@@ -219,6 +219,18 @@ ALTER TABLE notifications
       await addColumnIfNotExists('users', 'monthly_summary_enabled', 'BOOLEAN NOT NULL DEFAULT TRUE', 'summary_day_of_week')
     },
   },
+  {
+    name: '012_checklists_consecutive_misses',
+    run: async () => {
+      await addColumnIfNotExists('checklists', 'consecutive_misses', 'SMALLINT UNSIGNED NOT NULL DEFAULT 0', 'is_active')
+    },
+  },
+  {
+    name: '013_checklists_last_miss_poll_date',
+    run: async () => {
+      await addColumnIfNotExists('checklists', 'last_miss_poll_date', 'DATE DEFAULT NULL', 'consecutive_misses')
+    },
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

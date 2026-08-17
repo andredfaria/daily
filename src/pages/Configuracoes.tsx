@@ -63,6 +63,8 @@ const Configuracoes: React.FC = () => {
   const [dispatching, setDispatching] = useState(false)
   const [dispatchResult, setDispatchResult] = useState<{ sent: number; failed: number; skipped: number } | null>(null)
 
+  const [reactivatingAccount, setReactivatingAccount] = useState(false)
+
   const { success, error: showError } = useToast()
 
   const fetchUser = useCallback(async () => {
@@ -245,8 +247,41 @@ const Configuracoes: React.FC = () => {
     }
   }
 
+  const handleReactivateAccount = async () => {
+    setReactivatingAccount(true)
+    try {
+      await client.patch('/users/me', { is_active: true })
+      setUser((prev) => (prev ? { ...prev, is_active: true } : prev))
+      success('Conta reativada! Você voltará a receber lembretes por WhatsApp.')
+    } catch {
+      showError('Erro ao reativar conta.')
+    } finally {
+      setReactivatingAccount(false)
+    }
+  }
+
   return (
     <div className="space-y-6 animate-fadeIn">
+      {user && !user.is_active && (
+        <div className="rounded-2xl border border-error/30 bg-error/10 p-5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-error">pause_circle</span>
+            <div>
+              <p className="text-sm font-semibold text-on-surface">Seus lembretes por WhatsApp estão pausados</p>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                Pausamos automaticamente por falta de resposta ao checklist. Reative quando quiser voltar a receber lembretes.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleReactivateAccount}
+            disabled={reactivatingAccount}
+            className="btn-primary flex-shrink-0"
+          >
+            {reactivatingAccount ? 'Reativando...' : 'Reativar'}
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-12 gap-6">
         {/* Left column */}
         <div className="col-span-12 lg:col-span-8 space-y-5">

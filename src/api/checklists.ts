@@ -17,6 +17,7 @@ export interface UpdateChecklistPayload {
   recurrence_type?: ChecklistRecurrenceType
   recurrence_days?: number[] | null
   items?: { text: string }[]
+  is_active?: boolean
 }
 
 export const checklistsApi = {
