@@ -9,6 +9,7 @@ interface ChecklistCardProps {
   onDelete: (c: Checklist) => void
   onClearHistory: (c: Checklist) => void
   onSendNow: (c: Checklist) => void
+  onReactivate: (c: Checklist) => void
   sending: boolean
 }
 
@@ -19,7 +20,7 @@ const MiniStat: React.FC<{ label: string; value: string }> = ({ label, value }) 
   </div>
 )
 
-export const ChecklistCard: React.FC<ChecklistCardProps> = ({ checklist, stats, onEdit, onDelete, onClearHistory, onSendNow, sending }) => {
+export const ChecklistCard: React.FC<ChecklistCardProps> = ({ checklist, stats, onEdit, onDelete, onClearHistory, onSendNow, onReactivate, sending }) => {
   const recLabel = RECURRENCE_LABELS[checklist.recurrence_type] ?? 'Todos os dias'
   const customDays = checklist.recurrence_type === 'custom' && checklist.recurrence_days
     ? checklist.recurrence_days.map((d) => DAYS_LABELS[d]).join(', ')
@@ -73,6 +74,21 @@ export const ChecklistCard: React.FC<ChecklistCardProps> = ({ checklist, stats, 
           </button>
         </div>
       </div>
+
+      {!checklist.is_active && (
+        <div className="flex items-center justify-between gap-2 mb-3 px-3 py-2 rounded-xl bg-error/10 border border-error/30">
+          <span className="flex items-center gap-1.5 text-xs text-error">
+            <span className="material-symbols-outlined text-sm">pause_circle</span>
+            Pausado por inatividade
+          </span>
+          <button
+            onClick={() => onReactivate(checklist)}
+            className="text-xs font-semibold text-error hover:text-error/80 transition-colors"
+          >
+            Reativar
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center justify-around py-3 mb-3 rounded-xl bg-surface-container/60 border border-outline-variant/30">
         <MiniStat label="Semana" value={stats ? `${stats.week_count}/7` : '–/7'} />
