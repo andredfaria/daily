@@ -31,6 +31,12 @@ router.patch('/me', async (req: Request, res: Response) => {
     const fields: string[] = []
     const values: any[] = []
 
+    let reactivating = false
+    if (req.body.is_active === true) {
+      const [[current]]: any = await pool.query('SELECT is_active FROM users WHERE id = ?', [req.userId])
+      reactivating = !!current && !current.is_active
+    }
+
     for (const key of allowed) {
       if (req.body[key] === undefined) continue
 
@@ -100,6 +106,13 @@ router.patch('/me', async (req: Request, res: Response) => {
       values.push(new Date())
       values.push(req.userId)
       await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values)
+    }
+
+    if (reactivating) {
+      // Dá 15 dias novos de chance a cada checklist, em vez de reativar o
+      // usuário só para ele ser travado de novo no próximo dia por causa do
+      // histórico antigo de dias sem resposta.
+      await pool.query('UPDATE checklists SET consecutive_misses = 0 WHERE user_id = ?', [req.userId])
     }
 
     const [rows]: any = await pool.query('SELECT * FROM users WHERE id = ? LIMIT 1', [req.userId])
