@@ -6,6 +6,7 @@ import { materializeForUser, getTodaySaoPaulo } from './services/notificationMat
 import { sendPollsForHour } from './services/checklistDispatcher'
 import { sendWeeklySummary, sendMonthlySummary } from './services/summaryService'
 import { checkBudgetAlert } from './services/budgetAlertService'
+import { configureWahaWebhook } from './services/waha'
 
 function getCurrentHourSaoPaulo(): number {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -40,6 +41,16 @@ export async function initScheduler(): Promise<void> {
     const hour = getCurrentHourSaoPaulo()
     const today = getTodaySaoPaulo()
     console.log(`[scheduler] tick ${String(hour).padStart(2, '0')}h (${today} BRT)`)
+
+    // --- Reafirma webhook do WAHA (autocorreção caso a sessão tenha perdido a config) ---
+    const backendPublicUrl = process.env.BACKEND_PUBLIC_URL
+    if (backendPublicUrl) {
+      try {
+        await configureWahaWebhook(backendPublicUrl)
+      } catch (err: any) {
+        console.error('[scheduler] erro ao reafirmar webhook WAHA:', err.message)
+      }
+    }
 
     // --- Envio de notificações de contas ---
     try {
