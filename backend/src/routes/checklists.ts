@@ -112,7 +112,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     )
     if (!ownership.length) return res.status(404).json({ error: 'Checklist não encontrado.' })
 
-    const { name, send_time, timezone, recurrence_type, recurrence_days, items } = req.body
+    const { name, send_time, timezone, recurrence_type, recurrence_days, items, is_active } = req.body
 
     if (items) {
       if (!Array.isArray(items) || items.length < 2 || items.length > 12) {
@@ -134,6 +134,14 @@ router.put('/:id', async (req: Request, res: Response) => {
     if (timezone !== undefined) { updates.push('timezone = ?'); values.push(timezone) }
     if (recurrence_type !== undefined) { updates.push('recurrence_type = ?'); values.push(recurrence_type) }
     if (recurrence_days !== undefined) { updates.push('recurrence_days = ?'); values.push(JSON.stringify(recurrence_days)) }
+    if (is_active !== undefined) {
+      updates.push('is_active = ?')
+      values.push(is_active ? 1 : 0)
+      if (is_active) {
+        // Reativação manual: recomeça a contagem de dias sem resposta do zero.
+        updates.push('consecutive_misses = 0')
+      }
+    }
 
     const hasChanges = updates.length > 0 || !!items
     if (hasChanges) {
@@ -190,6 +198,7 @@ router.delete('/:id/history', async (req: Request, res: Response) => {
       'DELETE FROM checklist_daily_polls WHERE checklist_id = ?',
       [req.params.id],
     )
+    await pool.query('UPDATE checklists SET consecutive_misses = 0 WHERE id = ?', [req.params.id])
     res.json({ deleted: result.affectedRows ?? 0 })
   } catch (err: any) {
     console.error('[checklists] DELETE /:id/history', err)
