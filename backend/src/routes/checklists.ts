@@ -140,6 +140,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       if (is_active) {
         // Reativação manual: recomeça a contagem de dias sem resposta do zero.
         updates.push('consecutive_misses = 0')
+        updates.push('last_miss_poll_date = NULL')
       }
     }
 
@@ -198,7 +199,7 @@ router.delete('/:id/history', async (req: Request, res: Response) => {
       'DELETE FROM checklist_daily_polls WHERE checklist_id = ?',
       [req.params.id],
     )
-    await pool.query('UPDATE checklists SET consecutive_misses = 0 WHERE id = ?', [req.params.id])
+    await pool.query('UPDATE checklists SET consecutive_misses = 0, last_miss_poll_date = NULL WHERE id = ?', [req.params.id])
     res.json({ deleted: result.affectedRows ?? 0 })
   } catch (err: any) {
     console.error('[checklists] DELETE /:id/history', err)

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
+import { reactivateUserChecklists } from '../services/checklistDispatcher'
 
 const router = Router()
 
@@ -109,10 +110,7 @@ router.patch('/me', async (req: Request, res: Response) => {
     }
 
     if (reactivating) {
-      // Dá 15 dias novos de chance a cada checklist, em vez de reativar o
-      // usuário só para ele ser travado de novo no próximo dia por causa do
-      // histórico antigo de dias sem resposta.
-      await pool.query('UPDATE checklists SET consecutive_misses = 0 WHERE user_id = ?', [req.userId])
+      await reactivateUserChecklists(req.userId!)
     }
 
     const [rows]: any = await pool.query('SELECT * FROM users WHERE id = ? LIMIT 1', [req.userId])

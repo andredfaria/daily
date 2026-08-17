@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { sendWhatsAppPoll, sendWhatsAppText, WhatsAppNumberNotFoundError } from './waha'
-import { nextMissState } from './checklistInactivity'
+import { nextMissState, INACTIVITY_THRESHOLD } from './checklistInactivity'
 
 export function getTodaySaoPaulo(): string {
   // formatToParts garante YYYY-MM-DD independente da versão do ICU/Node
@@ -14,9 +14,14 @@ export function getTodaySaoPaulo(): string {
   return `${p.year}-${p.month}-${p.day}`
 }
 
-const INACTIVITY_THRESHOLD = 15
 const INACTIVITY_MESSAGE =
   'Notamos que você não responde ao checklist há 15 dias, então pausamos os lembretes por WhatsApp (checklist e contas). Quando quiser voltar, reative em Configurações no BillSync.'
+
+// Normaliza um valor de data (Date do mysql2 ou string) para YYYY-MM-DD,
+// seguindo o padrão já estabelecido em financialAnalytics.ts (topOcorrencias).
+function normalizeDate(value: any): string {
+  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10)
+}
 
 // Verifica o resultado do poll mais recente já encerrado (poll_date < hoje) e
 // atualiza o contador de dias seguidos sem resposta. Se o limiar for atingido,
@@ -25,16 +30,25 @@ const INACTIVITY_MESSAGE =
 // Retorna true se o checklist foi travado agora (o envio de hoje deve ser pulado).
 async function applyInactivityCheck(checklistId: string, userId: string, today: string): Promise<boolean> {
   const [lastPollRows]: any = await pool.query(
-    'SELECT completed_count FROM checklist_daily_polls WHERE checklist_id = ? AND poll_date < ? ORDER BY poll_date DESC LIMIT 1',
+    'SELECT poll_date, completed_count FROM checklist_daily_polls WHERE checklist_id = ? AND poll_date < ? ORDER BY poll_date DESC LIMIT 1',
     [checklistId, today],
   )
   if (!lastPollRows.length) return false
 
   const [checklistRows]: any = await pool.query(
-    'SELECT consecutive_misses FROM checklists WHERE id = ?',
+    'SELECT consecutive_misses, last_miss_poll_date FROM checklists WHERE id = ?',
     [checklistId],
   )
   if (!checklistRows.length) return false
+
+  const lastPollDate = normalizeDate(lastPollRows[0].poll_date)
+  const lastMissPollDate = checklistRows[0].last_miss_poll_date
+    ? normalizeDate(checklistRows[0].last_miss_poll_date)
+    : null
+
+  // Esse poll já foi avaliado (reenvio no mesmo dia após falha, ou nenhum
+  // poll novo fechou desde a última avaliação) — não conta de novo.
+  if (lastMissPollDate === lastPollDate) return false
 
   const { misses, shouldLock } = nextMissState(
     Number(checklistRows[0].consecutive_misses),
@@ -42,7 +56,10 @@ async function applyInactivityCheck(checklistId: string, userId: string, today: 
     INACTIVITY_THRESHOLD,
   )
 
-  await pool.query('UPDATE checklists SET consecutive_misses = ? WHERE id = ?', [misses, checklistId])
+  await pool.query(
+    'UPDATE checklists SET consecutive_misses = ?, last_miss_poll_date = ? WHERE id = ?',
+    [misses, lastPollDate, checklistId],
+  )
 
   if (!shouldLock) return false
 
@@ -69,6 +86,21 @@ async function applyInactivityCheck(checklistId: string, userId: string, today: 
   }
 
   return true
+}
+
+// Restaura checklists que foram travados pela regra de inatividade (is_active=0
+// com consecutive_misses >= limiar — único jeito de chegar nesse estado hoje) e
+// zera os contadores de todos os checklists do usuário, dando 15 dias novos de
+// chance a cada um.
+export async function reactivateUserChecklists(userId: string): Promise<void> {
+  await pool.query(
+    'UPDATE checklists SET is_active = 1 WHERE user_id = ? AND is_active = 0 AND consecutive_misses >= ?',
+    [userId, INACTIVITY_THRESHOLD],
+  )
+  await pool.query(
+    'UPDATE checklists SET consecutive_misses = 0, last_miss_poll_date = NULL WHERE user_id = ?',
+    [userId],
+  )
 }
 
 export async function sendDailyPoll(
