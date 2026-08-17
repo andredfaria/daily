@@ -22,14 +22,18 @@ Objetivo: parar de mandar mensagens (checklist e, em cascata, contas) pra quem p
 
 ## Mudanças no Backend
 
-### Migration `backend/src/pending-migrations/010_checklist_consecutive_misses.sql`
+### Migration em `backend/src/migrate.ts`
 
-```sql
-ALTER TABLE checklists
-  ADD COLUMN consecutive_misses SMALLINT UNSIGNED NOT NULL DEFAULT 0 AFTER is_active;
+As migrations reais do projeto vivem no array `MIGRATIONS` desse arquivo (a última hoje é `011_users_monthly_summary`; o diretório `backend/src/pending-migrations/*.sql` é apenas rascunho não lido por `runMigrations()`). Nova entrada `012_checklists_consecutive_misses`, seguindo o padrão `run` + `addColumnIfNotExists` já usado por `007_users_summary_budget`/`008_checklists_multi`:
+
+```ts
+{
+  name: '012_checklists_consecutive_misses',
+  run: async () => {
+    await addColumnIfNotExists('checklists', 'consecutive_misses', 'SMALLINT UNSIGNED NOT NULL DEFAULT 0', 'is_active')
+  },
+},
 ```
-
-Registrada em `migrate.ts` seguindo o padrão já existente de migrations incrementais (`addColumnIfNotExists` ou entrada na lista de migrations nomeadas, conforme convenção atual do arquivo).
 
 ### `backend/src/services/checklistDispatcher.ts`
 
