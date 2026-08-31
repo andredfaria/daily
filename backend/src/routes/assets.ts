@@ -13,18 +13,26 @@ const router = Router()
 
 const KINDS: AssetKind[] = ['stock', 'fii', 'crypto']
 
+// Ticker normalizado (maiúsculo, sem espaços): letras, números, ponto ou hífen,
+// no máximo 20 caracteres. Barra o INSERT estourando por tamanho, string numérica
+// tipo "1e400" (vira Infinity, ver validarCampos) e interpolação na URL da brapi
+// (ex.: "../QUOTE/X" vazando o Bearer token para um caminho arbitrário).
+const TICKER_REGEX = /^[A-Z0-9.\-]{1,20}$/
+
 // Valida e normaliza os campos numéricos vindos do corpo da requisição.
 // Devolve a mensagem de erro quando algo é inválido, ou null quando está tudo certo.
+// Number.isFinite (em vez de isNaN) rejeita também Infinity/-Infinity — "1e400" é um
+// número válido para isNaN, mas estoura a coluna DECIMAL no INSERT.
 function validarCampos(body: any): string | null {
-  if (body.quantity !== undefined && (isNaN(Number(body.quantity)) || Number(body.quantity) < 0)) {
+  if (body.quantity !== undefined && (!Number.isFinite(Number(body.quantity)) || Number(body.quantity) < 0)) {
     return 'quantidade deve ser um número maior ou igual a zero'
   }
-  if (body.avg_price !== undefined && (isNaN(Number(body.avg_price)) || Number(body.avg_price) < 0)) {
+  if (body.avg_price !== undefined && (!Number.isFinite(Number(body.avg_price)) || Number(body.avg_price) < 0)) {
     return 'preço médio deve ser um número maior ou igual a zero'
   }
   for (const campo of ['target_price', 'stop_price'] as const) {
     const valor = body[campo]
-    if (valor !== undefined && valor !== null && (isNaN(Number(valor)) || Number(valor) <= 0)) {
+    if (valor !== undefined && valor !== null && (!Number.isFinite(Number(valor)) || Number(valor) <= 0)) {
       return `${campo === 'target_price' ? 'preço-alvo' : 'stop'} deve ser um número maior que zero`
     }
   }
@@ -88,6 +96,9 @@ router.get('/', async (req: Request, res: Response) => {
 
 // POST /api/assets
 router.post('/', async (req: Request, res: Response) => {
+  // Declarado fora do try para ficar acessível no catch (ER_DUP_ENTRY da corrida
+  // SELECT→INSERT precisa da mesma mensagem 409 do caminho já detectado acima).
+  let symbol: string | undefined
   try {
     const {
       ticker, kind = 'stock', quantity = 0, avg_price = 0,
@@ -103,7 +114,10 @@ router.post('/', async (req: Request, res: Response) => {
     const erro = validarCampos(req.body)
     if (erro) return res.status(400).json({ error: erro })
 
-    const symbol = ticker.trim().toUpperCase()
+    symbol = ticker.trim().toUpperCase()
+    if (!TICKER_REGEX.test(symbol)) {
+      return res.status(400).json({ error: 'ticker inválido — use letras, números, ponto ou hífen, até 20 caracteres' })
+    }
 
     const [existente]: any = await pool.query(
       'SELECT id FROM assets WHERE user_id = ? AND ticker = ?',
@@ -131,6 +145,11 @@ router.post('/', async (req: Request, res: Response) => {
     )
     res.status(201).json(numerarAtivo(criado[0]))
   } catch (err: any) {
+    // Duas requisições simultâneas do mesmo ticker passam pelo SELECT e uma bate
+    // na unique key — mesma resposta 409 do caminho já detectado, não 500.
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: `${symbol} já está na sua carteira` })
+    }
     console.error('[assets] erro no POST /:', err.message)
     res.status(500).json({ error: 'Erro interno do servidor' })
   }
@@ -141,6 +160,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const erro = validarCampos(req.body)
     if (erro) return res.status(400).json({ error: erro })
+
+    if (req.body.is_active !== undefined && typeof req.body.is_active !== 'boolean') {
+      return res.status(400).json({ error: 'is_active deve ser booleano' })
+    }
 
     const campos: string[] = []
     const valores: any[] = []
@@ -154,6 +177,32 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (req.body.is_active !== undefined) {
       campos.push('is_active = ?')
       valores.push(req.body.is_active ? 1 : 0)
+    }
+
+    // Mudar o preço-alvo ou o stop reabre o alerta correspondente: sem isso, quem
+    // sobe o alvo depois de um disparo fica com o alerta pausado para sempre, sem
+    // entender por quê. Só zera quando o valor de fato muda.
+    if (req.body.target_price !== undefined || req.body.stop_price !== undefined) {
+      const [[atual]]: any = await pool.query(
+        'SELECT target_price, stop_price FROM assets WHERE id = ? AND user_id = ?',
+        [req.params.id, req.userId]
+      )
+      if (!atual) return res.status(404).json({ error: 'ativo não encontrado' })
+
+      if (req.body.target_price !== undefined) {
+        const novoAlvo = req.body.target_price === null ? null : Number(req.body.target_price)
+        const alvoAtual = atual.target_price === null ? null : Number(atual.target_price)
+        if (novoAlvo !== alvoAtual) {
+          campos.push('target_triggered_at = NULL')
+        }
+      }
+      if (req.body.stop_price !== undefined) {
+        const novoStop = req.body.stop_price === null ? null : Number(req.body.stop_price)
+        const stopAtual = atual.stop_price === null ? null : Number(atual.stop_price)
+        if (novoStop !== stopAtual) {
+          campos.push('stop_triggered_at = NULL')
+        }
+      }
     }
 
     if (!campos.length) return res.status(400).json({ error: 'nenhum campo para atualizar' })
