@@ -47,7 +47,7 @@ React SPA with React Router v6. All pages are protected by `ProtectedRoute`; `Au
 - `src/api/client.ts` — shared axios instance; attaches `billsync_token` from `localStorage` to every request; auto-redirects to `/login` on 401
 - `src/api/*.ts` — one file per domain (bills, occurrences, notifications, checklists)
 - `src/types/index.ts` — canonical TypeScript types shared across frontend (no duplication with backend)
-- `src/pages/` — full-page components: Dashboard, Contas (bills list), BillForm (create/edit), Checklists, Notificacoes, Configuracoes, Login
+- `src/pages/` — full-page components: Dashboard, Contas (bills list), BillForm (create/edit), Checklists, Notificacoes, Configuracoes, Login, Ativos (carteira de ativos)
 
 ### Backend (`backend/src/`)
 Express app, TypeScript, MySQL2 connection pool.
@@ -57,7 +57,7 @@ Express app, TypeScript, MySQL2 connection pool.
 - `migrate.ts` — inline migration system; checks for table existence and runs `CREATE TABLE IF NOT EXISTS` statements split on `;`
 - `scheduler.ts` — `node-cron` hourly tick (America/Sao_Paulo); dispatches bill notifications and checklist polls
 - `dispatcher.ts` — builds WhatsApp message text and calls WAHA to send bill reminders
-- `routes/` — REST handlers (bills, occurrences, notifications, checklists, waha, users, auth, webhooks)
+- `routes/` — REST handlers (bills, occurrences, notifications, checklists, waha, users, auth, webhooks, assets)
 - `services/` — domain logic separated from routes: `waha.ts` (WAHA client), `notificationMaterializer.ts` (generates notification records), `occurrenceGenerator.ts`, `checklistDispatcher.ts`, `brapi.ts` (cliente de cotações com cache de 10 min), `assetAlertService.ts` (alerta de preço-alvo e stop), `assetMath.ts` (cálculos puros de posição)
 
 ### Database (MySQL 8.0.13+)
