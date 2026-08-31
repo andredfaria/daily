@@ -5,12 +5,20 @@ import type { User } from '../types'
 import { useToast } from '../context/ToastContext'
 
 const NOTIFICATION_HOURS = [7, 8, 9, 10, 12, 18]
+const ASSET_ALERT_HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 interface NotificationSettings {
   whatsapp_alerts: boolean
   weekly_summary: boolean
   days_before: number
   notification_time: number
+  asset_alerts_enabled: boolean
+  asset_alert_hour: number
+}
+
+interface UserResponse extends User {
+  asset_alerts_enabled?: boolean
+  asset_alert_hour?: number
 }
 
 interface SummaryBudgetSettings {
@@ -35,6 +43,8 @@ const Configuracoes: React.FC = () => {
     weekly_summary: false,
     days_before: 3,
     notification_time: 8,
+    asset_alerts_enabled: true,
+    asset_alert_hour: 11,
   })
   const [savingNotif, setSavingNotif] = useState(false)
 
@@ -70,7 +80,7 @@ const Configuracoes: React.FC = () => {
   const fetchUser = useCallback(async () => {
     try {
       setLoadingUser(true)
-      const res = await client.get<User>('/users/me')
+      const res = await client.get<UserResponse>('/users/me')
       const u = res.data
       setUser(u)
       setProfileName(u.name ?? '')
@@ -80,6 +90,8 @@ const Configuracoes: React.FC = () => {
         weekly_summary: u.weekly_summary_enabled ?? false,
         days_before: u.default_days_before_alert ?? 3,
         notification_time: u.notification_time ?? 8,
+        asset_alerts_enabled: u.asset_alerts_enabled ?? true,
+        asset_alert_hour: u.asset_alert_hour ?? 11,
       })
       setSummarySettings({
         summary_enabled: u.summary_enabled ?? false,
@@ -172,6 +184,8 @@ const Configuracoes: React.FC = () => {
         weekly_summary_enabled: notifSettings.weekly_summary,
         default_days_before_alert: notifSettings.days_before,
         notification_time: notifSettings.notification_time,
+        asset_alerts_enabled: notifSettings.asset_alerts_enabled,
+        asset_alert_hour: notifSettings.asset_alert_hour,
       })
       success('Configurações salvas!')
     } catch {
@@ -503,6 +517,12 @@ const Configuracoes: React.FC = () => {
                 checked={notifSettings.weekly_summary}
                 onChange={(v) => setNotifSettings((prev) => ({ ...prev, weekly_summary: v }))}
               />
+              <ToggleRow
+                label="Alertas de ativos"
+                description="Receber aviso de preço-alvo e stop"
+                checked={notifSettings.asset_alerts_enabled}
+                onChange={(v) => setNotifSettings((prev) => ({ ...prev, asset_alerts_enabled: v }))}
+              />
 
               <div className="pt-2 border-t border-outline-variant/30 space-y-3">
                 <div>
@@ -548,6 +568,28 @@ const Configuracoes: React.FC = () => {
                         </option>
                       ))}
                     </select>
+                  </div>
+                )}
+
+                {notifSettings.asset_alerts_enabled && (
+                  <div>
+                    <label className="label">Horário do alerta de ativos</label>
+                    <select
+                      value={notifSettings.asset_alert_hour}
+                      onChange={(e) =>
+                        setNotifSettings((p) => ({ ...p, asset_alert_hour: Number(e.target.value) }))
+                      }
+                      className="input-field mt-1"
+                    >
+                      {ASSET_ALERT_HOURS.map((h) => (
+                        <option key={h} value={h}>
+                          {String(h).padStart(2, '0')}:00
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-on-surface-variant mt-1">
+                      Você recebe um aviso quando algum ativo atingir o preço-alvo ou o stop.
+                    </p>
                   </div>
                 )}
               </div>

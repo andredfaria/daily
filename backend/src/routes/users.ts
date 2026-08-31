@@ -27,6 +27,7 @@ router.patch('/me', async (req: Request, res: Response) => {
       'weekly_summary_enabled', 'default_days_before_alert',
       'summary_enabled', 'summary_day_of_week', 'monthly_budget_limit',
       'monthly_summary_enabled',
+      'asset_alerts_enabled', 'asset_alert_hour',
       'onboarding_completed',
     ]
     const fields: string[] = []
@@ -45,6 +46,16 @@ router.patch('/me', async (req: Request, res: Response) => {
         const h = Number(req.body[key])
         if (!Number.isInteger(h) || h < 0 || h > 23) {
           return res.status(400).json({ error: 'notification_time deve ser um inteiro entre 0 e 23' })
+        }
+        fields.push(`${key} = ?`)
+        values.push(h)
+        continue
+      }
+
+      if (key === 'asset_alert_hour') {
+        const h = Number(req.body[key])
+        if (!Number.isInteger(h) || h < 0 || h > 23) {
+          return res.status(400).json({ error: 'asset_alert_hour deve ser um inteiro entre 0 e 23' })
         }
         fields.push(`${key} = ?`)
         values.push(h)
