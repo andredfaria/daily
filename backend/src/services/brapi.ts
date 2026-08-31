@@ -10,9 +10,18 @@ export interface Quote {
 
 const CACHE_TTL_MS = 10 * 60 * 1000
 
+// Falha (rede, ticker sem cotação) também entra em cache, mas com TTL bem menor
+// que o de sucesso: sem BRAPI_TOKEN todo ticker fora dos 4 livres falha sempre,
+// e sem cache negativo cada GET /api/assets bateria de novo em todos eles (10s de
+// timeout cada) até estourar a cota mensal. 60s evita isso sem prender por muito
+// tempo uma falha que pode ter sido só uma instabilidade passageira da brapi.
+const NEGATIVE_CACHE_TTL_MS = 60 * 1000
+
 // A tela consulta cotações a cada carregamento; sem cache um F5 repetido
 // queima o limite mensal de 15.000 requisições do plano gratuito.
-const cache = new Map<string, { quote: Quote; expiresAt: number }>()
+// Chave inclui o tipo (kind:symbol) para não deixar um ticker validado como
+// cripto ser aceito como ação (ou vice-versa) a partir de um cache quente.
+const cache = new Map<string, { quote: Quote | null; expiresAt: number }>()
 
 export function clearQuoteCache(): void {
   cache.clear()
@@ -31,14 +40,19 @@ function brapiClient() {
 }
 
 function parseQuotedAt(raw: unknown): Date {
-  if (typeof raw === 'number') return new Date(raw * 1000)
-  if (typeof raw === 'string') return new Date(raw)
-  return new Date()
+  let d: Date
+  if (typeof raw === 'number') d = new Date(raw * 1000)
+  else if (typeof raw === 'string') d = new Date(raw)
+  else d = new Date()
+  // Data impossível de parsear (ou epoch absurdo) não pode virar um RangeError
+  // lá na frente, em formatDateSaoPaulo — cai para "agora", que é sempre válido.
+  return Number.isNaN(d.getTime()) ? new Date() : d
 }
 
 export async function fetchQuote(ticker: string, kind: AssetKind): Promise<Quote | null> {
   const symbol = ticker.trim().toUpperCase()
-  const cached = cache.get(symbol)
+  const cacheKey = `${kind}:${symbol}`
+  const cached = cache.get(cacheKey)
   if (cached && cached.expiresAt > Date.now()) return cached.quote
 
   try {
@@ -71,14 +85,16 @@ export async function fetchQuote(ticker: string, kind: AssetKind): Promise<Quote
 
     if (!quote || !Number.isFinite(quote.price)) {
       console.warn(`[brapi] sem cotação para ${symbol}`)
+      cache.set(cacheKey, { quote: null, expiresAt: Date.now() + NEGATIVE_CACHE_TTL_MS })
       return null
     }
 
-    cache.set(symbol, { quote, expiresAt: Date.now() + CACHE_TTL_MS })
+    cache.set(cacheKey, { quote, expiresAt: Date.now() + CACHE_TTL_MS })
     return quote
   } catch (err: any) {
     // Falha de rede nunca sobe: o tick do scheduler precisa continuar.
     console.error(`[brapi] erro ao buscar ${symbol}:`, err.message)
+    cache.set(cacheKey, { quote: null, expiresAt: Date.now() + NEGATIVE_CACHE_TTL_MS })
     return null
   }
 }

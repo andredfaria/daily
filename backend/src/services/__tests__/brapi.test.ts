@@ -80,6 +80,31 @@ describe('fetchQuote', () => {
     await fetchQuote('petr4', 'stock')
     expect(getMock.mock.calls[0][0]).toContain('PETR4')
   })
+
+  it('converte regularMarketTime numérico (epoch em segundos) para Date', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        results: [
+          { symbol: 'PETR4', shortName: 'PETROBRAS PN', regularMarketPrice: 42.3, regularMarketTime: 1755000000 },
+        ],
+      },
+    })
+    const quote = await fetchQuote('PETR4', 'stock')
+    expect(quote?.quotedAt).toEqual(new Date(1755000000 * 1000))
+  })
+
+  it('cai para uma data válida quando regularMarketTime é uma string impossível de parsear', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        results: [
+          { symbol: 'PETR4', shortName: 'PETROBRAS PN', regularMarketPrice: 42.3, regularMarketTime: 'não é uma data' },
+        ],
+      },
+    })
+    const quote = await fetchQuote('PETR4', 'stock')
+    expect(quote).not.toBeNull()
+    expect(Number.isNaN(quote!.quotedAt.getTime())).toBe(false)
+  })
 })
 
 describe('cache de cotações', () => {
@@ -107,11 +132,32 @@ describe('cache de cotações', () => {
     expect(getMock).toHaveBeenCalledTimes(2)
   })
 
-  it('não guarda em cache uma falha', async () => {
+  it('guarda uma falha em cache por um tempo curto, evitando bater a API a cada requisição', async () => {
+    jest.useFakeTimers()
     getMock.mockRejectedValueOnce(new Error('erro de rede'))
     getMock.mockResolvedValueOnce(acaoOk)
     expect(await fetchQuote('PETR4', 'stock')).toBeNull()
+    expect(await fetchQuote('PETR4', 'stock')).toBeNull()
+    expect(getMock).toHaveBeenCalledTimes(1)
+    jest.useRealTimers()
+  })
+
+  it('expira o cache negativo depois do TTL curto e tenta de novo', async () => {
+    jest.useFakeTimers()
+    getMock.mockRejectedValueOnce(new Error('erro de rede'))
+    getMock.mockResolvedValueOnce(acaoOk)
+    expect(await fetchQuote('PETR4', 'stock')).toBeNull()
+    jest.advanceTimersByTime(61 * 1000)
     expect((await fetchQuote('PETR4', 'stock'))?.price).toBe(42.3)
+    jest.useRealTimers()
+  })
+
+  it('mantém caches negativos separados por tipo (kind:symbol)', async () => {
+    getMock.mockRejectedValueOnce(new Error('erro de rede'))
+    getMock.mockResolvedValueOnce(acaoOk)
+    expect(await fetchQuote('BTC', 'stock')).toBeNull()
+    expect((await fetchQuote('BTC', 'crypto'))).toBeNull()
+    expect(getMock).toHaveBeenCalledTimes(2)
   })
 })
 
