@@ -6,6 +6,7 @@ import { materializeForUser, getTodaySaoPaulo } from './services/notificationMat
 import { sendPollsForHour } from './services/checklistDispatcher'
 import { sendWeeklySummary, sendMonthlySummary } from './services/summaryService'
 import { checkBudgetAlert } from './services/budgetAlertService'
+import { checkAssetAlerts } from './services/assetAlertService'
 import { configureWahaWebhook } from './services/waha'
 
 function getCurrentHourSaoPaulo(): number {
@@ -119,6 +120,19 @@ export async function initScheduler(): Promise<void> {
         }
       } catch (e: any) { console.error('[scheduler] budget tick erro:', e.message) }
     }
+
+    // --- Alerta de ativos (hora configurável por usuário, default 11h) ---
+    try {
+      const [assetUsers]: any = await pool.query(
+        `SELECT id FROM users
+          WHERE asset_alerts_enabled = 1 AND asset_alert_hour = ?
+            AND whatsapp_alerts_enabled = 1 AND is_active = 1`,
+        [hour]
+      )
+      for (const { id } of assetUsers) {
+        try { await checkAssetAlerts(id) } catch (e: any) { console.error('[scheduler] asset erro:', e.message) }
+      }
+    } catch (e: any) { console.error('[scheduler] asset tick erro:', e.message) }
   }, { timezone: 'America/Sao_Paulo' })
 
   console.log('[scheduler] cron horário registrado (timezone America/Sao_Paulo)')
