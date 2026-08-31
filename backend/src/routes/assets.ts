@@ -32,8 +32,9 @@ function validarCampos(body: any): string | null {
 }
 
 // Converte os campos DECIMAL vindos do mysql2 (string) para number,
-// preservando null em target_price/stop_price. Usado nas rotas de escrita
-// para devolver a linha no mesmo formato numérico que o GET já entrega.
+// preservando null em target_price/stop_price. Normaliza is_active (1/0 do MySQL)
+// para booleano. Usado nas rotas de escrita para devolver a linha no mesmo formato
+// que o GET já entrega.
 function numerarAtivo(a: any): any {
   return {
     ...a,
@@ -41,6 +42,7 @@ function numerarAtivo(a: any): any {
     avg_price: Number(a.avg_price),
     target_price: a.target_price === null ? null : Number(a.target_price),
     stop_price: a.stop_price === null ? null : Number(a.stop_price),
+    is_active: !!a.is_active,
   }
 }
 
@@ -65,6 +67,7 @@ router.get('/', async (req: Request, res: Response) => {
           avg_price: avgPrice,
           target_price: a.target_price === null ? null : Number(a.target_price),
           stop_price: a.stop_price === null ? null : Number(a.stop_price),
+          is_active: !!a.is_active,
           short_name: quote?.shortName ?? a.ticker,
           current_price: price,
           quote_stale: !quote,
