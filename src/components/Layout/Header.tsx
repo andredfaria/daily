@@ -5,6 +5,7 @@ const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
   '/contas': 'Minhas Contas',
   '/contas/nova': 'Nova Conta',
+  '/ativos': 'Meus Ativos',
   '/checklists': 'Checklists',
   '/notificacoes': 'Notificações',
   '/historico': 'Histórico',

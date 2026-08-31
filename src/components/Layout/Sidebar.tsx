@@ -6,6 +6,7 @@ const navItems = [
   { path: '/', label: 'Dashboard', icon: 'dashboard', exact: true },
   { path: '/contas', label: 'Contas', icon: 'receipt_long' },
   { path: '/analise', label: 'Análise', icon: 'monitoring' },
+  { path: '/ativos', label: 'Ativos', icon: 'trending_up' },
   { path: '/checklists', label: 'Checklists', icon: 'checklist' },
   { path: '/notificacoes', label: 'Notificações', icon: 'notifications' },
   { path: '/configuracoes', label: 'Configurações', icon: 'settings' },
