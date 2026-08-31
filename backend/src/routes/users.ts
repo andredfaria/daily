@@ -53,6 +53,9 @@ router.patch('/me', async (req: Request, res: Response) => {
       }
 
       if (key === 'asset_alert_hour') {
+        if (req.body[key] === null || req.body[key] === '') {
+          return res.status(400).json({ error: 'asset_alert_hour não pode ser nulo ou vazio' })
+        }
         const h = Number(req.body[key])
         if (!Number.isInteger(h) || h < 0 || h > 23) {
           return res.status(400).json({ error: 'asset_alert_hour deve ser um inteiro entre 0 e 23' })

@@ -5,7 +5,11 @@ import type { User } from '../types'
 import { useToast } from '../context/ToastContext'
 
 const NOTIFICATION_HOURS = [7, 8, 9, 10, 12, 18]
-const ASSET_ALERT_HOURS = Array.from({ length: 24 }, (_, i) => i)
+// B3 negocia das 10h às 17h BRT; antes da abertura a brapi devolve o fechamento
+// anterior e o alerta de ação/FII nunca dispara. Limita o seletor a 11h-23h para
+// que quem configurar essa hora sempre receba o alerta. Cripto não tem essa
+// restrição, mas usa o mesmo horário — ver validação no backend (aceita 0-23).
+const ASSET_ALERT_HOURS = Array.from({ length: 13 }, (_, i) => i + 11)
 
 interface NotificationSettings {
   whatsapp_alerts: boolean
@@ -589,6 +593,7 @@ const Configuracoes: React.FC = () => {
                     </select>
                     <p className="text-xs text-on-surface-variant mt-1">
                       Você recebe um aviso quando algum ativo atingir o preço-alvo ou o stop.
+                      Ações e FIIs só são checados após a abertura do pregão.
                     </p>
                   </div>
                 )}
