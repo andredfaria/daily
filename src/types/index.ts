@@ -217,3 +217,33 @@ export interface OcorrenciaTop {
 export interface TopOccurrencesResponse {
   ocorrencias: OcorrenciaTop[]
 }
+
+export type AssetKind = 'stock' | 'fii' | 'crypto'
+
+export interface Asset {
+  id: string
+  user_id: string
+  ticker: string
+  kind: AssetKind
+  quantity: number
+  avg_price: number
+  target_price: number | null
+  stop_price: number | null
+  target_triggered_at: string | null
+  stop_triggered_at: string | null
+  last_price: number | null
+  last_quote_at: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AssetWithQuote extends Asset {
+  short_name: string
+  current_price: number | null
+  quote_stale: boolean
+  invested_value: number
+  current_value: number | null
+  profit_loss: number | null
+  profit_loss_pct: number | null
+}
