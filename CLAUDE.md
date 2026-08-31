@@ -37,6 +37,7 @@ Copy `.env.example` to `.env`. Required vars for local dev:
 - `WAHA_WEBHOOK_SECRET` / `WHATSAPP_HOOK_HMAC_KEY` — webhook HMAC verification
 - `PIX_ENCRYPTION_KEY` — AES-256-GCM key for `pix_key` at-rest encryption; **required in production**. In dev, if unset, `pix_key` is stored in plaintext with a warning.
 - `DEV_OTP_BYPASS=true` — skip WAHA for OTP in local dev (code logged to backend stdout)
+- `BRAPI_TOKEN` — token gratuito da [brapi.dev](https://brapi.dev) para cotação de ativos. Sem ele, apenas PETR4, MGLU3, VALE3 e ITUB4 respondem. Plano gratuito: 15.000 req/mês, 1 ticker por requisição.
 
 ## Architecture
 
@@ -57,10 +58,10 @@ Express app, TypeScript, MySQL2 connection pool.
 - `scheduler.ts` — `node-cron` hourly tick (America/Sao_Paulo); dispatches bill notifications and checklist polls
 - `dispatcher.ts` — builds WhatsApp message text and calls WAHA to send bill reminders
 - `routes/` — REST handlers (bills, occurrences, notifications, checklists, waha, users, auth, webhooks)
-- `services/` — domain logic separated from routes: `waha.ts` (WAHA client), `notificationMaterializer.ts` (generates notification records), `occurrenceGenerator.ts`, `checklistDispatcher.ts`
+- `services/` — domain logic separated from routes: `waha.ts` (WAHA client), `notificationMaterializer.ts` (generates notification records), `occurrenceGenerator.ts`, `checklistDispatcher.ts`, `brapi.ts` (cliente de cotações com cache de 10 min), `assetAlertService.ts` (alerta de preço-alvo e stop), `assetMath.ts` (cálculos puros de posição)
 
 ### Database (MySQL 8.0.13+)
-Requires `DEFAULT (UUID())` expression support. Schema in `database/migrations/` (initial schema) + incremental migrations in `backend/src/migrate.ts`. Tables: `users`, `bills`, `payment_methods`, `bill_occurrences`, `notifications`, `otp_codes`, `checklists`, `checklist_items`, `checklist_daily_polls`.
+Requires `DEFAULT (UUID())` expression support. Schema in `database/migrations/` (initial schema) + incremental migrations in `backend/src/migrate.ts`. Tables: `users`, `bills`, `payment_methods`, `bill_occurrences`, `notifications`, `otp_codes`, `checklists`, `checklist_items`, `checklist_daily_polls`, `assets`.
 
 ### Auth flow
 OTP via WhatsApp → JWT (30 days) stored in `localStorage` → `Authorization: Bearer` on every API call. `authMiddleware` (`backend/src/middleware/auth.ts`) sets `req.userId` for downstream handlers.
@@ -71,4 +72,6 @@ OTP via WhatsApp → JWT (30 days) stored in `localStorage` → `Authorization: 
 - `notification_time` on `users` is an integer hour (0–23) in America/Sao_Paulo; scheduler compares it to current São Paulo hour.
 - Bill recurrence: `monthly` uses `recurrence_day_of_month`, `weekly` uses `recurrence_day_of_week` (0=Sunday), `once` uses `due_date`.
 - WAHA webhook hits `/api/webhooks`; payment confirmations via WhatsApp reply update occurrence status.
-- No test suite currently exists in this repo.
+- Alertas de ativos rodam no tick horário conforme `users.asset_alert_hour` (default 11). Disparam uma vez e pausam (`target_triggered_at` / `stop_triggered_at`), até serem reativados no app.
+- Ações e FIIs são pulados quando a cotação não é do dia corrente (fim de semana e feriado); cripto roda todo dia.
+- Testes com jest + ts-jest em `backend/src/services/__tests__/`, cobrindo funções puras sem banco nem rede. Rodar com `cd backend && npm test`.

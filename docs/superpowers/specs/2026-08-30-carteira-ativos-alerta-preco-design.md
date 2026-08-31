@@ -40,7 +40,7 @@ Escopo de ativos: **ações da B3, FIIs e criptomoedas**. Ações dos EUA ficam 
 
 ## 4. Dependência externa: brapi.dev
 
-- **Endpoints:** `/api/v2/stocks/quote` (ações e FIIs), `/api/v2/crypto` (cripto)
+- **Endpoints:** `/api/quote/{ticker}` (ações e FIIs, confirmado empiricamente), `/api/v2/crypto` (cripto)
 - **Autenticação:** header `Authorization: Bearer ${BRAPI_TOKEN}`
 - **Plano gratuito:** 15.000 requisições/mês, **1 ticker por requisição** (sem batch)
 - **Sem token:** apenas PETR4, MGLU3, VALE3 e ITUB4 respondem
