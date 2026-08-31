@@ -111,7 +111,7 @@ export async function validateTicker(ticker: string, kind: AssetKind): Promise<b
 - Instância axios com `baseURL: https://brapi.dev/api`, header Bearer, timeout 10s.
 - Cache em memória (`Map<string, {quote, expiresAt}>`), TTL 10 min por ticker.
   Sem ele, recarregar a tela repetidamente queima o limite mensal.
-- `kind` decide o endpoint: `stock`/`fii` → `/v2/stocks/quote`, `crypto` → `/v2/crypto`.
+- `kind` decide o endpoint: `stock`/`fii` → `/quote/{ticker}`, `crypto` → `/v2/crypto`.
 - Qualquer falha (timeout, 404, 5xx) retorna `null` e loga. Nunca lança.
 
 ### 6.2 `backend/src/services/assetAlertService.ts` — regra de alerta
