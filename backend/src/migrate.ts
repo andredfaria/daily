@@ -231,6 +231,39 @@ ALTER TABLE notifications
       await addColumnIfNotExists('checklists', 'last_miss_poll_date', 'DATE DEFAULT NULL', 'consecutive_misses')
     },
   },
+  {
+    name: '014_assets',
+    statements: splitStatements(`
+CREATE TABLE IF NOT EXISTS assets (
+  id                  CHAR(36)      NOT NULL DEFAULT (UUID()),
+  user_id             CHAR(36)      NOT NULL,
+  ticker              VARCHAR(20)   NOT NULL,
+  kind                ENUM('stock','fii','crypto') NOT NULL DEFAULT 'stock',
+  quantity            DECIMAL(18,8) NOT NULL DEFAULT 0,
+  avg_price           DECIMAL(18,8) NOT NULL DEFAULT 0,
+  target_price        DECIMAL(18,8) DEFAULT NULL,
+  stop_price          DECIMAL(18,8) DEFAULT NULL,
+  target_triggered_at DATETIME      DEFAULT NULL,
+  stop_triggered_at   DATETIME      DEFAULT NULL,
+  last_price          DECIMAL(18,8) DEFAULT NULL,
+  last_quote_at       DATETIME      DEFAULT NULL,
+  is_active           BOOLEAN       NOT NULL DEFAULT TRUE,
+  created_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_user_ticker (user_id, ticker),
+  KEY idx_assets_user_active (user_id, is_active),
+  CONSTRAINT fk_assets_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `),
+  },
+  {
+    name: '015_users_asset_alerts',
+    run: async () => {
+      await addColumnIfNotExists('users', 'asset_alerts_enabled', 'BOOLEAN NOT NULL DEFAULT TRUE')
+      await addColumnIfNotExists('users', 'asset_alert_hour', 'TINYINT UNSIGNED NOT NULL DEFAULT 11', 'asset_alerts_enabled')
+    },
+  },
 ]
 
 export async function runMigrations(): Promise<void> {
