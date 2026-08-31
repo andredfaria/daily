@@ -123,6 +123,14 @@ describe('buildAlertMessage', () => {
     expect(msg).toContain('Lucro: +R$ 730,00 (+20,9%)')
   })
 
+  it('formata quantidade fracionária de cripto no padrão pt-BR, sem casas fixas erradas', () => {
+    const cripto: AlertHit = {
+      ticker: 'BTC', reason: 'target', price: 350000, threshold: 340000, quantity: 0.005, avgPrice: 300000,
+    }
+    const msg = buildAlertMessage([cripto])
+    expect(msg).toContain('Posição: 0,005 un. · pago R$ 300.000,00')
+  })
+
   it('usa a palavra prejuízo e sinal negativo quando o resultado é negativo', () => {
     const msg = buildAlertMessage([stop])
     expect(msg).toContain('🛑 *MXRF11* atingiu o stop')

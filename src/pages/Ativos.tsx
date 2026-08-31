@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { assetsApi, CreateAssetPayload } from '../api/assets'
 import type { AssetKind, AssetWithQuote } from '../types'
 import { useToast } from '../context/ToastContext'
+import Modal from '../components/ui/Modal'
 
 const KIND_LABELS: Record<AssetKind, string> = {
   stock: 'Ação',
@@ -11,6 +12,18 @@ const KIND_LABELS: Record<AssetKind, string> = {
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+// Espelha formatPct de backend/src/services/assetMath.ts — mesma casa decimal
+// no WhatsApp e na tela, para não mostrar "+20,9%" lá e "+20.9%" aqui.
+const formatPct = (value: number) =>
+  Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+// Espelha formatQuantity de backend/src/services/assetMath.ts — quantidade
+// fracionária (cripto) sai com vírgula, não ponto: "0,005", não "0.005".
+const formatQuantity = (quantity: number) =>
+  Number.isInteger(quantity)
+    ? String(quantity)
+    : quantity.toLocaleString('pt-BR', { maximumFractionDigits: 8 })
 
 const FORM_INICIAL: CreateAssetPayload = {
   ticker: '', kind: 'stock', quantity: 0, avg_price: 0, target_price: null, stop_price: null,
@@ -23,6 +36,9 @@ const Ativos: React.FC = () => {
   const [salvando, setSalvando] = useState(false)
   const [formAberto, setFormAberto] = useState(false)
   const [form, setForm] = useState<CreateAssetPayload>(FORM_INICIAL)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; ticker: string } | null>(null)
+  const [excluindo, setExcluindo] = useState(false)
 
   const carregar = async () => {
     setCarregando(true)
@@ -37,18 +53,46 @@ const Ativos: React.FC = () => {
 
   useEffect(() => { carregar() }, [])
 
+  const fecharForm = () => {
+    setForm(FORM_INICIAL)
+    setEditingId(null)
+    setFormAberto(false)
+  }
+
+  const iniciarEdicao = (a: AssetWithQuote) => {
+    setEditingId(a.id)
+    setForm({
+      ticker: a.ticker,
+      kind: a.kind,
+      quantity: a.quantity,
+      avg_price: a.avg_price,
+      target_price: a.target_price,
+      stop_price: a.stop_price,
+    })
+    setFormAberto(true)
+  }
+
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault()
     setSalvando(true)
     try {
-      await assetsApi.create({
-        ...form,
-        target_price: form.target_price || null,
-        stop_price: form.stop_price || null,
-      })
-      showToast(`${form.ticker.toUpperCase()} adicionado à carteira`, 'success')
-      setForm(FORM_INICIAL)
-      setFormAberto(false)
+      if (editingId) {
+        await assetsApi.update(editingId, {
+          quantity: form.quantity,
+          avg_price: form.avg_price,
+          target_price: form.target_price || null,
+          stop_price: form.stop_price || null,
+        })
+        showToast(`${form.ticker.toUpperCase()} atualizado`, 'success')
+      } else {
+        await assetsApi.create({
+          ...form,
+          target_price: form.target_price || null,
+          stop_price: form.stop_price || null,
+        })
+        showToast(`${form.ticker.toUpperCase()} adicionado à carteira`, 'success')
+      }
+      fecharForm()
       carregar()
     } catch (err: any) {
       showToast(err.response?.data?.error ?? 'Não consegui salvar o ativo', 'error')
@@ -67,14 +111,18 @@ const Ativos: React.FC = () => {
     }
   }
 
-  const remover = async (id: string, ticker: string) => {
-    if (!confirm(`Remover ${ticker} da carteira?`)) return
+  const confirmarRemocao = async () => {
+    if (!deleteTarget) return
+    setExcluindo(true)
     try {
-      await assetsApi.delete(id)
-      showToast(`${ticker} removido`, 'success')
+      await assetsApi.delete(deleteTarget.id)
+      showToast(`${deleteTarget.ticker} removido`, 'success')
+      setDeleteTarget(null)
       carregar()
     } catch {
       showToast('Não consegui remover o ativo', 'error')
+    } finally {
+      setExcluindo(false)
     }
   }
 
@@ -95,7 +143,7 @@ const Ativos: React.FC = () => {
             : `${ativos.length} ativo${ativos.length > 1 ? 's' : ''} monitorado${ativos.length > 1 ? 's' : ''}`}
         </p>
         <button
-          onClick={() => setFormAberto((v) => !v)}
+          onClick={() => (formAberto ? fecharForm() : setFormAberto(true))}
           className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-xl bg-primary text-on-primary text-sm font-medium"
         >
           <span className="material-symbols-outlined text-[20px]">{formAberto ? 'close' : 'add'}</span>
@@ -105,23 +153,30 @@ const Ativos: React.FC = () => {
 
       {formAberto && (
         <form onSubmit={salvar} className="rounded-2xl bg-surface-container-lowest border border-outline-variant/50 p-4 space-y-3">
+          {editingId && (
+            <p className="text-xs text-on-surface-variant">
+              Editando {form.ticker} — ticker e tipo não podem ser alterados.
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
               Ticker
               <input
                 required
+                disabled={!!editingId}
                 value={form.ticker}
                 onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })}
                 placeholder="PETR4"
-                className="min-h-[48px] px-3 rounded-xl bg-surface-container border border-outline-variant/50 text-sm text-on-surface"
+                className="min-h-[48px] px-3 rounded-xl bg-surface-container border border-outline-variant/50 text-sm text-on-surface disabled:opacity-50"
               />
             </label>
             <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
               Tipo
               <select
+                disabled={!!editingId}
                 value={form.kind}
                 onChange={(e) => setForm({ ...form, kind: e.target.value as AssetKind })}
-                className="min-h-[48px] px-3 rounded-xl bg-surface-container border border-outline-variant/50 text-sm text-on-surface"
+                className="min-h-[48px] px-3 rounded-xl bg-surface-container border border-outline-variant/50 text-sm text-on-surface disabled:opacity-50"
               >
                 <option value="stock">Ação</option>
                 <option value="fii">FII</option>
@@ -172,7 +227,7 @@ const Ativos: React.FC = () => {
             disabled={salvando}
             className="w-full min-h-[48px] rounded-xl bg-primary text-on-primary text-sm font-medium disabled:opacity-50"
           >
-            {salvando ? 'Salvando...' : 'Adicionar à carteira'}
+            {salvando ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Adicionar à carteira'}
           </button>
         </form>
       )}
@@ -217,11 +272,11 @@ const Ativos: React.FC = () => {
               {a.quantity > 0 && a.profit_loss !== null && (
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-on-surface-variant">
-                    {a.quantity} un. · pago R$ {brl(a.avg_price)}
+                    {formatQuantity(a.quantity)} un. · pago R$ {brl(a.avg_price)}
                   </span>
                   <span className={`font-semibold ${positivo ? 'text-tertiary' : 'text-error'}`}>
                     {positivo ? '+' : '-'}R$ {brl(Math.abs(lucro))} ({positivo ? '+' : '-'}
-                    {Math.abs(a.profit_loss_pct ?? 0).toFixed(1)}%)
+                    {formatPct(a.profit_loss_pct ?? 0)}%)
                   </span>
                 </div>
               )}
@@ -255,9 +310,16 @@ const Ativos: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
                 <button
-                  onClick={() => remover(a.id, a.ticker)}
+                  onClick={() => iniciarEdicao(a)}
+                  className="flex items-center gap-1 text-xs text-on-surface-variant px-3 min-h-[48px]"
+                >
+                  <span className="material-symbols-outlined text-[18px]">edit</span>
+                  Editar
+                </button>
+                <button
+                  onClick={() => setDeleteTarget({ id: a.id, ticker: a.ticker })}
                   className="flex items-center gap-1 text-xs text-error px-3 min-h-[48px]"
                 >
                   <span className="material-symbols-outlined text-[18px]">delete</span>
@@ -268,6 +330,18 @@ const Ativos: React.FC = () => {
           )
         })}
       </div>
+
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmarRemocao}
+        title="Remover ativo"
+        description={`Remover ${deleteTarget?.ticker} da carteira? Essa ação não pode ser desfeita.`}
+        confirmLabel="Remover"
+        cancelLabel="Cancelar"
+        variant="danger"
+        loading={excluindo}
+      />
     </div>
   )
 }
