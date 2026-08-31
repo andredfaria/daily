@@ -31,6 +31,19 @@ function validarCampos(body: any): string | null {
   return null
 }
 
+// Converte os campos DECIMAL vindos do mysql2 (string) para number,
+// preservando null em target_price/stop_price. Usado nas rotas de escrita
+// para devolver a linha no mesmo formato numérico que o GET já entrega.
+function numerarAtivo(a: any): any {
+  return {
+    ...a,
+    quantity: Number(a.quantity),
+    avg_price: Number(a.avg_price),
+    target_price: a.target_price === null ? null : Number(a.target_price),
+    stop_price: a.stop_price === null ? null : Number(a.stop_price),
+  }
+}
+
 // GET /api/assets — lista com cotação e resultado calculado
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -113,7 +126,7 @@ router.post('/', async (req: Request, res: Response) => {
       'SELECT * FROM assets WHERE user_id = ? AND ticker = ?',
       [req.userId, symbol]
     )
-    res.status(201).json(criado[0])
+    res.status(201).json(numerarAtivo(criado[0]))
   } catch (err: any) {
     console.error('[assets] erro no POST /:', err.message)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -153,7 +166,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
       'SELECT * FROM assets WHERE id = ? AND user_id = ?',
       [req.params.id, req.userId]
     )
-    res.json(rows[0])
+    res.json(numerarAtivo(rows[0]))
   } catch (err: any) {
     console.error('[assets] erro no PATCH /:id:', err.message)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -174,7 +187,7 @@ router.post('/:id/rearm', async (req: Request, res: Response) => {
       'SELECT * FROM assets WHERE id = ? AND user_id = ?',
       [req.params.id, req.userId]
     )
-    res.json(rows[0])
+    res.json(numerarAtivo(rows[0]))
   } catch (err: any) {
     console.error('[assets] erro no POST /:id/rearm:', err.message)
     res.status(500).json({ error: 'Erro interno do servidor' })
