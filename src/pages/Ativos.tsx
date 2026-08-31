@@ -227,8 +227,18 @@ const Ativos: React.FC = () => {
               )}
 
               <div className="flex flex-wrap gap-2 text-[11px] text-on-surface-variant">
-                {a.target_price !== null && <span>🎯 alvo R$ {brl(a.target_price)}</span>}
-                {a.stop_price !== null && <span>🛑 stop R$ {brl(a.stop_price)}</span>}
+                {a.target_price !== null && (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">flag</span>
+                    alvo R$ {brl(a.target_price)}
+                  </span>
+                )}
+                {a.stop_price !== null && (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">shield</span>
+                    stop R$ {brl(a.stop_price)}
+                  </span>
+                )}
               </div>
 
               {pausado && (
