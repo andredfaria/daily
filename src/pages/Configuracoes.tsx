@@ -290,7 +290,7 @@ const Configuracoes: React.FC = () => {
             <div>
               <p className="text-sm font-semibold text-on-surface">Seus lembretes por WhatsApp estão pausados</p>
               <p className="text-xs text-on-surface-variant mt-0.5">
-                Pausamos automaticamente por falta de resposta ao checklist. Reative quando quiser voltar a receber lembretes.
+                Enquanto estiver pausado você não recebe lembretes de contas nem enquetes de checklist. Reative quando quiser voltar a receber.
               </p>
             </div>
           </div>

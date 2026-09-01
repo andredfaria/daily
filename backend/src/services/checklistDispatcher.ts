@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { sendWhatsAppPoll, sendWhatsAppText, WhatsAppNumberNotFoundError } from './waha'
-import { nextMissState, INACTIVITY_THRESHOLD } from './checklistInactivity'
+import { nextMissState, buildInactivityMessage, INACTIVITY_THRESHOLD } from './checklistInactivity'
 
 export function getTodaySaoPaulo(): string {
   // formatToParts garante YYYY-MM-DD independente da versão do ICU/Node
@@ -14,9 +14,6 @@ export function getTodaySaoPaulo(): string {
   return `${p.year}-${p.month}-${p.day}`
 }
 
-const INACTIVITY_MESSAGE =
-  'Notamos que você não responde ao checklist há 15 dias, então pausamos os lembretes por WhatsApp (checklist e contas). Quando quiser voltar, reative em Configurações no BillSync.'
-
 // Normaliza um valor de data (Date do mysql2 ou string) para YYYY-MM-DD,
 // seguindo o padrão já estabelecido em financialAnalytics.ts (topOcorrencias).
 function normalizeDate(value: any): string {
@@ -25,8 +22,9 @@ function normalizeDate(value: any): string {
 
 // Verifica o resultado do poll mais recente já encerrado (poll_date < hoje) e
 // atualiza o contador de dias seguidos sem resposta. Se o limiar for atingido,
-// trava o checklist e, se for o último checklist ativo do usuário, trava o
-// usuário inteiro (corta contas + checklist) e avisa por WhatsApp uma única vez.
+// pausa apenas este checklist e avisa por WhatsApp na hora.
+// A pausa não toca users.is_active de propósito: cortar os lembretes de contas
+// de quem só parou de votar no checklist desliga a função principal do app.
 // Retorna true se o checklist foi travado agora (o envio de hoje deve ser pulado).
 async function applyInactivityCheck(checklistId: string, userId: string, today: string): Promise<boolean> {
   const [lastPollRows]: any = await pool.query(
@@ -36,7 +34,7 @@ async function applyInactivityCheck(checklistId: string, userId: string, today: 
   if (!lastPollRows.length) return false
 
   const [checklistRows]: any = await pool.query(
-    'SELECT consecutive_misses, last_miss_poll_date FROM checklists WHERE id = ?',
+    'SELECT name, consecutive_misses, last_miss_poll_date FROM checklists WHERE id = ?',
     [checklistId],
   )
   if (!checklistRows.length) return false
@@ -64,23 +62,16 @@ async function applyInactivityCheck(checklistId: string, userId: string, today: 
   if (!shouldLock) return false
 
   await pool.query('UPDATE checklists SET is_active = 0 WHERE id = ?', [checklistId])
-  console.log(`[checklistDispatcher] checklist ${checklistId} travado por inatividade (${misses} dias sem resposta)`)
-
-  const [remainingRows]: any = await pool.query(
-    'SELECT COUNT(*) AS cnt FROM checklists WHERE user_id = ? AND is_active = 1 AND consecutive_misses < ?',
-    [userId, INACTIVITY_THRESHOLD],
-  )
-  if (remainingRows[0].cnt > 0) return true
+  console.log(`[checklistDispatcher] checklist ${checklistId} pausado por inatividade (${misses} dias sem resposta)`)
 
   const [userRows]: any = await pool.query('SELECT whatsapp_number FROM users WHERE id = ?', [userId])
-  await pool.query('UPDATE users SET is_active = 0 WHERE id = ?', [userId])
-  console.log(`[checklistDispatcher] usuário ${userId} desativado — todos os checklists travados por inatividade`)
-
   const phone = userRows[0]?.whatsapp_number
   if (phone) {
     try {
-      await sendWhatsAppText(phone, INACTIVITY_MESSAGE)
+      await sendWhatsAppText(phone, buildInactivityMessage(checklistRows[0].name))
     } catch (err: any) {
+      // Falhar o aviso não pode desfazer a pausa — o checklist já está pausado
+      // e o usuário ainda encontra o botão de reativar na tela.
       console.error(`[checklistDispatcher] erro ao enviar aviso de pausa:`, err.message)
     }
   }
@@ -90,8 +81,8 @@ async function applyInactivityCheck(checklistId: string, userId: string, today: 
 
 // Restaura checklists que foram travados pela regra de inatividade (is_active=0
 // com consecutive_misses >= limiar — único jeito de chegar nesse estado hoje) e
-// zera os contadores de todos os checklists do usuário, dando 15 dias novos de
-// chance a cada um.
+// zera os contadores de todos os checklists do usuário, zerando a sequência de
+// faltas de cada um.
 export async function reactivateUserChecklists(userId: string): Promise<void> {
   await pool.query(
     'UPDATE checklists SET is_active = 1 WHERE user_id = ? AND is_active = 0 AND consecutive_misses >= ?',
