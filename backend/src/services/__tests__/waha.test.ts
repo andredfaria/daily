@@ -1,4 +1,4 @@
-import { generatePhoneVariant, buildPhoneCandidates } from '../waha'
+import { generatePhoneVariant, buildPhoneCandidates, parseContactPayload } from '../waha'
 
 describe('generatePhoneVariant', () => {
   it('adiciona 9 a numero de 12 digitos', () => {
@@ -36,5 +36,34 @@ describe('buildPhoneCandidates', () => {
   it('nao duplica quando digits e resolved e variant sao todos iguais (numero nao-BR)', () => {
     // 11 digitos — generatePhoneVariant retorna null
     expect(buildPhoneCandidates('12345678901', '12345678901')).toEqual(['12345678901'])
+  })
+})
+
+describe('parseContactPayload', () => {
+  it('lê pushname minúsculo, que é o que o engine GOWS devolve', () => {
+    expect(parseContactPayload({ name: 'André Eu', pushname: 'André de Faria' }))
+      .toEqual({ savedName: 'André Eu', pushName: 'André de Faria' })
+  })
+
+  it('aceita também pushName camelCase, caso o engine mude', () => {
+    expect(parseContactPayload({ pushName: 'André de Faria' }))
+      .toEqual({ savedName: null, pushName: 'André de Faria' })
+  })
+
+  it('desembrulha resposta em array', () => {
+    expect(parseContactPayload([{ name: 'X', pushname: 'Y' }]))
+      .toEqual({ savedName: 'X', pushName: 'Y' })
+  })
+
+  it('devolve nulos para payload vazio, nulo ou de tipo errado', () => {
+    const vazio = { savedName: null, pushName: null }
+    expect(parseContactPayload(null)).toEqual(vazio)
+    expect(parseContactPayload([])).toEqual(vazio)
+    expect(parseContactPayload({ name: 123, pushname: {} })).toEqual(vazio)
+  })
+
+  it('trata string vazia como ausente', () => {
+    expect(parseContactPayload({ name: '', pushname: '   ' }))
+      .toEqual({ savedName: null, pushName: null })
   })
 })

@@ -4,7 +4,7 @@ import { notificationsApi } from '../api/notifications'
 import type { User } from '../types'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
-import { WhatsAppProfileCard } from '../components/whatsapp/WhatsAppProfileCard'
+import { WhatsAppProfileCard, WhatsAppProfile } from '../components/whatsapp/WhatsAppProfileCard'
 
 const NOTIFICATION_HOURS = [7, 8, 9, 10, 12, 18]
 // B3 negocia das 10h às 17h BRT; antes da abertura a brapi devolve o fechamento
@@ -66,11 +66,7 @@ const Configuracoes: React.FC = () => {
   const [wahaStatus, setWahaStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading')
   const [reconnecting, setReconnecting] = useState(false)
 
-  const [wahaProfile, setWahaProfile] = useState<{
-    name: string | null
-    about: string | null
-    profilePicUrl: string | null
-  } | null>(null)
+  const [wahaProfile, setWahaProfile] = useState<WhatsAppProfile | null>(null)
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [profileError, setProfileError] = useState<string | null>(null)
 

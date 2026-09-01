@@ -1,5 +1,6 @@
 import client from './client'
 import type { Notification, NotificationEnriched } from '../types'
+import type { WhatsAppProfile } from '../components/whatsapp/WhatsAppProfileCard'
 
 export const notificationsApi = {
   list: async (params?: { status?: string; limit?: number }): Promise<Notification[]> => {
@@ -66,7 +67,7 @@ export const notificationsApi = {
     return res.data
   },
 
-  getWhatsAppProfile(): Promise<{ name: string | null; about: string | null; profilePicUrl: string | null }> {
+  getWhatsAppProfile(): Promise<WhatsAppProfile> {
     return client.get('/waha/profile').then((r) => r.data)
   },
 

@@ -156,43 +156,80 @@ export async function fetchWhatsAppName(phone: string): Promise<string | null> {
   }
 }
 
-export async function fetchWhatsAppProfile(phone: string): Promise<{
-  name: string | null
-  about: string | null
+// Extrai os dois nomes do payload de /api/contacts. O engine GOWS devolve
+// `pushname` (n minúsculo); versões anteriores usavam `pushName`. Ler só uma das
+// grafias deixa o fallback morto sem erro nenhum — foi o que aconteceu até aqui.
+export function parseContactPayload(data: any): {
+  savedName: string | null
+  pushName: string | null
+} {
+  const contact = Array.isArray(data) ? data[0] : data
+  const texto = (valor: any): string | null => {
+    if (typeof valor !== 'string') return null
+    const limpo = valor.trim()
+    return limpo.length > 0 ? limpo : null
+  }
+  return {
+    savedName: texto(contact?.name),
+    pushName: texto(contact?.pushname) ?? texto(contact?.pushName),
+  }
+}
+
+export interface WhatsAppProfile {
+  // Nome que o próprio dono do número definiu no WhatsApp.
+  pushName: string | null
+  // Como a conta que envia os lembretes tem esse número salvo na agenda.
+  savedName: string | null
   profilePicUrl: string | null
-}> {
+  // null quando a verificação não pôde ser feita — diferente de false, que
+  // significa "o WhatsApp respondeu que este número não existe".
+  numberExists: boolean | null
+}
+
+// Não busca `about`: /api/contacts/about responde 501 no engine GOWS
+// ("not implemented"), então a chamada só gastava uma requisição para gravar
+// null. Se um dia o engine mudar, volta como um campo novo, não como um
+// try/catch silencioso.
+export async function fetchWhatsAppProfile(phone: string): Promise<WhatsAppProfile> {
   const session = process.env.WAHA_SESSION || 'default'
   const digits = phone.replace(/\D/g, '')
   const contactId = `${digits}@c.us`
+  const client = wahaClient()
 
-  let name: string | null = null
-  let about: string | null = null
+  // Número brasileiro existe em duas formas (com e sem o 9º dígito) e o envio já
+  // tenta as duas via buildPhoneCandidates. Checar só uma delas faria o selo
+  // dizer "não encontrado" para quem recebe as mensagens normalmente.
+  const variante = generatePhoneVariant(digits)
+  const candidatos = [...new Set([digits, ...(variante ? [variante] : [])])]
+
+  // allSettled: foto indisponível não pode apagar o nome, e vice-versa.
+  const [contatoR, fotoR, ...existeRs] = await Promise.allSettled([
+    client.get('/api/contacts', { params: { contactId, session } }),
+    client.get('/api/contacts/profile-picture', { params: { contactId, session } }),
+    ...candidatos.map((p) => client.get('/api/contacts/check-exists', { params: { phone: p, session } })),
+  ])
+
+  const { savedName, pushName } =
+    contatoR.status === 'fulfilled'
+      ? parseContactPayload(contatoR.value.data)
+      : { savedName: null, pushName: null }
+
   let profilePicUrl: string | null = null
-
-  try {
-    const { data } = await wahaClient().get('/api/contacts', {
-      params: { contactId, session },
-    })
-    const contact = Array.isArray(data) ? data[0] : data
-    name = contact?.name || contact?.pushName || null
-    about = contact?.about || null
-    if (typeof name !== 'string') name = null
-    if (typeof about !== 'string') about = null
-  } catch {
-    // sem nome/bio disponíveis
+  if (fotoR.status === 'fulfilled') {
+    const d: any = fotoR.value.data
+    const url = d?.profilePictureURL || d?.profilePicUrl || d?.url || null
+    profilePicUrl = typeof url === 'string' && url.length > 0 ? url : null
   }
 
-  try {
-    const { data } = await wahaClient().get('/api/contacts/profile-picture', {
-      params: { contactId, session },
-    })
-    const url = data?.profilePictureURL || data?.profilePicUrl || data?.url || null
-    profilePicUrl = typeof url === 'string' ? url : null
-  } catch {
-    // foto não disponível (WAHA Core ou privacidade)
-  }
+  // Basta um candidato existir. Só devolve null quando nenhuma checagem
+  // completou — aí não se sabe, que é diferente de saber que não existe.
+  const respostas = existeRs.filter((r) => r.status === 'fulfilled') as
+    PromiseFulfilledResult<{ data: any }>[]
+  const numberExists = respostas.length
+    ? respostas.some((r) => Boolean(r.value.data?.numberExists))
+    : null
 
-  return { name, about, profilePicUrl }
+  return { pushName, savedName, profilePicUrl, numberExists }
 }
 
 export async function getWahaWebhookStatus(backendPublicUrl: string): Promise<{
