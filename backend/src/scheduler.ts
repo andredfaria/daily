@@ -7,6 +7,7 @@ import { sendPollsForHour } from './services/checklistDispatcher'
 import { sendWeeklySummary, sendMonthlySummary } from './services/summaryService'
 import { checkBudgetAlert } from './services/budgetAlertService'
 import { checkAssetAlerts } from './services/assetAlertService'
+import { syncUserAssets } from './services/assetQuoteSync'
 import { configureWahaWebhook } from './services/waha'
 
 function getCurrentHourSaoPaulo(): number {
@@ -121,16 +122,24 @@ export async function initScheduler(): Promise<void> {
       } catch (e: any) { console.error('[scheduler] budget tick erro:', e.message) }
     }
 
-    // --- Alerta de ativos (hora configurável por usuário, default 11h) ---
+    // --- Ativos: coleta diária de cotação + alerta (hora configurável, default 11h) ---
+    // A coleta roda para todo mundo que tem ativo, mesmo com alerta desligado —
+    // senão quem desliga alerta fica sem histórico de patrimônio.
     try {
       const [assetUsers]: any = await pool.query(
-        `SELECT id FROM users
-          WHERE asset_alerts_enabled = 1 AND asset_alert_hour = ?
-            AND whatsapp_alerts_enabled = 1 AND is_active = 1`,
+        `SELECT u.id, u.asset_alerts_enabled, u.whatsapp_alerts_enabled
+           FROM users u
+          WHERE u.is_active = 1 AND u.asset_alert_hour = ?
+            AND EXISTS (SELECT 1 FROM assets a WHERE a.user_id = u.id AND a.is_active = 1)`,
         [hour]
       )
-      for (const { id } of assetUsers) {
-        try { await checkAssetAlerts(id) } catch (e: any) { console.error('[scheduler] asset erro:', e.message) }
+      for (const u of assetUsers) {
+        try {
+          const synced = await syncUserAssets(u.id)
+          if (u.asset_alerts_enabled && u.whatsapp_alerts_enabled) {
+            await checkAssetAlerts(u.id, synced)
+          }
+        } catch (e: any) { console.error('[scheduler] asset erro:', e.message) }
       }
     } catch (e: any) { console.error('[scheduler] asset tick erro:', e.message) }
   }, { timezone: 'America/Sao_Paulo' })

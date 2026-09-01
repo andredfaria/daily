@@ -1,6 +1,6 @@
 import pool from '../db'
 import { sendWhatsAppText } from './waha'
-import { fetchQuote } from './brapi'
+import { SyncedAsset } from './assetQuoteSync'
 import {
   AlertHit,
   isTargetHit,
@@ -9,7 +9,9 @@ import {
   formatDateSaoPaulo,
 } from './assetMath'
 
-export async function checkAssetAlerts(userId: string): Promise<void> {
+export async function checkAssetAlerts(userId: string, synced: SyncedAsset[]): Promise<void> {
+  if (!synced.length) return
+
   const [userRows]: any = await pool.query(
     `SELECT whatsapp_number FROM users
       WHERE id = ? AND is_active = 1 AND whatsapp_alerts_enabled = 1 AND asset_alerts_enabled = 1`,
@@ -17,30 +19,15 @@ export async function checkAssetAlerts(userId: string): Promise<void> {
   )
   if (!userRows.length || !userRows[0].whatsapp_number) return
 
-  const [assets]: any = await pool.query(
-    `SELECT id, ticker, kind, quantity, avg_price, target_price, stop_price,
-            target_triggered_at, stop_triggered_at
-       FROM assets WHERE user_id = ? AND is_active = 1`,
-    [userId]
-  )
-  if (!assets.length) return
-
   const hoje = formatDateSaoPaulo(new Date())
   const hits: AlertHit[] = []
   const marcarAlvo: string[] = []
   const marcarStop: string[] = []
 
-  for (const asset of assets) {
-    // Um ticker quebrado (cotação inválida, UPDATE falho, data impossível) não
-    // pode abortar o laço — os hits já acumulados nos outros ativos não podem se perder.
+  for (const { asset, quote } of synced) {
+    // Um ativo sem cotação do dia não gera alerta — os hits dos outros seguem.
     try {
-      const quote = await fetchQuote(asset.ticker, asset.kind)
       if (!quote) continue
-
-      await pool.query(
-        'UPDATE assets SET last_price = ?, last_quote_at = ? WHERE id = ?',
-        [quote.price, quote.quotedAt, asset.id]
-      )
 
       // Em fim de semana e feriado a brapi devolve o fechamento anterior.
       // Disparar com preço velho seria alerta falso — cripto não tem pregão.
