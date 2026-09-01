@@ -47,7 +47,7 @@ React SPA with React Router v6. All pages are protected by `ProtectedRoute`; `Au
 - `src/api/client.ts` — shared axios instance; attaches `billsync_token` from `localStorage` to every request; auto-redirects to `/login` on 401
 - `src/api/*.ts` — one file per domain (bills, occurrences, notifications, checklists)
 - `src/types/index.ts` — canonical TypeScript types shared across frontend (no duplication with backend)
-- `src/pages/` — full-page components: Dashboard, Contas (bills list), BillForm (create/edit), Checklists, Notificacoes, Configuracoes, Login, Ativos (carteira de ativos)
+- `src/pages/` — Home, Contas (`contas/`: lista + análise), Ativos (`ativos/`: carteira + análise), Checklists (`checklists/`: lista + análise), BillForm (create/edit), Notificacoes, Configuracoes, Login. Páginas com análise usam shell + rotas aninhadas: `/contas/lista` e `/contas/analise` são rotas reais, e a aba ativa vem da URL via `TabNav` (`src/components/ui/TabNav.tsx`).
 
 ### Backend (`backend/src/`)
 Express app, TypeScript, MySQL2 connection pool.
@@ -58,10 +58,10 @@ Express app, TypeScript, MySQL2 connection pool.
 - `scheduler.ts` — `node-cron` hourly tick (America/Sao_Paulo); dispatches bill notifications and checklist polls
 - `dispatcher.ts` — builds WhatsApp message text and calls WAHA to send bill reminders
 - `routes/` — REST handlers (bills, occurrences, notifications, checklists, waha, users, auth, webhooks, assets)
-- `services/` — domain logic separated from routes: `waha.ts` (WAHA client), `notificationMaterializer.ts` (generates notification records), `occurrenceGenerator.ts`, `checklistDispatcher.ts`, `brapi.ts` (cliente de cotações com cache de 10 min), `assetAlertService.ts` (alerta de preço-alvo e stop), `assetMath.ts` (cálculos puros de posição)
+- `services/` — domain logic separated from routes: `waha.ts` (WAHA client), `notificationMaterializer.ts` (generates notification records), `occurrenceGenerator.ts`, `checklistDispatcher.ts`, `brapi.ts` (cliente de cotações com cache de 10 min), `assetAlertService.ts` (alerta de preço-alvo e stop), `assetMath.ts` (cálculos puros de posição), `assetQuoteSync.ts` (coleta diária de cotação + snapshot), `assetSnapshotMath.ts` (decisões puras do snapshot)
 
 ### Database (MySQL 8.0.13+)
-Requires `DEFAULT (UUID())` expression support. Schema in `database/migrations/` (initial schema) + incremental migrations in `backend/src/migrate.ts`. Tables: `users`, `bills`, `payment_methods`, `bill_occurrences`, `notifications`, `otp_codes`, `checklists`, `checklist_items`, `checklist_daily_polls`, `assets`.
+Requires `DEFAULT (UUID())` expression support. Schema in `database/migrations/` (initial schema) + incremental migrations in `backend/src/migrate.ts`. Tables: `users`, `bills`, `payment_methods`, `bill_occurrences`, `notifications`, `otp_codes`, `checklists`, `checklist_items`, `checklist_daily_polls`, `assets`, `asset_snapshots`.
 
 ### Auth flow
 OTP via WhatsApp → JWT (30 days) stored in `localStorage` → `Authorization: Bearer` on every API call. `authMiddleware` (`backend/src/middleware/auth.ts`) sets `req.userId` for downstream handlers.
@@ -71,7 +71,9 @@ OTP via WhatsApp → JWT (30 days) stored in `localStorage` → `Authorization: 
 - All code, comments, and log messages are in **Portuguese** (pt-BR).
 - `notification_time` on `users` is an integer hour (0–23) in America/Sao_Paulo; scheduler compares it to current São Paulo hour.
 - Bill recurrence: `monthly` uses `recurrence_day_of_month`, `weekly` uses `recurrence_day_of_week` (0=Sunday), `once` uses `due_date`.
-- WAHA webhook hits `/api/webhooks`; payment confirmations via WhatsApp reply update occurrence status.
+- WAHA webhook hits `/api/webhooks`; a resposta do usuário alimenta os checklists. Não há estado de pagamento em `bill_occurrences` — `status`, `paid_at` e `confirmation_source` foram removidos pela migration `010_remove_payment_fields`.
 - Alertas de ativos rodam no tick horário conforme `users.asset_alert_hour` (default 11). Disparam uma vez e pausam (`target_triggered_at` / `stop_triggered_at`), até serem reativados no app.
 - Ações e FIIs são pulados quando a cotação não é do dia corrente (fim de semana e feriado); cripto roda todo dia.
 - Testes com jest + ts-jest em `backend/src/services/__tests__/`, cobrindo funções puras sem banco nem rede. Rodar com `cd backend && npm test`.
+- Testes do frontend com vitest em `src/**/__tests__/`, também só de funções puras. Rodar com `npm test` na raiz.
+- Snapshot diário de ativos: `syncUserAssets` roda no tick de `asset_alert_hour` para todo usuário com ativo ativo, mesmo com alerta desligado, e grava uma linha por ativo em `asset_snapshots`. A trava de cotação velha vale só para o alerta — o snapshot registra o preço como veio, senão o total do sábado despencaria por falta das ações.
