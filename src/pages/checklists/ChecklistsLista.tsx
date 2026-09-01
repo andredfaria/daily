@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { checklistsApi, CreateChecklistPayload, UpdateChecklistPayload } from '../api/checklists'
-import type { Checklist, ChecklistDashboardData, ChecklistRecurrenceType, ChecklistStatsEntry } from '../types'
-import { useToast } from '../context/ToastContext'
-import { SkeletonStatCard } from '../components/ui/Skeleton'
-import { ProgressBar } from '../components/checklist/ProgressBar'
-import { ChecklistCard } from '../components/checklist/ChecklistCard'
-import { RECURRENCE_LABELS, DAYS_LABELS } from '../components/checklist/constants'
+import { checklistsApi, CreateChecklistPayload, UpdateChecklistPayload } from '../../api/checklists'
+import type { Checklist, ChecklistDashboardData, ChecklistRecurrenceType, ChecklistStatsEntry } from '../../types'
+import { useToast } from '../../context/ToastContext'
+import { SkeletonStatCard } from '../../components/ui/Skeleton'
+import { ProgressBar } from '../../components/checklist/ProgressBar'
+import { ChecklistCard } from '../../components/checklist/ChecklistCard'
+import { RECURRENCE_LABELS, DAYS_LABELS } from '../../components/checklist/constants'
 
 // -------- Checklist Page --------
-const Checklists: React.FC = () => {
+const ChecklistsLista: React.FC = () => {
   const { success, error: showError } = useToast()
 
   const [checklists, setChecklists] = useState<Checklist[]>([])
@@ -194,7 +194,6 @@ const Checklists: React.FC = () => {
   if (loading) {
     return (
       <div className="space-y-6 animate-fadeIn">
-        <h2 className="text-lg font-bold text-on-surface">Checklists</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 3 }).map((_, i) => <SkeletonStatCard key={i} />)}
         </div>
@@ -422,7 +421,6 @@ const Checklists: React.FC = () => {
     <div className="space-y-6 animate-fadeIn">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-on-surface">Checklists</h2>
         {!showForm && (
           <button onClick={openNew} className="btn-primary">
             <span className="material-symbols-outlined text-lg">add</span>
@@ -531,4 +529,4 @@ const Checklists: React.FC = () => {
   )
 }
 
-export default Checklists
+export default ChecklistsLista

@@ -1,5 +1,5 @@
 import React from 'react'
-import type { ChecklistItemStat } from '../../types'
+import type { ChecklistItemStat } from '../../../types'
 
 interface ChecklistItemRankingProps {
   itemStats: ChecklistItemStat[]

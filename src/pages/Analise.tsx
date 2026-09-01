@@ -11,9 +11,9 @@ import { SpendingTrendChart } from '../components/contas/analise/SpendingTrendCh
 import { CategoryBreakdown } from '../components/contas/analise/CategoryBreakdown'
 import { SummaryStats } from '../components/contas/analise/SummaryStats'
 import { StatCard } from '../components/ui/StatCard'
-import { ChecklistHeatmap } from '../components/checklist/ChecklistHeatmap'
-import { ChecklistItemRanking } from '../components/checklist/ChecklistItemRanking'
-import { WeeklyTrendSparkline } from '../components/checklist/WeeklyTrendSparkline'
+import { ChecklistHeatmap } from '../components/checklist/analise/ChecklistHeatmap'
+import { ChecklistItemRanking } from '../components/checklist/analise/ChecklistItemRanking'
+import { WeeklyTrendSparkline } from '../components/checklist/analise/WeeklyTrendSparkline'
 
 type AnaliseTab = 'financeiro' | 'checklist'
 

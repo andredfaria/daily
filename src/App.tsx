@@ -11,7 +11,9 @@ import BillForm from './pages/BillForm'
 import Notificacoes from './pages/Notificacoes'
 import Configuracoes from './pages/Configuracoes'
 import Login from './pages/Login'
-import Checklists from './pages/Checklists'
+import ChecklistsShell from './pages/checklists/ChecklistsShell'
+import ChecklistsLista from './pages/checklists/ChecklistsLista'
+import ChecklistsAnalise from './pages/checklists/ChecklistsAnalise'
 import Analise from './pages/Analise'
 import Ativos from './pages/Ativos'
 // Protects all children — redirects to /login if not authenticated
@@ -55,7 +57,11 @@ const App: React.FC = () => {
                 <Route path="/ativos" element={<Ativos />} />
                 <Route path="/contas/nova" element={<BillForm />} />
                 <Route path="/contas/:id/editar" element={<BillForm />} />
-                <Route path="/checklists" element={<Checklists />} />
+                <Route path="/checklists" element={<ChecklistsShell />}>
+                  <Route index element={<Navigate to="lista" replace />} />
+                  <Route path="lista" element={<ChecklistsLista />} />
+                  <Route path="analise" element={<ChecklistsAnalise />} />
+                </Route>
                 <Route path="/notificacoes" element={<Notificacoes />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
               </Route>
