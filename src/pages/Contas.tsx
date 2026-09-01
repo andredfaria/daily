@@ -52,113 +52,112 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, t
         }
       `}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className={`
-            w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
-            ${bill.is_active ? 'bg-primary/15' : 'bg-outline/15'}
-          `}>
-            <span className={`material-symbols-outlined text-lg ${bill.is_active ? 'text-primary' : 'text-outline'}`}>
-              {icon}
-            </span>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-on-surface leading-tight">{bill.name}</h3>
-            <p className="text-xs text-on-surface-variant mt-0.5">{recurrenceDetail}</p>
-            {bill.category && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-surface-variant text-on-surface-variant mt-0.5 inline-block">
-                {getCategoryLabel(bill.category)}
-              </span>
-            )}
-            {bill.description && (
-              <p className="text-xs text-on-surface-variant/70 mt-0.5 line-clamp-1">{bill.description}</p>
-            )}
-          </div>
+      {/* Identity + actions */}
+      <div className="flex items-start gap-3">
+        <div className={`
+          w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+          ${bill.is_active ? 'bg-primary/15' : 'bg-outline/15'}
+        `}>
+          <span className={`material-symbols-outlined text-lg ${bill.is_active ? 'text-primary' : 'text-outline'}`}>
+            {icon}
+          </span>
         </div>
 
-        <div className="flex items-center gap-1">
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${recurrenceColor}`}>
-            {recurrenceLabel}
-          </span>
-
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-            bill.is_active
-              ? 'bg-tertiary/15 text-tertiary'
-              : 'bg-outline/15 text-outline'
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${bill.is_active ? 'bg-tertiary' : 'bg-outline'}`} />
-            {bill.is_active ? 'Ativa' : 'Inativa'}
-          </span>
-
-          <div className="flex items-center gap-0.5 ml-1">
-            <button
-              onClick={() => onEdit(bill.id)}
-              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-primary"
-              title="Editar"
-            >
-              <span className="material-symbols-outlined text-base">edit</span>
-            </button>
-            <button
-              onClick={() => onToggle(bill.id, !bill.is_active)}
-              disabled={toggling === bill.id}
-              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-tertiary disabled:opacity-40"
-              title={bill.is_active ? 'Desativar' : 'Ativar'}
-            >
-              {toggling === bill.id ? (
-                <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <span className="material-symbols-outlined text-base">
-                  {bill.is_active ? 'toggle_on' : 'toggle_off'}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => onDelete(bill)}
-              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-error"
-              title="Excluir"
-            >
-              <span className="material-symbols-outlined text-base">delete</span>
-            </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-sm font-semibold text-on-surface leading-tight truncate pt-2">{bill.name}</h3>
+            <div className="flex items-center gap-0.5 flex-shrink-0 -mt-1 -mr-1.5">
+              <button
+                onClick={() => onEdit(bill.id)}
+                className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-primary cursor-pointer"
+                title="Editar"
+                aria-label="Editar conta"
+              >
+                <span className="material-symbols-outlined text-base">edit</span>
+              </button>
+              <button
+                onClick={() => onToggle(bill.id, !bill.is_active)}
+                disabled={toggling === bill.id}
+                className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-tertiary disabled:opacity-40 cursor-pointer"
+                title={bill.is_active ? 'Desativar' : 'Ativar'}
+                aria-label={bill.is_active ? 'Desativar conta' : 'Ativar conta'}
+              >
+                {toggling === bill.id ? (
+                  <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <span className="material-symbols-outlined text-base">
+                    {bill.is_active ? 'toggle_on' : 'toggle_off'}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => onDelete(bill)}
+                className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-error cursor-pointer"
+                title="Excluir"
+                aria-label="Excluir conta"
+              >
+                <span className="material-symbols-outlined text-base">delete</span>
+              </button>
+            </div>
           </div>
+          <p className="text-xs text-on-surface-variant mt-0.5">{recurrenceDetail}</p>
         </div>
       </div>
 
-      {/* Payment methods */}
-      {(hasPix || hasBoleto) && (
-        <div className="flex items-center gap-1.5 mb-3">
-          {hasPix && (
-            <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-              <span className="material-symbols-outlined text-xs">qr_code</span>
-              PIX
-            </span>
-          )}
-          {hasBoleto && (
-            <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-secondary-container/50 text-on-secondary-container border border-outline-variant/20">
-              <span className="material-symbols-outlined text-xs">barcode</span>
-              BOLETO
-            </span>
+      {/* Badges */}
+      <div className="flex flex-wrap items-center gap-1.5 mt-3">
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${recurrenceColor}`}>
+          {recurrenceLabel}
+        </span>
+
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+          bill.is_active
+            ? 'bg-tertiary/15 text-tertiary'
+            : 'bg-outline/15 text-outline'
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${bill.is_active ? 'bg-tertiary' : 'bg-outline'}`} />
+          {bill.is_active ? 'Ativa' : 'Inativa'}
+        </span>
+
+        {bill.category && (
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant">
+            {getCategoryLabel(bill.category)}
+          </span>
+        )}
+
+        {hasPix && (
+          <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+            <span className="material-symbols-outlined text-xs">qr_code</span>
+            PIX
+          </span>
+        )}
+        {hasBoleto && (
+          <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-secondary-container/50 text-on-secondary-container border border-outline-variant/20">
+            <span className="material-symbols-outlined text-xs">barcode</span>
+            BOLETO
+          </span>
+        )}
+      </div>
+
+      {bill.description && (
+        <p className="text-xs text-on-surface-variant/70 mt-2 line-clamp-1">{bill.description}</p>
+      )}
+
+      {/* Amount + due date */}
+      <div className="flex items-end justify-between mt-4">
+        <div>
+          <div className="text-xl font-bold text-primary">{formatBRL(bill.amount)}</div>
+          {bill.due_date && (
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              Vence em {formatDate(bill.due_date)}
+            </p>
           )}
         </div>
-      )}
-
-      {/* Amount */}
-      <div className="text-xl font-bold text-primary mb-1">{formatBRL(bill.amount)}</div>
-
-      {/* Due date */}
-      {bill.due_date && (
-        <p className="text-xs text-on-surface-variant">
-          Vence em {formatDate(bill.due_date)}
+        <p className="flex items-center gap-1 text-[11px] text-on-surface-variant/60">
+          <span className="material-symbols-outlined text-xs">notifications</span>
+          {bill.days_before_alert} {bill.days_before_alert === 1 ? 'dia' : 'dias'} antes
         </p>
-      )}
-
-      {/* Alert */}
-      <p className="text-xs text-on-surface-variant/60 mt-1">
-        <span className="material-symbols-outlined text-xs align-middle mr-0.5">notifications</span>
-        Alerta {bill.days_before_alert} {bill.days_before_alert === 1 ? 'dia' : 'dias'} antes
-      </p>
-
-
+      </div>
     </div>
   )
 }
@@ -264,29 +263,29 @@ const Contas: React.FC = () => {
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-lg font-bold text-on-surface">Minhas Contas</h2>
           <span className="px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-semibold">
             TOTAL {formatBRL(totalAmount)}
           </span>
         </div>
-        <button onClick={() => navigate('/contas/nova')} className="btn-primary">
+        <button onClick={() => navigate('/contas/nova')} className="btn-primary justify-center w-full md:w-auto">
           <span className="material-symbols-outlined text-lg">add</span>
           Nova Conta
         </button>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Recurrence filter pills */}
-        <div className="flex items-center gap-1.5 bg-surface-container rounded-xl p-1">
+      <div className="space-y-3">
+        {/* Recurrence filter pills — contained horizontal scroll on mobile */}
+        <div className="flex items-center gap-1.5 bg-surface-container rounded-xl p-1 overflow-x-auto no-scrollbar">
           {recurrenceFilters.map((f) => (
             <button
               key={f.value}
               onClick={() => setRecurrenceFilter(f.value)}
               className={`
-                px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200
+                flex-shrink-0 min-h-[44px] px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer
                 ${recurrenceFilter === f.value
                   ? 'bg-primary text-on-primary-fixed shadow-sm'
                   : 'text-on-surface-variant hover:text-on-surface'
@@ -298,39 +297,42 @@ const Contas: React.FC = () => {
           ))}
         </div>
 
-        {/* Active filter pills */}
-        <div className="flex items-center gap-1.5 bg-surface-container rounded-xl p-1">
-          {activeFilters.map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setActiveFilter(f.value)}
-              className={`
-                px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200
-                ${activeFilter === f.value
-                  ? 'bg-surface-container-high text-on-surface shadow-sm'
-                  : 'text-on-surface-variant hover:text-on-surface'
-                }
-              `}
-            >
-              {f.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Active filter pills */}
+          <div className="flex items-center gap-1.5 bg-surface-container rounded-xl p-1">
+            {activeFilters.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setActiveFilter(f.value)}
+                className={`
+                  min-h-[44px] px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer
+                  ${activeFilter === f.value
+                    ? 'bg-surface-container-high text-on-surface shadow-sm'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                  }
+                `}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Category filter select */}
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
+            aria-label="Filtrar por categoria"
+            className="min-h-[44px] px-3 rounded-xl text-xs font-semibold bg-surface-container text-on-surface-variant border-none outline-none cursor-pointer hover:text-on-surface transition-colors"
+          >
+            {categoryFilters.map((f) => (
+              <option key={f.value} value={f.value}>{f.label}</option>
+            ))}
+          </select>
+
+          <span className="text-xs text-on-surface-variant ml-auto">
+            {filtered.length} conta{filtered.length !== 1 ? 's' : ''}
+          </span>
         </div>
-
-        {/* Category filter select */}
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
-          className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface-container text-on-surface-variant border-none outline-none cursor-pointer hover:text-on-surface transition-colors"
-        >
-          {categoryFilters.map((f) => (
-            <option key={f.value} value={f.value}>{f.label}</option>
-          ))}
-        </select>
-
-        <span className="text-xs text-on-surface-variant ml-auto">
-          {filtered.length} conta{filtered.length !== 1 ? 's' : ''}
-        </span>
       </div>
 
       {/* Bento Grid */}

@@ -2,6 +2,7 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { BudgetResponse } from '../../types'
 import { formatBRL } from '../../utils/format'
+import { RadialGauge } from './RadialGauge'
 
 interface BudgetCardProps {
   data: BudgetResponse | null
@@ -30,31 +31,31 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({ data, loading }) => {
           </button>
         </div>
       ) : (
-        <div>
-          <div className="flex items-end justify-between mb-2">
-            <span className="text-2xl font-bold text-on-surface">{formatBRL(data.total)}</span>
-            <span className="text-sm text-on-surface-variant">de {formatBRL(data.orcamento)}</span>
-          </div>
-          <div className="w-full h-3 rounded-full bg-outline-variant/30 overflow-hidden">
-            <div
-              className={`h-3 rounded-full transition-all duration-700 ${
-                data.total > data.orcamento ? 'bg-error' : 'bg-primary'
-              }`}
-              style={{
-                width: `${
-                  data.orcamento > 0
-                    ? Math.min((data.total / data.orcamento) * 100, 100)
-                    : (data.total > 0 ? 100 : 0)
-                }%`,
-              }}
-            />
-          </div>
-          <p className={`text-xs mt-2 ${data.total > data.orcamento ? 'text-error' : 'text-on-surface-variant'}`}>
-            {data.total > data.orcamento
-              ? `${formatBRL(data.total - data.orcamento)} acima do limite`
-              : `${formatBRL(data.orcamento - data.total)} restantes`}
-          </p>
-        </div>
+        (() => {
+          const overBudget = data.total > data.orcamento
+          const pct = data.orcamento > 0
+            ? Math.round((data.total / data.orcamento) * 100)
+            : (data.total > 0 ? 100 : 0)
+          return (
+            <div className="flex items-center gap-5">
+              <RadialGauge pct={pct} color={overBudget ? '#ffb4ab' : '#c0c1ff'}>
+                <span className={`text-lg font-bold ${overBudget ? 'text-error' : 'text-on-surface'}`}>{pct}%</span>
+                <span className="text-[10px] text-on-surface-variant">gasto</span>
+              </RadialGauge>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-1 flex-wrap">
+                  <span className="text-xl font-bold text-on-surface">{formatBRL(data.total)}</span>
+                  <span className="text-xs text-on-surface-variant">de {formatBRL(data.orcamento)}</span>
+                </div>
+                <p className={`text-xs mt-1.5 ${overBudget ? 'text-error' : 'text-on-surface-variant'}`}>
+                  {overBudget
+                    ? `${formatBRL(data.total - data.orcamento)} acima do limite`
+                    : `${formatBRL(data.orcamento - data.total)} restantes`}
+                </p>
+              </div>
+            </div>
+          )
+        })()
       )}
     </div>
   )

@@ -68,6 +68,15 @@
     z-index: 1;
   }
 
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .shimmer-bg {
     background: linear-gradient(
       90deg,

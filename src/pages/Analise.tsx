@@ -1,20 +1,19 @@
 import React, { useEffect, useState } from 'react'
-import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-} from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import { analyticsApi } from '../api/analytics'
 import { checklistsApi } from '../api/checklists'
 import type { ByCategoryResponse, ProjectionResponse, BudgetResponse, OcorrenciaTop } from '../types'
 import type { Checklist, ChecklistDashboardData, ChecklistStatsEntry } from '../types'
-import { categoryColor, categoryLabel } from '../utils/categoryColors'
-import { formatBRL } from '../utils/format'
 import { useToast } from '../context/ToastContext'
 import { BudgetCard } from '../components/analise/BudgetCard'
 import { TopOccurrencesList } from '../components/analise/TopOccurrencesList'
+import { SpendingTrendChart } from '../components/analise/SpendingTrendChart'
+import { CategoryBreakdown } from '../components/analise/CategoryBreakdown'
+import { SummaryStats } from '../components/analise/SummaryStats'
 import { StatCard } from '../components/checklist/StatCard'
 import { ChecklistHeatmap } from '../components/checklist/ChecklistHeatmap'
 import { ChecklistItemRanking } from '../components/checklist/ChecklistItemRanking'
+import { WeeklyTrendSparkline } from '../components/checklist/WeeklyTrendSparkline'
 
 type AnaliseTab = 'financeiro' | 'checklist'
 
@@ -104,110 +103,18 @@ const Analise: React.FC = () => {
     }
   }
 
-  const pieData = (byCat?.categorias ?? []).map((c) => ({
-    name: categoryLabel(c.category),
-    value: c.total,
-    color: categoryColor(c.category),
-    pct: c.pct,
-  }))
-
-  const historyData = (history?.meses ?? []).map((m, i, arr) => ({
-    label: i === arr.length - 1 ? `${m.label} (parcial)` : m.label,
-    total: m.total,
-    isCurrent: i === arr.length - 1,
-  }))
-
-  const projectionData = (projection?.meses ?? []).map((m) => ({ label: m.label, total: m.total }))
-
   const renderFinanceiroTab = () => (
     <div className="space-y-6">
+      <SummaryStats byCat={byCat} history={history} projection={projection} loading={loadingFinanceiro} />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <BudgetCard data={budget} loading={loadingFinanceiro} />
         <TopOccurrencesList occurrences={topOcc} loading={loadingFinanceiro} />
       </div>
 
-      <section className="glass-card rounded-2xl border border-outline-variant/50 p-5">
-        <h2 className="text-base font-semibold text-on-surface mb-4">Gastos por categoria (mês atual)</h2>
-        {loadingFinanceiro ? (
-          <p className="text-sm text-on-surface-variant">Carregando…</p>
-        ) : pieData.length === 0 ? (
-          <p className="text-sm text-on-surface-variant">Nenhuma conta neste período.</p>
-        ) : (
-          <div className="flex flex-col sm:flex-row items-center gap-6">
-            <div className="w-full sm:w-1/2 h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85} paddingAngle={2}>
-                    {pieData.map((d, i) => <Cell key={i} fill={d.color} />)}
-                  </Pie>
-                  <Tooltip formatter={(value: any) => formatBRL(Number(value))} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <ul className="w-full sm:w-1/2 space-y-2">
-              {pieData.map((d, i) => (
-                <li key={i} className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 text-on-surface">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }} />
-                    {d.name}
-                  </span>
-                  <span className="text-on-surface-variant">{formatBRL(d.value)} · {d.pct}%</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
+      <SpendingTrendChart history={history} projection={projection} loading={loadingFinanceiro} />
 
-      <section className="glass-card rounded-2xl border border-outline-variant/50 p-5">
-        <h2 className="text-base font-semibold text-on-surface mb-1">Histórico (últimos 6 meses)</h2>
-        <p className="text-xs text-on-surface-variant mb-4">O último mês está em andamento (parcial).</p>
-        {loadingFinanceiro ? (
-          <p className="text-sm text-on-surface-variant">Carregando…</p>
-        ) : historyData.length === 0 ? (
-          <p className="text-sm text-on-surface-variant">Sem dados de histórico.</p>
-        ) : (
-          <div className="w-full h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={historyData}>
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} width={48} />
-                <Tooltip formatter={(value: any) => formatBRL(Number(value))} />
-                <Bar dataKey="total" radius={[6, 6, 0, 0]}>
-                  {historyData.map((d, i) => (
-                    <Cell key={i} fill={d.isCurrent ? '#6750A466' : '#6750A4'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </section>
-
-      <section className="glass-card rounded-2xl border border-outline-variant/50 p-5">
-        <h2 className="text-base font-semibold text-on-surface mb-1">Projeção dos próximos meses</h2>
-        {projection?.meses?.[1] && (
-          <p className="text-sm text-on-surface-variant mb-4">
-            Você vai gastar ~{formatBRL(projection.meses[1].total)} em {projection.meses[1].label}.
-          </p>
-        )}
-        {loadingFinanceiro ? (
-          <p className="text-sm text-on-surface-variant">Carregando…</p>
-        ) : projectionData.length === 0 ? (
-          <p className="text-sm text-on-surface-variant">Sem dados de projeção.</p>
-        ) : (
-          <div className="w-full h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={projectionData}>
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} width={48} />
-                <Tooltip formatter={(value: any) => formatBRL(Number(value))} />
-                <Bar dataKey="total" fill="#6750A4" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </section>
+      <CategoryBreakdown data={byCat} loading={loadingFinanceiro} />
     </div>
   )
 
@@ -253,26 +160,39 @@ const Analise: React.FC = () => {
           </div>
         )}
 
-        {dashChecklist && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard icon="checklist" label="Itens" value={dashChecklist.items.length} iconColor="text-primary" iconBg="bg-primary/15" />
-            <StatCard
-              icon="schedule"
-              label="Horário de Envio"
-              value={`${String(dashChecklist.send_time).padStart(2, '0')}h`}
-              iconColor="text-yellow-400"
-              iconBg="bg-yellow-400/15"
-            />
-            <StatCard
-              icon="today"
-              label="Conclusão Hoje"
-              value={today ? `${today.completion_pct}%` : '—'}
-              iconColor={today && today.completion_pct >= 100 ? 'text-tertiary' : 'text-on-surface-variant'}
-              iconBg={today && today.completion_pct >= 100 ? 'bg-tertiary/15' : 'bg-surface-container-high'}
-            />
-            <StatCard icon="bar_chart" label="Dias Registrados" value={history.length} iconColor="text-primary" iconBg="bg-primary/15" />
-          </div>
-        )}
+        {dashChecklist && (() => {
+          const itemStats = checklistDashboard?.itemStats ?? []
+          const bestStreak = itemStats.reduce((max, s) => Math.max(max, s.streak_current), 0)
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <StatCard icon="checklist" label="Itens" value={dashChecklist.items.length} iconColor="text-primary" iconBg="bg-primary/15" />
+              <StatCard
+                icon="schedule"
+                label="Horário de Envio"
+                value={`${String(dashChecklist.send_time).padStart(2, '0')}h`}
+                iconColor="text-yellow-400"
+                iconBg="bg-yellow-400/15"
+              />
+              <StatCard
+                icon="today"
+                label="Conclusão Hoje"
+                value={today ? `${today.completion_pct}%` : '—'}
+                iconColor={today && today.completion_pct >= 100 ? 'text-tertiary' : 'text-on-surface-variant'}
+                iconBg={today && today.completion_pct >= 100 ? 'bg-tertiary/15' : 'bg-surface-container-high'}
+              />
+              <StatCard
+                icon="local_fire_department"
+                label="Melhor Sequência"
+                value={bestStreak > 0 ? `${bestStreak} ${bestStreak === 1 ? 'dia' : 'dias'}` : '—'}
+                iconColor="text-orange-400"
+                iconBg="bg-orange-400/15"
+              />
+              <StatCard icon="bar_chart" label="Dias Registrados" value={history.length} iconColor="text-primary" iconBg="bg-primary/15" />
+            </div>
+          )
+        })()}
+
+        <WeeklyTrendSparkline history={history} />
 
         <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
           <h3 className="text-base font-semibold text-on-surface mb-4">Histórico (12 semanas)</h3>
@@ -285,7 +205,7 @@ const Analise: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold text-on-surface">Análise</h1>
         <p className="text-sm text-on-surface-variant">Métricas aprofundadas de contas e checklist.</p>
