@@ -80,11 +80,13 @@ export const Login: React.FC = () => {
 
   const handleOtpPaste = (e: React.ClipboardEvent) => {
     const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    if (pasted.length === 6) {
-      e.preventDefault()
-      setDigits(pasted.split(''))
-      inputRefs.current[5]?.focus()
-    }
+    if (pasted.length === 0) return
+    e.preventDefault()
+    const next = Array(6).fill('')
+    pasted.split('').forEach((d, i) => { next[i] = d })
+    setDigits(next)
+    setError(null)
+    inputRefs.current[Math.min(pasted.length, 5)]?.focus()
   }
 
   const handleVerifyOtp = useCallback(async () => {
@@ -189,8 +191,10 @@ export const Login: React.FC = () => {
                     ref={(el) => { inputRefs.current[i] = el }}
                     type="text"
                     inputMode="numeric"
+                    pattern="[0-9]*"
                     maxLength={1}
                     value={d}
+                    aria-label={`Dígito ${i + 1} de 6 do código`}
                     autoComplete={i === 0 ? 'one-time-code' : 'off'}
                     onChange={(e) => handleOtpInput(i, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(i, e)}

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import client from '../api/client'
 import { wahaApi } from '../api/waha'
+import NumberField from '../components/ui/NumberField'
+import { parseNumericInput } from '../utils/numberInput'
 
 type Step = 0 | 1 | 2 | 3
 
@@ -62,11 +64,11 @@ const Onboarding: React.FC = () => {
   const handleCreateBill = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    const value = Number(amount.replace(',', '.'))
-    const day = Number(dayOfMonth)
+    const value = parseNumericInput(amount)
+    const day = parseNumericInput(dayOfMonth)
     if (!name.trim()) return setError('Informe o nome da conta')
-    if (isNaN(value) || value < 0) return setError('Informe um valor válido')
-    if (isNaN(day) || day < 1 || day > 31) return setError('Dia de vencimento entre 1 e 31')
+    if (value === null || value <= 0) return setError('Informe um valor maior que zero')
+    if (day === null || day < 1 || day > 31) return setError('Dia de vencimento entre 1 e 31')
 
     setSaving(true)
     try {
@@ -162,49 +164,48 @@ const Onboarding: React.FC = () => {
                 <h2 className="text-lg font-medium text-on-surface">Sua primeira conta</h2>
               </div>
               <div>
-                <label className="block text-xs font-medium text-on-surface-variant mb-2">Nome</label>
+                <label htmlFor="onb-nome" className="label">Nome <span className="text-error">*</span></label>
                 <input
+                  id="onb-nome"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex.: Aluguel, Netflix, Energia"
-                  className="w-full px-4 py-3 rounded-xl bg-surface-container-high border border-outline-variant focus:border-primary focus:outline-none text-on-surface text-sm"
-                  required
+                  className="input-field min-h-[48px] bg-surface-container-high"
+                  aria-required="true"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-on-surface-variant mb-2">Valor (R$)</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0,00"
-                    className="w-full px-4 py-3 rounded-xl bg-surface-container-high border border-outline-variant focus:border-primary focus:outline-none text-on-surface text-sm"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-on-surface-variant mb-2">Vence dia</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={31}
-                    value={dayOfMonth}
-                    onChange={(e) => setDayOfMonth(e.target.value)}
-                    placeholder="10"
-                    className="w-full px-4 py-3 rounded-xl bg-surface-container-high border border-outline-variant focus:border-primary focus:outline-none text-on-surface text-sm"
-                    required
-                  />
-                </div>
+                <NumberField
+                  label="Valor"
+                  required
+                  mode="currency"
+                  min={0}
+                  prefix="R$"
+                  placeholder="0,00"
+                  inputClassName="bg-surface-container-high"
+                  value={amount}
+                  onChange={setAmount}
+                />
+                <NumberField
+                  label="Vence dia"
+                  required
+                  mode="integer"
+                  min={1}
+                  max={31}
+                  placeholder="10"
+                  inputClassName="bg-surface-container-high"
+                  value={dayOfMonth}
+                  onChange={setDayOfMonth}
+                />
               </div>
               <div>
-                <label className="block text-xs font-medium text-on-surface-variant mb-2">Categoria</label>
+                <label htmlFor="onb-categoria" className="label">Categoria</label>
                 <select
+                  id="onb-categoria"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-surface-container-high border border-outline-variant focus:border-primary focus:outline-none text-on-surface text-sm"
+                  className="input-field min-h-[48px] bg-surface-container-high"
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c.value} value={c.value}>{c.label}</option>

@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { billsApi } from '../api/bills'
 import type { BillCategory, PaymentMethod, PixKeyType, RecurrenceType } from '../types'
 import { useToast } from '../context/ToastContext'
+import NumberField from '../components/ui/NumberField'
+import { formatNumericInput, parseNumericInput } from '../utils/numberInput'
 
 // --- Types ---
 interface PaymentMethodDraft {
@@ -169,7 +171,7 @@ const BillForm: React.FC = () => {
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('monthly')
-  const [dayOfMonth, setDayOfMonth] = useState<number>(1)
+  const [dayOfMonth, setDayOfMonth] = useState('1')
   const [dayOfWeek, setDayOfWeek] = useState<number>(1)
   const [dueDate, setDueDate] = useState('')
   const [daysBeforeAlert, setDaysBeforeAlert] = useState(3)
@@ -190,9 +192,9 @@ const BillForm: React.FC = () => {
       setName(bill.name)
       setCategory(bill.category ?? '')
       setDescription(bill.description ?? '')
-      setAmount(bill.amount.toString())
+      setAmount(formatNumericInput(Number(bill.amount), 2, { padDecimals: true }))
       setRecurrenceType(bill.recurrence_type)
-      setDayOfMonth(bill.recurrence_day_of_month ?? 1)
+      setDayOfMonth(String(bill.recurrence_day_of_month ?? 1))
       setDayOfWeek(bill.recurrence_day_of_week ?? 1)
       setDueDate(bill.due_date ?? '')
       setDaysBeforeAlert(bill.days_before_alert)
@@ -228,22 +230,19 @@ const BillForm: React.FC = () => {
   const validate = (): boolean => {
     const errs: FormErrors = {}
     if (!name.trim()) errs.name = 'Nome é obrigatório'
-    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-      errs.amount = 'Valor inválido'
+    const parsedAmount = parseNumericInput(amount)
+    if (parsedAmount === null || parsedAmount <= 0) {
+      errs.amount = 'Informe um valor maior que zero'
     }
     if (!recurrenceType) errs.recurrence_type = 'Recorrência é obrigatória'
     const dayOfMonthTypes: RecurrenceType[] = ['monthly', 'quarterly', 'semiannual', 'annual']
-    if (dayOfMonthTypes.includes(recurrenceType) && (!dayOfMonth || dayOfMonth < 1 || dayOfMonth > 31)) {
-      errs.recurrence_day_of_month = 'Dia inválido (1-31)'
+    const parsedDay = parseNumericInput(dayOfMonth)
+    if (dayOfMonthTypes.includes(recurrenceType) && (parsedDay === null || parsedDay < 1 || parsedDay > 31)) {
+      errs.recurrence_day_of_month = 'Informe um dia entre 1 e 31'
     }
     if (recurrenceType === 'once' && !dueDate) errs.due_date = 'Data de vencimento obrigatória'
     setErrors(errs)
     return Object.keys(errs).length === 0
-  }
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/[^\d,.]/, '')
-    setAmount(val)
   }
 
   const handleMethodChange = (
@@ -276,9 +275,9 @@ const BillForm: React.FC = () => {
         name: name.trim(),
         category: category || undefined,
         description: description.trim() || undefined,
-        amount: parseFloat(amount.replace(',', '.')),
+        amount: parseNumericInput(amount) ?? 0,
         recurrence_type: recurrenceType,
-        recurrence_day_of_month: needsDayOfMonth ? dayOfMonth : undefined,
+        recurrence_day_of_month: needsDayOfMonth ? (parseNumericInput(dayOfMonth) ?? 1) : undefined,
         recurrence_day_of_week: needsDayOfWeek ? dayOfWeek : undefined,
         due_date: recurrenceType === 'once' ? dueDate : undefined,
         days_before_alert: daysBeforeAlert,
@@ -429,27 +428,17 @@ const BillForm: React.FC = () => {
               </div>
 
               {/* Valor */}
-              <div>
-                <label className="label">Valor *</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm font-medium">
-                    R$
-                  </span>
-                  <input
-                    type="text"
-                    value={amount}
-                    onChange={handleAmountChange}
-                    placeholder="0,00"
-                    className={`input-field pl-10 ${errors.amount ? 'error' : ''}`}
-                  />
-                </div>
-                {errors.amount && (
-                  <p className="text-xs text-error mt-1 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm">error</span>
-                    {errors.amount}
-                  </p>
-                )}
-              </div>
+              <NumberField
+                label="Valor"
+                required
+                mode="currency"
+                min={0}
+                prefix="R$"
+                placeholder="0,00"
+                value={amount}
+                onChange={setAmount}
+                error={errors.amount}
+              />
 
               {/* Recorrência */}
               <div>
@@ -471,20 +460,18 @@ const BillForm: React.FC = () => {
 
               {/* Dynamic field based on recurrence type */}
               {['monthly', 'quarterly', 'semiannual', 'annual'].includes(recurrenceType) && (
-                <div>
-                  <label className="label">Dia do Mês *</label>
-                  <input
-                    type="number"
-                    value={dayOfMonth}
-                    onChange={(e) => setDayOfMonth(parseInt(e.target.value))}
-                    min={1}
-                    max={31}
-                    className={`input-field ${errors.recurrence_day_of_month ? 'error' : ''}`}
-                  />
-                  {errors.recurrence_day_of_month && (
-                    <p className="text-xs text-error mt-1">{errors.recurrence_day_of_month}</p>
-                  )}
-                </div>
+                <NumberField
+                  label="Dia do Mês"
+                  required
+                  mode="integer"
+                  min={1}
+                  max={31}
+                  placeholder="10"
+                  hint="Entre 1 e 31"
+                  value={dayOfMonth}
+                  onChange={setDayOfMonth}
+                  error={errors.recurrence_day_of_month}
+                />
               )}
 
               {['weekly', 'biweekly'].includes(recurrenceType) && (
@@ -532,18 +519,25 @@ const BillForm: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
+                    aria-label="Diminuir um dia de antecedência"
+                    disabled={daysBeforeAlert <= 0}
                     onClick={() => setDaysBeforeAlert((v) => Math.max(0, v - 1))}
-                    className="w-11 h-11 rounded-xl bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
+                    className="w-11 h-11 rounded-xl bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <span className="material-symbols-outlined text-base">remove</span>
                   </button>
-                  <span className="w-12 text-center text-base font-semibold text-on-surface">
+                  <span
+                    aria-live="polite"
+                    className="w-12 text-center text-base font-semibold text-on-surface tabular-nums"
+                  >
                     {daysBeforeAlert}
                   </span>
                   <button
                     type="button"
+                    aria-label="Aumentar um dia de antecedência"
+                    disabled={daysBeforeAlert >= 30}
                     onClick={() => setDaysBeforeAlert((v) => Math.min(30, v + 1))}
-                    className="w-11 h-11 rounded-xl bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
+                    className="w-11 h-11 rounded-xl bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <span className="material-symbols-outlined text-base">add</span>
                   </button>

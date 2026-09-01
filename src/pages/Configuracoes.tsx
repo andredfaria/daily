@@ -3,6 +3,8 @@ import client from '../api/client'
 import { notificationsApi } from '../api/notifications'
 import type { User } from '../types'
 import { useToast } from '../context/ToastContext'
+import NumberField from '../components/ui/NumberField'
+import { formatNumericInput, parseNumericInput } from '../utils/numberInput'
 import { useAuth } from '../context/AuthContext'
 import { WhatsAppProfileCard, WhatsAppProfile } from '../components/whatsapp/WhatsAppProfileCard'
 
@@ -99,7 +101,10 @@ const Configuracoes: React.FC = () => {
       setSummarySettings({
         summary_enabled: u.summary_enabled ?? false,
         summary_day_of_week: u.summary_day_of_week ?? 1,
-        monthly_budget_limit: u.monthly_budget_limit != null ? String(u.monthly_budget_limit) : '',
+        monthly_budget_limit:
+          u.monthly_budget_limit != null
+            ? formatNumericInput(Number(u.monthly_budget_limit), 2, { padDecimals: true })
+            : '',
         monthly_summary_enabled: u.monthly_summary_enabled ?? true,
       })
     } catch {
@@ -203,11 +208,12 @@ const Configuracoes: React.FC = () => {
     setSavingSummary(true)
     const prev = { ...summarySettings }
     try {
-      const budgetVal = summarySettings.monthly_budget_limit.trim()
+      // Campo vazio desliga o alerta de orçamento — vira null, não zero.
+      const budgetVal = parseNumericInput(summarySettings.monthly_budget_limit)
       await client.patch('/users/me', {
         summary_enabled: summarySettings.summary_enabled,
         summary_day_of_week: summarySettings.summary_day_of_week,
-        monthly_budget_limit: budgetVal === '' ? null : Number(budgetVal),
+        monthly_budget_limit: budgetVal,
         monthly_summary_enabled: summarySettings.monthly_summary_enabled,
       })
       success('Resumo e orçamento salvos!')
@@ -326,21 +332,26 @@ const Configuracoes: React.FC = () => {
             ) : editingProfile ? (
               <div className="space-y-4">
                 <div>
-                  <label className="label">Nome</label>
+                  <label htmlFor="perfil-nome" className="label">Nome</label>
                   <input
+                    id="perfil-nome"
                     type="text"
+                    autoComplete="name"
                     value={profileName}
                     onChange={(e) => setProfileName(e.target.value)}
-                    className="input-field"
+                    className="input-field min-h-[48px]"
                   />
                 </div>
                 <div>
-                  <label className="label">WhatsApp</label>
+                  <label htmlFor="perfil-whatsapp" className="label">WhatsApp</label>
                   <input
-                    type="text"
+                    id="perfil-whatsapp"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     value={profileWhatsapp}
                     onChange={(e) => setProfileWhatsapp(e.target.value)}
-                    className="input-field"
+                    className="input-field min-h-[48px] tabular-nums"
                     placeholder="+55 (11) 99999-9999"
                   />
                 </div>
@@ -414,20 +425,19 @@ const Configuracoes: React.FC = () => {
               )}
 
               <div className="pt-2 border-t border-outline-variant/30">
-                <label className="label">Limite mensal (R$)</label>
                 <p className="text-xs text-on-surface-variant mb-2">
                   Receba um alerta quando suas contas pendentes ultrapassarem este valor. Deixe vazio para desativar.
                 </p>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                <NumberField
+                  label="Limite mensal"
+                  mode="currency"
+                  min={0}
+                  prefix="R$"
+                  placeholder="Ex.: 2.000,00"
                   value={summarySettings.monthly_budget_limit}
-                  onChange={(e) =>
-                    setSummarySettings((prev) => ({ ...prev, monthly_budget_limit: e.target.value }))
+                  onChange={(v) =>
+                    setSummarySettings((prev) => ({ ...prev, monthly_budget_limit: v }))
                   }
-                  className="input-field"
-                  placeholder="Ex: 2000.00"
                 />
               </div>
 
@@ -482,22 +492,29 @@ const Configuracoes: React.FC = () => {
                   <div className="flex items-center gap-3 mt-2">
                     <button
                       type="button"
+                      aria-label="Diminuir um dia de antecedência"
+                      disabled={notifSettings.days_before <= 0}
                       onClick={() =>
                         setNotifSettings((p) => ({ ...p, days_before: Math.max(0, p.days_before - 1) }))
                       }
-                      className="w-11 h-11 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
+                      className="w-11 h-11 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <span className="material-symbols-outlined text-sm">remove</span>
                     </button>
-                    <span className="w-10 text-center text-base font-semibold text-on-surface">
+                    <span
+                      aria-live="polite"
+                      className="w-10 text-center text-base font-semibold text-on-surface tabular-nums"
+                    >
                       {notifSettings.days_before}
                     </span>
                     <button
                       type="button"
+                      aria-label="Aumentar um dia de antecedência"
+                      disabled={notifSettings.days_before >= 30}
                       onClick={() =>
                         setNotifSettings((p) => ({ ...p, days_before: Math.min(30, p.days_before + 1) }))
                       }
-                      className="w-11 h-11 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors"
+                      className="w-11 h-11 rounded-lg bg-surface-container border border-outline-variant/50 flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <span className="material-symbols-outlined text-sm">add</span>
                     </button>
