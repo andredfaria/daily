@@ -2,7 +2,7 @@ import React from 'react'
 import type { ByCategoryResponse, ProjectionResponse } from '../../types'
 import { categoryLabel } from '../../utils/categoryColors'
 import { formatBRL } from '../../utils/format'
-import { StatCard } from '../checklist/StatCard'
+import { StatCard } from '../ui/StatCard'
 import { SkeletonStatCard } from '../ui/Skeleton'
 
 interface SummaryStatsProps {

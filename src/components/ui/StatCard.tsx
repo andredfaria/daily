@@ -6,9 +6,10 @@ interface StatCardProps {
   value: string | number
   iconColor: string
   iconBg: string
+  sub?: string
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ icon, label, value, iconColor, iconBg }) => (
+export const StatCard: React.FC<StatCardProps> = ({ icon, label, value, iconColor, iconBg, sub }) => (
   <div className="glass-card rounded-2xl border border-outline-variant/50 p-5 animate-fadeIn">
     <div className="flex items-center justify-between mb-3">
       <div className={`w-9 h-9 rounded-xl ${iconBg} flex items-center justify-center`}>
@@ -17,5 +18,6 @@ export const StatCard: React.FC<StatCardProps> = ({ icon, label, value, iconColo
     </div>
     <div className="text-2xl font-bold text-on-surface mb-0.5">{value}</div>
     <div className="text-xs text-on-surface-variant font-medium">{label}</div>
+    {sub && <div className="text-xs text-on-surface-variant/70 mt-0.5">{sub}</div>}
   </div>
 )
