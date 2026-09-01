@@ -264,6 +264,24 @@ CREATE TABLE IF NOT EXISTS assets (
       await addColumnIfNotExists('users', 'asset_alert_hour', 'TINYINT UNSIGNED NOT NULL DEFAULT 11', 'asset_alerts_enabled')
     },
   },
+  {
+    name: '016_asset_snapshots',
+    statements: splitStatements(`
+CREATE TABLE IF NOT EXISTS asset_snapshots (
+  id            CHAR(36)      NOT NULL DEFAULT (UUID()),
+  user_id       CHAR(36)      NOT NULL,
+  asset_id      CHAR(36)      NOT NULL,
+  snapshot_date DATE          NOT NULL,
+  price         DECIMAL(18,8) NOT NULL,
+  quantity      DECIMAL(18,8) NOT NULL,
+  avg_price     DECIMAL(18,8) NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_asset_date (asset_id, snapshot_date),
+  KEY idx_user_date (user_id, snapshot_date),
+  CONSTRAINT fk_snapshot_asset FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `),
+  },
 ]
 
 export async function runMigrations(): Promise<void> {
