@@ -14,7 +14,6 @@ import Login from './pages/Login'
 import ChecklistsShell from './pages/checklists/ChecklistsShell'
 import ChecklistsLista from './pages/checklists/ChecklistsLista'
 import ChecklistsAnalise from './pages/checklists/ChecklistsAnalise'
-import Analise from './pages/Analise'
 import AtivosShell from './pages/ativos/AtivosShell'
 import AtivosCarteira from './pages/ativos/AtivosCarteira'
 import AtivosAnalise from './pages/ativos/AtivosAnalise'
@@ -55,7 +54,6 @@ const App: React.FC = () => {
                   <Route path="lista" element={<ContasLista />} />
                   <Route path="analise" element={<ContasAnalise />} />
                 </Route>
-                <Route path="/analise" element={<Analise />} />
                 <Route path="/ativos" element={<AtivosShell />}>
                   <Route index element={<Navigate to="carteira" replace />} />
                   <Route path="carteira" element={<AtivosCarteira />} />

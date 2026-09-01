@@ -1,12 +1,11 @@
 import React from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
 import Sidebar, { navItems } from './Sidebar'
 import Header from './Header'
 
 const BottomNav: React.FC = () => {
-  const { logout } = useAuth()
-
+  // Sem botão Sair: ação destrutiva não divide barra com navegação, e a largura
+  // liberada deixa os seis rótulos legíveis no mobile. Sair vive em Configurações.
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest border-t border-outline-variant/50 flex items-stretch">
       {navItems.map((item) => (
@@ -33,14 +32,6 @@ const BottomNav: React.FC = () => {
           )}
         </NavLink>
       ))}
-      <button
-        onClick={logout}
-        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[9px] font-medium text-error min-h-[56px]"
-        aria-label="Sair"
-      >
-        <span className="material-symbols-outlined text-[22px]">logout</span>
-        <span className="leading-none">Sair</span>
-      </button>
     </nav>
   )
 }

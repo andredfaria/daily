@@ -3,9 +3,8 @@ import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: 'dashboard', exact: true },
+  { path: '/', label: 'Home', icon: 'home', exact: true },
   { path: '/contas', label: 'Contas', icon: 'receipt_long' },
-  { path: '/analise', label: 'Análise', icon: 'monitoring' },
   { path: '/ativos', label: 'Ativos', icon: 'trending_up' },
   { path: '/checklists', label: 'Checklists', icon: 'checklist' },
   { path: '/notificacoes', label: 'Notificações', icon: 'notifications' },

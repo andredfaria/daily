@@ -3,6 +3,7 @@ import client from '../api/client'
 import { notificationsApi } from '../api/notifications'
 import type { User } from '../types'
 import { useToast } from '../context/ToastContext'
+import { useAuth } from '../context/AuthContext'
 
 const NOTIFICATION_HOURS = [7, 8, 9, 10, 12, 18]
 // B3 negocia das 10h às 17h BRT; antes da abertura a brapi devolve o fechamento
@@ -35,6 +36,7 @@ interface SummaryBudgetSettings {
 const DAYS_OF_WEEK = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 const Configuracoes: React.FC = () => {
+  const { logout } = useAuth()
   const [user, setUser] = useState<User | null>(null)
   const [loadingUser, setLoadingUser] = useState(true)
   const [editingProfile, setEditingProfile] = useState(false)
@@ -729,6 +731,17 @@ const Configuracoes: React.FC = () => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Sair — saiu do bottom nav mobile: ação destrutiva não divide barra com navegação */}
+      <div className="section-card">
+        <button
+          onClick={logout}
+          className="w-full flex items-center justify-center gap-2 px-4 min-h-[48px] rounded-xl text-sm font-medium text-error hover:bg-error/10 transition-colors"
+        >
+          <span className="material-symbols-outlined text-lg">logout</span>
+          Sair da conta
+        </button>
       </div>
 
     </div>
