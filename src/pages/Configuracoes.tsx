@@ -4,6 +4,7 @@ import { notificationsApi } from '../api/notifications'
 import type { User } from '../types'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
+import { WhatsAppProfileCard } from '../components/whatsapp/WhatsAppProfileCard'
 
 const NOTIFICATION_HOURS = [7, 8, 9, 10, 12, 18]
 // B3 negocia das 10h às 17h BRT; antes da abertura a brapi devolve o fechamento
@@ -369,64 +370,13 @@ const Configuracoes: React.FC = () => {
           </div>
 
           {/* WhatsApp Profile Card */}
-          <div className="section-card">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">account_circle</span>
-                <h3 className="text-base font-semibold text-on-surface">Perfil WhatsApp</h3>
-              </div>
-              <button
-                onClick={fetchWahaProfile}
-                disabled={loadingProfile}
-                className="btn-ghost text-xs"
-              >
-                <span className={`material-symbols-outlined text-base ${loadingProfile ? 'animate-spin' : ''}`}>
-                  refresh
-                </span>
-              </button>
-            </div>
-
-            {loadingProfile ? (
-              <div className="space-y-3">
-                {Array.from({ length: 2 }).map((_, i) => (
-                  <div key={i} className="h-10 shimmer-bg rounded-xl" />
-                ))}
-              </div>
-            ) : profileError ? (
-              <div className="flex flex-col items-center gap-2 py-4 text-center">
-                <span className="material-symbols-outlined text-3xl text-on-surface-variant">wifi_off</span>
-                <p className="text-sm text-on-surface-variant leading-relaxed">{profileError}</p>
-              </div>
-            ) : wahaProfile ? (
-              <div className="flex items-start gap-4">
-                {wahaProfile.profilePicUrl ? (
-                  <img
-                    src={wahaProfile.profilePicUrl}
-                    alt="Foto de perfil"
-                    className="w-16 h-16 rounded-full object-cover flex-shrink-0 border border-outline-variant/30"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none'
-                    }}
-                  />
-                ) : (
-                  <span className="material-symbols-outlined text-6xl text-on-surface-variant flex-shrink-0">
-                    account_circle
-                  </span>
-                )}
-                <div className="min-w-0 flex-1 space-y-1">
-                  <p className="text-sm font-semibold text-on-surface truncate">
-                    {wahaProfile.name ?? user?.whatsapp_number ?? '-'}
-                  </p>
-                  <p className="text-xs text-on-surface-variant">{user?.whatsapp_number}</p>
-                  {wahaProfile.about && (
-                    <p className="text-xs text-on-surface-variant italic leading-relaxed mt-1">
-                      "{wahaProfile.about}"
-                    </p>
-                  )}
-                </div>
-              </div>
-            ) : null}
-          </div>
+          <WhatsAppProfileCard
+            profile={wahaProfile}
+            whatsappNumber={user?.whatsapp_number ?? null}
+            loading={loadingProfile}
+            error={profileError}
+            onRefresh={fetchWahaProfile}
+          />
 
           {/* Summary & Budget Card */}
           <div className="section-card">
