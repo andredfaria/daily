@@ -1,5 +1,5 @@
 import client from './client'
-import type { Asset, AssetKind, AssetWithQuote } from '../types'
+import type { Asset, AssetKind, AssetWithQuote, AssetHistoryResponse } from '../types'
 
 export interface CreateAssetPayload {
   ticker: string
@@ -17,6 +17,11 @@ export interface UpdateAssetPayload extends Partial<Omit<CreateAssetPayload, 'ti
 export const assetsApi = {
   list: async (): Promise<AssetWithQuote[]> => {
     const res = await client.get<AssetWithQuote[]>('/assets')
+    return res.data
+  },
+
+  history: async (days = 90): Promise<AssetHistoryResponse> => {
+    const res = await client.get<AssetHistoryResponse>('/assets/history', { params: { days } })
     return res.data
   },
 

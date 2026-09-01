@@ -247,3 +247,13 @@ export interface AssetWithQuote extends Asset {
   profit_loss: number | null
   profit_loss_pct: number | null
 }
+
+export interface AssetHistoryPoint {
+  date: string
+  current_value: number
+  invested_value: number
+}
+
+export interface AssetHistoryResponse {
+  pontos: AssetHistoryPoint[]
+}

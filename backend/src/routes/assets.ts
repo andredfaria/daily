@@ -94,6 +94,40 @@ router.get('/', async (req: Request, res: Response) => {
   }
 })
 
+// GET /api/assets/history — evolução diária do patrimônio a partir dos snapshots.
+// Precisa vir antes de qualquer rota /:id, senão "history" é lido como id.
+router.get('/history', async (req: Request, res: Response) => {
+  try {
+    const bruto = Number(req.query.days)
+    const days = Number.isFinite(bruto) ? Math.min(Math.max(Math.trunc(bruto), 1), 365) : 90
+
+    const desde = new Date()
+    desde.setDate(desde.getDate() - days)
+
+    const [rows]: any = await pool.query(
+      `SELECT DATE_FORMAT(snapshot_date, '%Y-%m-%d') AS date,
+              SUM(price * quantity)     AS current_value,
+              SUM(avg_price * quantity) AS invested_value
+         FROM asset_snapshots
+        WHERE user_id = ? AND snapshot_date >= ?
+        GROUP BY snapshot_date
+        ORDER BY snapshot_date`,
+      [req.userId, desde]
+    )
+
+    res.json({
+      pontos: rows.map((r: any) => ({
+        date: r.date,
+        current_value: Number(r.current_value),
+        invested_value: Number(r.invested_value),
+      })),
+    })
+  } catch (err: any) {
+    console.error('[assets] erro ao buscar histórico:', err.message)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
 // POST /api/assets
 router.post('/', async (req: Request, res: Response) => {
   // Declarado fora do try para ficar acessível no catch (ER_DUP_ENTRY da corrida
