@@ -1,5 +1,6 @@
 import pool from '../db'
 import { sendWhatsAppText } from './waha'
+import { claimMessage, releaseMessageClaim, claimKeyDia } from './messageClaim'
 
 export async function checkBudgetAlert(userId: string): Promise<void> {
   const [userRows]: any = await pool.query(
@@ -26,7 +27,17 @@ export async function checkBudgetAlert(userId: string): Promise<void> {
       `⚠️ *Alerta de Orçamento — BillSync*\n\n` +
       `Suas contas deste mês somam *R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*, ` +
       `acima do limite configurado de *R$ ${budget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*.`
-    await sendWhatsAppText(userRows[0].whatsapp_number, msg)
+    // Chave diária: preserva a cadência atual (um aviso por dia enquanto o
+    // orçamento estiver estourado) e barra só a duplicata entre instâncias.
+    const refKey = claimKeyDia()
+    if (!await claimMessage(userId, 'budget_alert', refKey)) return
+
+    try {
+      await sendWhatsAppText(userRows[0].whatsapp_number, msg)
+    } catch (err) {
+      await releaseMessageClaim(userId, 'budget_alert', refKey)
+      throw err
+    }
     console.log(`[budgetAlert] alerta enviado para ${userId}`)
   }
 }

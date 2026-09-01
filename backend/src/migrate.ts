@@ -282,6 +282,22 @@ CREATE TABLE IF NOT EXISTS asset_snapshots (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `),
   },
+  {
+    name: '017_message_claims',
+    statements: splitStatements(`
+CREATE TABLE IF NOT EXISTS message_claims (
+  id         CHAR(36)    NOT NULL DEFAULT (UUID()),
+  user_id    CHAR(36)    NOT NULL,
+  kind       VARCHAR(40) NOT NULL,
+  ref_key    VARCHAR(60) NOT NULL,
+  claimed_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_message_claim (user_id, kind, ref_key),
+  KEY idx_claim_claimed_at (claimed_at),
+  CONSTRAINT fk_claim_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `),
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

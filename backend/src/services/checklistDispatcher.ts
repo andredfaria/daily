@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { sendWhatsAppPoll, sendWhatsAppText, WhatsAppNumberNotFoundError } from './waha'
 import { nextMissState, buildInactivityMessage, INACTIVITY_THRESHOLD } from './checklistInactivity'
+import { claimMessage, releaseMessageClaim } from './messageClaim'
 
 export function getTodaySaoPaulo(): string {
   // formatToParts garante YYYY-MM-DD independente da versão do ICU/Node
@@ -66,12 +67,14 @@ async function applyInactivityCheck(checklistId: string, userId: string, today: 
 
   const [userRows]: any = await pool.query('SELECT whatsapp_number FROM users WHERE id = ?', [userId])
   const phone = userRows[0]?.whatsapp_number
-  if (phone) {
+  if (phone && await claimMessage(userId, 'checklist_inactivity', `${checklistId}:${today}`)) {
     try {
       await sendWhatsAppText(phone, buildInactivityMessage(checklistRows[0].name))
     } catch (err: any) {
       // Falhar o aviso não pode desfazer a pausa — o checklist já está pausado
-      // e o usuário ainda encontra o botão de reativar na tela.
+      // e o usuário ainda encontra o botão de reativar na tela. Mas o claim volta,
+      // para que uma execução posterior possa avisar.
+      await releaseMessageClaim(userId, 'checklist_inactivity', `${checklistId}:${today}`)
       console.error(`[checklistDispatcher] erro ao enviar aviso de pausa:`, err.message)
     }
   }
@@ -155,7 +158,22 @@ export async function sendDailyPoll(
     }
 
     const pollName = checklist.name || 'Checklist Diário'
-    const result = await sendWhatsAppPoll(phone, pollName, options)
+    // O INSERT em checklist_daily_polls (com unique key) só acontece depois do
+    // envio, então ele protege o dado mas não a mensagem: várias instâncias
+    // passam pelo SELECT de "já enviei hoje" e todas enviam. O claim resolve
+    // antes de qualquer uma chamar o WAHA.
+    if (!await claimMessage(userId, 'checklist_poll', `${checklistId}:${today}`)) {
+      console.log(`[checklistDispatcher] poll de ${checklistId} em ${today} já reivindicado por outra instância`)
+      return
+    }
+
+    let result: { id: string | null }
+    try {
+      result = await sendWhatsAppPoll(phone, pollName, options)
+    } catch (err) {
+      await releaseMessageClaim(userId, 'checklist_poll', `${checklistId}:${today}`)
+      throw err
+    }
 
     const dailyPollId = uuidv4()
     await pool.query(

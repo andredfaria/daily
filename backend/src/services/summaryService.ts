@@ -1,6 +1,7 @@
 import pool from '../db'
 import { sendWhatsAppText } from './waha'
 import { fechamentoMensal } from './financialAnalytics'
+import { claimMessage, releaseMessageClaim, claimKeyDia, claimKeyMesAnterior } from './messageClaim'
 
 function formatBRL(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -60,7 +61,15 @@ export async function sendWeeklySummary(userId: string): Promise<void> {
     msg += `\nNenhuma conta nos próximos 7 dias. 🎉\n`
   }
 
-  await sendWhatsAppText(userRows[0].whatsapp_number, msg)
+  const refKey = claimKeyDia()
+  if (!await claimMessage(userId, 'weekly_summary', refKey)) return
+
+  try {
+    await sendWhatsAppText(userRows[0].whatsapp_number, msg)
+  } catch (err) {
+    await releaseMessageClaim(userId, 'weekly_summary', refKey)
+    throw err
+  }
   console.log(`[summary] resumo semanal enviado para ${userId}`)
 }
 
@@ -103,6 +112,14 @@ export async function sendMonthlySummary(userId: string): Promise<void> {
     }
   }
 
-  await sendWhatsAppText(userRows[0].whatsapp_number, msg)
+  const refKey = claimKeyMesAnterior()
+  if (!await claimMessage(userId, 'monthly_summary', refKey)) return
+
+  try {
+    await sendWhatsAppText(userRows[0].whatsapp_number, msg)
+  } catch (err) {
+    await releaseMessageClaim(userId, 'monthly_summary', refKey)
+    throw err
+  }
   console.log(`[summary] sumário mensal enviado para ${userId}`)
 }

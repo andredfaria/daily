@@ -8,6 +8,7 @@ import {
   buildAlertMessage,
   formatDateSaoPaulo,
 } from './assetMath'
+import { claimMessage, releaseMessageClaim, claimKeyDia } from './messageClaim'
 
 export async function checkAssetAlerts(userId: string, synced: SyncedAsset[]): Promise<void> {
   if (!synced.length) return
@@ -58,7 +59,17 @@ export async function checkAssetAlerts(userId: string, synced: SyncedAsset[]): P
 
   if (!hits.length) return
 
-  await sendWhatsAppText(userRows[0].whatsapp_number, buildAlertMessage(hits))
+  // O par "ler target_triggered_at, depois gravar" não é atômico: três
+  // instâncias leem null no mesmo tick e as três enviam. O claim decide antes.
+  const refKey = claimKeyDia()
+  if (!await claimMessage(userId, 'asset_alert', refKey)) return
+
+  try {
+    await sendWhatsAppText(userRows[0].whatsapp_number, buildAlertMessage(hits))
+  } catch (err) {
+    await releaseMessageClaim(userId, 'asset_alert', refKey)
+    throw err
+  }
 
   if (marcarAlvo.length) {
     await pool.query('UPDATE assets SET target_triggered_at = NOW() WHERE id IN (?)', [marcarAlvo])
