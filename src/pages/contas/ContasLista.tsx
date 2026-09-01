@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { billsApi } from '../api/bills'
-import type { Bill, BillCategory, RecurrenceType } from '../types'
+import { billsApi } from '../../api/bills'
+import type { Bill, BillCategory, RecurrenceType } from '../../types'
 import {
   formatBRL,
   formatDate,
@@ -10,10 +10,10 @@ import {
   getRecurrenceBadgeColor,
   getRecurrenceLabel,
   getRecurrenceShortLabel,
-} from '../utils/format'
-import Modal from '../components/ui/Modal'
-import { SkeletonCard } from '../components/ui/Skeleton'
-import { useToast } from '../context/ToastContext'
+} from '../../utils/format'
+import Modal from '../../components/ui/Modal'
+import { SkeletonCard } from '../../components/ui/Skeleton'
+import { useToast } from '../../context/ToastContext'
 
 // --- Filter types ---
 type RecurrenceFilter = 'all' | RecurrenceType
@@ -163,7 +163,7 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, t
 }
 
 // --- Contas Page ---
-const Contas: React.FC = () => {
+const ContasLista: React.FC = () => {
   const [bills, setBills] = useState<Bill[]>([])
   const [loading, setLoading] = useState(true)
   const [recurrenceFilter, setRecurrenceFilter] = useState<RecurrenceFilter>('all')
@@ -262,14 +262,11 @@ const Contas: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Page Header */}
+      {/* Page Header — sem título: o Header da app e a TabNav já situam a página */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-lg font-bold text-on-surface">Minhas Contas</h2>
-          <span className="px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-semibold">
-            TOTAL {formatBRL(totalAmount)}
-          </span>
-        </div>
+        <span className="px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-semibold self-start">
+          TOTAL {formatBRL(totalAmount)}
+        </span>
         <button onClick={() => navigate('/contas/nova')} className="btn-primary justify-center w-full md:w-auto">
           <span className="material-symbols-outlined text-lg">add</span>
           Nova Conta
@@ -393,4 +390,4 @@ const Contas: React.FC = () => {
   )
 }
 
-export default Contas
+export default ContasLista

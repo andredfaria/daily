@@ -4,7 +4,9 @@ import { ToastProvider } from './context/ToastContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout/Layout'
 import Dashboard from './pages/Dashboard'
-import Contas from './pages/Contas'
+import ContasShell from './pages/contas/ContasShell'
+import ContasLista from './pages/contas/ContasLista'
+import ContasAnalise from './pages/contas/ContasAnalise'
 import BillForm from './pages/BillForm'
 import Notificacoes from './pages/Notificacoes'
 import Configuracoes from './pages/Configuracoes'
@@ -44,7 +46,11 @@ const App: React.FC = () => {
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/contas" element={<Contas />} />
+                <Route path="/contas" element={<ContasShell />}>
+                  <Route index element={<Navigate to="lista" replace />} />
+                  <Route path="lista" element={<ContasLista />} />
+                  <Route path="analise" element={<ContasAnalise />} />
+                </Route>
                 <Route path="/analise" element={<Analise />} />
                 <Route path="/ativos" element={<Ativos />} />
                 <Route path="/contas/nova" element={<BillForm />} />

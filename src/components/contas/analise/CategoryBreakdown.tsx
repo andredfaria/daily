@@ -1,8 +1,8 @@
 import React from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import type { ByCategoryResponse } from '../../types'
-import { categoryColor, categoryLabel } from '../../utils/categoryColors'
-import { formatBRL } from '../../utils/format'
+import type { ByCategoryResponse } from '../../../types'
+import { categoryColor, categoryLabel } from '../../../utils/categoryColors'
+import { formatBRL } from '../../../utils/format'
 
 interface CategoryBreakdownProps {
   data: ByCategoryResponse | null

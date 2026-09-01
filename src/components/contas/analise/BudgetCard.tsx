@@ -1,7 +1,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { BudgetResponse } from '../../types'
-import { formatBRL } from '../../utils/format'
+import type { BudgetResponse } from '../../../types'
+import { formatBRL } from '../../../utils/format'
 import { RadialGauge } from './RadialGauge'
 
 interface BudgetCardProps {

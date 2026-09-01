@@ -1,6 +1,6 @@
 import React from 'react'
-import type { OcorrenciaTop } from '../../types'
-import { formatBRL, formatDate, getBillIcon } from '../../utils/format'
+import type { OcorrenciaTop } from '../../../types'
+import { formatBRL, formatDate, getBillIcon } from '../../../utils/format'
 
 interface TopOccurrencesListProps {
   occurrences: OcorrenciaTop[]

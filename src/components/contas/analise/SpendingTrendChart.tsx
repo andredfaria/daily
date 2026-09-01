@@ -2,8 +2,8 @@ import React from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
 } from 'recharts'
-import type { ProjectionResponse } from '../../types'
-import { formatBRL } from '../../utils/format'
+import type { ProjectionResponse } from '../../../types'
+import { formatBRL } from '../../../utils/format'
 
 interface SpendingTrendChartProps {
   history: ProjectionResponse | null
