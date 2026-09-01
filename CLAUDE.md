@@ -37,7 +37,8 @@ Copy `.env.example` to `.env`. Required vars for local dev:
 - `WAHA_WEBHOOK_SECRET` / `WHATSAPP_HOOK_HMAC_KEY` — webhook HMAC verification
 - `PIX_ENCRYPTION_KEY` — AES-256-GCM key for `pix_key` at-rest encryption; **required in production**. In dev, if unset, `pix_key` is stored in plaintext with a warning.
 - `DEV_OTP_BYPASS=true` — skip WAHA for OTP in local dev (code logged to backend stdout)
-- `BRAPI_TOKEN` — token gratuito da [brapi.dev](https://brapi.dev) para cotação de ativos. Sem ele, apenas PETR4, MGLU3, VALE3 e ITUB4 respondem. Plano gratuito: 15.000 req/mês, 1 ticker por requisição.
+- `BRAPI_TOKEN` — token gratuito da [brapi.dev](https://brapi.dev) para cotação de ativos. Sem ele, apenas PETR4, MGLU3, VALE3 e ITUB4 respondem. Plano gratuito: 15.000 req/mês, 1 ticker por requisição. **Criptomoedas exigem plano pago** (a brapi responde `403 FEATURE_NOT_AVAILABLE`).
+- `BRAPI_TOKEN_2` — token de contingência, opcional. Usado automaticamente quando o primário é recusado (401/403) ou estoura a cota (402/429).
 
 ## Architecture
 
@@ -74,6 +75,8 @@ OTP via WhatsApp → JWT (30 days) stored in `localStorage` → `Authorization: 
 - WAHA webhook hits `/api/webhooks`; a resposta do usuário alimenta os checklists. Não há estado de pagamento em `bill_occurrences` — `status`, `paid_at` e `confirmation_source` foram removidos pela migration `010_remove_payment_fields`.
 - Alertas de ativos rodam no tick horário conforme `users.asset_alert_hour` (default 11). Disparam uma vez e pausam (`target_triggered_at` / `stop_triggered_at`), até serem reativados no app.
 - Ações e FIIs são pulados quando a cotação não é do dia corrente (fim de semana e feriado); cripto roda todo dia.
+- Contingência de token da brapi: `fetchQuote` percorre `BRAPI_TOKEN` e depois `BRAPI_TOKEN_2`. Token recusado por credencial/cota fica 30 min de molho (vai para o fim da fila) para não gastar uma requisição perdida em cada ticker. `403 FEATURE_NOT_AVAILABLE` (recurso fora do plano, caso das criptomoedas) tenta o outro token mas **não** deixa o primeiro de molho — ele continua válido para ações e FIIs. Rede, 404 e 5xx não trocam de token.
+- Ticker e tipo do ativo são editáveis no `PATCH /api/assets/:id`; a troca revalida na brapi, checa duplicidade e zera `last_price`/`last_quote_at`/gatilhos de alerta. O histórico em `asset_snapshots` continua preso ao `asset_id`, então linhas antigas seguem sob o ativo renomeado.
 - Testes com jest + ts-jest em `backend/src/services/__tests__/`, cobrindo funções puras sem banco nem rede. Rodar com `cd backend && npm test`.
 - Testes do frontend com vitest em `src/**/__tests__/`, também só de funções puras. Rodar com `npm test` na raiz.
 - Snapshot diário de ativos: `syncUserAssets` roda no tick de `asset_alert_hour` para todo usuário com ativo ativo, mesmo com alerta desligado, e grava uma linha por ativo em `asset_snapshots`. A trava de cotação velha vale só para o alerta — o snapshot registra o preço como veio, senão o total do sábado despencaria por falta das ações.

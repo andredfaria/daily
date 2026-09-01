@@ -1,13 +1,29 @@
 import React, { useEffect, useState } from 'react'
-import { assetsApi, CreateAssetPayload } from '../../api/assets'
+import { assetsApi } from '../../api/assets'
 import type { AssetKind, AssetWithQuote } from '../../types'
 import { useToast } from '../../context/ToastContext'
 import Modal from '../../components/ui/Modal'
+import NumberField from '../../components/ui/NumberField'
+import { formatNumericInput, parseNumericInput } from '../../utils/numberInput'
 
 const KIND_LABELS: Record<AssetKind, string> = {
   stock: 'Ação',
   fii: 'FII',
   crypto: 'Cripto',
+}
+
+// O formato do código muda por tipo — o campo precisa dizer isso antes de o
+// usuário errar: ação/FII usam o ticker da B3, cripto usa o símbolo da moeda.
+const KIND_PLACEHOLDER: Record<AssetKind, string> = {
+  stock: 'PETR4',
+  fii: 'MXRF11',
+  crypto: 'BTC',
+}
+
+const KIND_HINT: Record<AssetKind, string> = {
+  stock: 'Ticker da B3, como PETR4 ou VALE3',
+  fii: 'Ticker do fundo, como MXRF11 ou HGLG11',
+  crypto: 'Símbolo da moeda, como BTC, ETH ou SOL — cotação em BRL',
 }
 
 const brl = (v: number) =>
@@ -25,8 +41,25 @@ const formatQuantity = (quantity: number) =>
     ? String(quantity)
     : quantity.toLocaleString('pt-BR', { maximumFractionDigits: 8 })
 
-const FORM_INICIAL: CreateAssetPayload = {
-  ticker: '', kind: 'stock', quantity: 0, avg_price: 0, target_price: null, stop_price: null,
+// Campos numéricos ficam como string para o usuário poder deixá-los vazios
+// enquanto digita. A conversão para número acontece só no envio.
+interface FormAtivo {
+  ticker: string
+  kind: AssetKind
+  quantity: string
+  avg_price: string
+  target_price: string
+  stop_price: string
+}
+
+interface ErrosAtivo {
+  ticker?: string
+  quantity?: string
+  avg_price?: string
+}
+
+const FORM_INICIAL: FormAtivo = {
+  ticker: '', kind: 'stock', quantity: '', avg_price: '', target_price: '', stop_price: '',
 }
 
 const AtivosCarteira: React.FC = () => {
@@ -35,7 +68,8 @@ const AtivosCarteira: React.FC = () => {
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [formAberto, setFormAberto] = useState(false)
-  const [form, setForm] = useState<CreateAssetPayload>(FORM_INICIAL)
+  const [form, setForm] = useState<FormAtivo>(FORM_INICIAL)
+  const [erros, setErros] = useState<ErrosAtivo>({})
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; ticker: string } | null>(null)
   const [excluindo, setExcluindo] = useState(false)
@@ -55,40 +89,67 @@ const AtivosCarteira: React.FC = () => {
 
   const fecharForm = () => {
     setForm(FORM_INICIAL)
+    setErros({})
     setEditingId(null)
     setFormAberto(false)
   }
 
+  // Preço opcional vazio significa "sem alerta" — vira null, não zero.
+  const precoOpcional = (texto: string) => (texto === '' ? null : parseNumericInput(texto))
+
+  // Trocar o tipo muda o formato esperado do código (PETR4 x BTC): o erro
+  // anterior deixa de valer e o campo ganha o novo exemplo.
+  const trocarTipo = (kind: AssetKind) => {
+    setForm((f) => ({ ...f, kind }))
+    setErros((e) => ({ ...e, ticker: undefined }))
+  }
+
   const iniciarEdicao = (a: AssetWithQuote) => {
     setEditingId(a.id)
+    setErros({})
     setForm({
       ticker: a.ticker,
       kind: a.kind,
-      quantity: a.quantity,
-      avg_price: a.avg_price,
-      target_price: a.target_price,
-      stop_price: a.stop_price,
+      quantity: formatNumericInput(a.quantity, 8),
+      avg_price: formatNumericInput(a.avg_price, 2, { padDecimals: true }),
+      target_price: a.target_price != null ? formatNumericInput(a.target_price, 2, { padDecimals: true }) : '',
+      stop_price: a.stop_price != null ? formatNumericInput(a.stop_price, 2, { padDecimals: true }) : '',
     })
     setFormAberto(true)
   }
 
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    const quantidade = parseNumericInput(form.quantity)
+    const precoMedio = parseNumericInput(form.avg_price)
+    const novosErros: ErrosAtivo = {}
+    if (!form.ticker.trim()) novosErros.ticker = 'Informe o ticker'
+    if (quantidade === null || quantidade <= 0) novosErros.quantity = 'Informe uma quantidade maior que zero'
+    if (precoMedio === null || precoMedio <= 0) novosErros.avg_price = 'Informe o preço médio pago'
+    setErros(novosErros)
+    if (Object.keys(novosErros).length > 0) return
+
     setSalvando(true)
     try {
       if (editingId) {
         await assetsApi.update(editingId, {
-          quantity: form.quantity,
-          avg_price: form.avg_price,
-          target_price: form.target_price || null,
-          stop_price: form.stop_price || null,
+          ticker: form.ticker.trim().toUpperCase(),
+          kind: form.kind,
+          quantity: quantidade!,
+          avg_price: precoMedio!,
+          target_price: precoOpcional(form.target_price),
+          stop_price: precoOpcional(form.stop_price),
         })
         showToast(`${form.ticker.toUpperCase()} atualizado`, 'success')
       } else {
         await assetsApi.create({
-          ...form,
-          target_price: form.target_price || null,
-          stop_price: form.stop_price || null,
+          ticker: form.ticker.trim().toUpperCase(),
+          kind: form.kind,
+          quantity: quantidade!,
+          avg_price: precoMedio!,
+          target_price: precoOpcional(form.target_price),
+          stop_price: precoOpcional(form.stop_price),
         })
         showToast(`${form.ticker.toUpperCase()} adicionado à carteira`, 'success')
       }
@@ -155,72 +216,107 @@ const AtivosCarteira: React.FC = () => {
         <form onSubmit={salvar} className="rounded-2xl bg-surface-container-lowest border border-outline-variant/50 p-4 space-y-3">
           {editingId && (
             <p className="text-xs text-on-surface-variant">
-              Editando {form.ticker} — ticker e tipo não podem ser alterados.
+              Editando {ativos.find((a) => a.id === editingId)?.ticker ?? form.ticker}. Trocar o
+              ticker ou o tipo reinicia a cotação e os alertas, mas mantém o histórico do ativo.
             </p>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
-              Ticker
+            <div>
+              <label htmlFor="ativo-ticker" className="label">Ticker <span className="text-error">*</span></label>
               <input
-                required
-                disabled={!!editingId}
+                id="ativo-ticker"
+                aria-required="true"
+                autoComplete="off"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
                 value={form.ticker}
                 onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })}
-                placeholder="PETR4"
-                className="min-h-[48px] px-3 rounded-xl bg-surface-container border border-outline-variant/50 text-sm text-on-surface disabled:opacity-50"
+                placeholder={KIND_PLACEHOLDER[form.kind]}
+                aria-invalid={!!erros.ticker}
+                aria-describedby={erros.ticker ? 'ativo-ticker-erro' : 'ativo-ticker-hint'}
+                className={`input-field min-h-[48px] uppercase ${erros.ticker ? 'error' : ''}`}
               />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
-              Tipo
+              {erros.ticker ? (
+                <p id="ativo-ticker-erro" role="alert" className="mt-1 flex items-center gap-1 text-xs text-error">
+                  <span className="material-symbols-outlined text-sm">error</span>
+                  {erros.ticker}
+                </p>
+              ) : (
+                <p id="ativo-ticker-hint" className="mt-1 text-xs text-on-surface-variant">
+                  {KIND_HINT[form.kind]}
+                </p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="ativo-tipo" className="label">Tipo</label>
               <select
-                disabled={!!editingId}
+                id="ativo-tipo"
                 value={form.kind}
-                onChange={(e) => setForm({ ...form, kind: e.target.value as AssetKind })}
-                className="min-h-[48px] px-3 rounded-xl bg-surface-container border border-outline-variant/50 text-sm text-on-surface disabled:opacity-50"
+                onChange={(e) => trocarTipo(e.target.value as AssetKind)}
+                className="input-field min-h-[48px]"
               >
                 <option value="stock">Ação</option>
                 <option value="fii">FII</option>
                 <option value="crypto">Cripto</option>
               </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
-              Quantidade
-              <input
-                type="number" step="any" min="0"
-                value={form.quantity ?? 0}
-                onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })}
-                className="min-h-[48px] px-3 rounded-xl bg-surface-container border border-outline-variant/50 text-sm text-on-surface"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
-              Preço médio pago (R$)
-              <input
-                type="number" step="any" min="0"
-                value={form.avg_price ?? 0}
-                onChange={(e) => setForm({ ...form, avg_price: Number(e.target.value) })}
-                className="min-h-[48px] px-3 rounded-xl bg-surface-container border border-outline-variant/50 text-sm text-on-surface"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
-              Preço-alvo de venda (R$)
-              <input
-                type="number" step="any" min="0"
-                value={form.target_price ?? ''}
-                onChange={(e) => setForm({ ...form, target_price: e.target.value ? Number(e.target.value) : null })}
-                placeholder="opcional"
-                className="min-h-[48px] px-3 rounded-xl bg-surface-container border border-outline-variant/50 text-sm text-on-surface"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-on-surface-variant">
-              Stop (R$)
-              <input
-                type="number" step="any" min="0"
-                value={form.stop_price ?? ''}
-                onChange={(e) => setForm({ ...form, stop_price: e.target.value ? Number(e.target.value) : null })}
-                placeholder="opcional"
-                className="min-h-[48px] px-3 rounded-xl bg-surface-container border border-outline-variant/50 text-sm text-on-surface"
-              />
-            </label>
+            </div>
+
+            {form.kind === 'crypto' && (
+              <div
+                role="status"
+                className="sm:col-span-2 flex items-start gap-2 rounded-xl border border-yellow-400/40 bg-yellow-400/10 p-3"
+              >
+                <span className="material-symbols-outlined text-yellow-400 text-lg shrink-0">info</span>
+                <p className="text-xs text-on-surface-variant">
+                  A brapi.dev liberou criptomoedas só nos planos pagos. Com um token do plano
+                  gratuito o cadastro vai falhar na busca da cotação — ações e FIIs seguem
+                  funcionando normalmente.
+                </p>
+              </div>
+            )}
+            <NumberField
+              label="Quantidade"
+              required
+              mode="decimal"
+              min={0}
+              placeholder="0"
+              hint="Aceita fração — ex.: 0,005"
+              value={form.quantity}
+              onChange={(v) => setForm({ ...form, quantity: v })}
+              error={erros.quantity}
+            />
+            <NumberField
+              label="Preço médio pago"
+              required
+              mode="currency"
+              min={0}
+              prefix="R$"
+              placeholder="0,00"
+              value={form.avg_price}
+              onChange={(v) => setForm({ ...form, avg_price: v })}
+              error={erros.avg_price}
+            />
+            <NumberField
+              label="Preço-alvo de venda"
+              mode="currency"
+              min={0}
+              prefix="R$"
+              placeholder="Opcional"
+              hint="Avisa no WhatsApp quando a cotação chegar aqui"
+              value={form.target_price}
+              onChange={(v) => setForm({ ...form, target_price: v })}
+            />
+            <NumberField
+              label="Stop"
+              mode="currency"
+              min={0}
+              prefix="R$"
+              placeholder="Opcional"
+              hint="Avisa se a cotação cair até este preço"
+              value={form.stop_price}
+              onChange={(v) => setForm({ ...form, stop_price: v })}
+            />
           </div>
           <button
             type="submit"

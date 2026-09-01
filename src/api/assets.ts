@@ -10,7 +10,9 @@ export interface CreateAssetPayload {
   stop_price?: number | null
 }
 
-export interface UpdateAssetPayload extends Partial<Omit<CreateAssetPayload, 'ticker' | 'kind'>> {
+// Ticker e tipo entram aqui: o backend aceita renomear o ativo no lugar de
+// obrigar a apagar e recadastrar, o que jogaria fora o histórico de snapshots.
+export interface UpdateAssetPayload extends Partial<CreateAssetPayload> {
   is_active?: boolean
 }
 

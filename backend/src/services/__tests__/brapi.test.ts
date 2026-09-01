@@ -1,5 +1,13 @@
 import axios from 'axios'
-import { fetchQuote, validateTicker, clearQuoteCache } from '../brapi'
+import {
+  fetchQuote,
+  isFeatureUnavailable,
+  validateTicker,
+  clearQuoteCache,
+  configuredTokens,
+  orderTokens,
+  isTokenFailure,
+} from '../brapi'
 
 jest.mock('axios')
 const mockedAxios = axios as jest.Mocked<typeof axios>
@@ -162,13 +170,259 @@ describe('cache de cotações', () => {
 })
 
 describe('validateTicker', () => {
-  it('retorna true quando a cotação existe', async () => {
+  it('aprova quando a cotação existe', async () => {
     getMock.mockResolvedValue(acaoOk)
-    expect(await validateTicker('PETR4', 'stock')).toBe(true)
+    expect(await validateTicker('PETR4', 'stock')).toEqual({ ok: true })
   })
 
-  it('retorna false quando a cotação não existe', async () => {
+  it('reprova com motivo quando a cotação não existe', async () => {
     getMock.mockResolvedValue({ data: { results: [] } })
-    expect(await validateTicker('XPTO99', 'stock')).toBe(false)
+    expect(await validateTicker('XPTO99', 'stock')).toEqual({ ok: false, motivo: 'sem_cotacao' })
+  })
+
+  it('separa indisponibilidade da API de ticker inexistente', async () => {
+    getMock.mockRejectedValue(new Error('timeout of 10000ms exceeded'))
+    expect(await validateTicker('PETR4', 'stock')).toEqual({
+      ok: false,
+      motivo: 'falha_na_consulta',
+    })
+  })
+})
+
+// --- Contingência de token ---
+
+const erroHttp = (status: number) =>
+  Object.assign(new Error(`Request failed with status code ${status}`), {
+    response: { status },
+  })
+
+const authDaChamada = (i: number) =>
+  (mockedAxios.create as jest.Mock).mock.calls[i][0].headers.Authorization
+
+describe('configuredTokens', () => {
+  const original = { ...process.env }
+  afterEach(() => {
+    process.env.BRAPI_TOKEN = original.BRAPI_TOKEN
+    process.env.BRAPI_TOKEN_2 = original.BRAPI_TOKEN_2
+  })
+
+  it('devolve os dois tokens na ordem de uso', () => {
+    process.env.BRAPI_TOKEN = 'principal'
+    process.env.BRAPI_TOKEN_2 = 'reserva'
+    expect(configuredTokens().map((t) => t.nome)).toEqual(['BRAPI_TOKEN', 'BRAPI_TOKEN_2'])
+  })
+
+  it('ignora token vazio ou só com espaços', () => {
+    process.env.BRAPI_TOKEN = '   '
+    process.env.BRAPI_TOKEN_2 = 'reserva'
+    expect(configuredTokens()).toEqual([{ nome: 'BRAPI_TOKEN_2', valor: 'reserva' }])
+  })
+
+  it('não repete o mesmo token colado nas duas variáveis', () => {
+    process.env.BRAPI_TOKEN = 'igual'
+    process.env.BRAPI_TOKEN_2 = 'igual'
+    expect(configuredTokens()).toHaveLength(1)
+  })
+
+  it('devolve lista vazia quando nenhum token está configurado', () => {
+    delete process.env.BRAPI_TOKEN
+    delete process.env.BRAPI_TOKEN_2
+    expect(configuredTokens()).toEqual([])
+  })
+})
+
+describe('orderTokens', () => {
+  const tokens = [
+    { nome: 'BRAPI_TOKEN', valor: 'a' },
+    { nome: 'BRAPI_TOKEN_2', valor: 'b' },
+  ]
+
+  it('mantém a ordem declarada quando ninguém está de molho', () => {
+    expect(orderTokens(tokens, new Map(), 1000).map((t) => t.valor)).toEqual(['a', 'b'])
+  })
+
+  it('joga para o fim o token recusado há pouco', () => {
+    const cooldown = new Map([['a', 5000]])
+    expect(orderTokens(tokens, cooldown, 1000).map((t) => t.valor)).toEqual(['b', 'a'])
+  })
+
+  it('volta a priorizar o token depois que o molho vence', () => {
+    const cooldown = new Map([['a', 5000]])
+    expect(orderTokens(tokens, cooldown, 6000).map((t) => t.valor)).toEqual(['a', 'b'])
+  })
+})
+
+describe('isTokenFailure', () => {
+  it('reconhece credencial recusada e cota estourada', () => {
+    for (const status of [401, 402, 403, 429]) {
+      expect(isTokenFailure(erroHttp(status))).toBe(true)
+    }
+  })
+
+  it('não trata 404, 5xx e timeout como problema de token', () => {
+    expect(isTokenFailure(erroHttp(404))).toBe(false)
+    expect(isTokenFailure(erroHttp(500))).toBe(false)
+    expect(isTokenFailure(new Error('timeout of 10000ms exceeded'))).toBe(false)
+  })
+})
+
+describe('fallback para o BRAPI_TOKEN_2', () => {
+  const original = { ...process.env }
+
+  beforeEach(() => {
+    process.env.BRAPI_TOKEN = 'principal'
+    process.env.BRAPI_TOKEN_2 = 'reserva'
+  })
+
+  afterEach(() => {
+    process.env.BRAPI_TOKEN = original.BRAPI_TOKEN
+    process.env.BRAPI_TOKEN_2 = original.BRAPI_TOKEN_2
+  })
+
+  it('usa o token de contingência quando a cota do principal estoura', async () => {
+    getMock.mockRejectedValueOnce(erroHttp(429))
+    getMock.mockResolvedValueOnce(acaoOk)
+
+    const quote = await fetchQuote('PETR4', 'stock')
+
+    expect(quote?.price).toBe(42.3)
+    expect(getMock).toHaveBeenCalledTimes(2)
+    expect(authDaChamada(0)).toBe('Bearer principal')
+    expect(authDaChamada(1)).toBe('Bearer reserva')
+  })
+
+  it('também troca de token quando a credencial é recusada (401)', async () => {
+    getMock.mockRejectedValueOnce(erroHttp(401))
+    getMock.mockResolvedValueOnce(acaoOk)
+    expect((await fetchQuote('PETR4', 'stock'))?.price).toBe(42.3)
+    expect(getMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('não gasta o segundo token em erro de rede', async () => {
+    getMock.mockRejectedValue(new Error('timeout of 10000ms exceeded'))
+    expect(await fetchQuote('PETR4', 'stock')).toBeNull()
+    expect(getMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('não gasta o segundo token quando o ticker não existe (404)', async () => {
+    getMock.mockRejectedValue(erroHttp(404))
+    expect(await fetchQuote('XPTO99', 'stock')).toBeNull()
+    expect(getMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('não tenta o segundo token quando a API responde 200 sem resultado', async () => {
+    getMock.mockResolvedValue({ data: { results: [] } })
+    expect(await fetchQuote('XPTO99', 'stock')).toBeNull()
+    expect(getMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('devolve null quando os dois tokens são recusados', async () => {
+    getMock.mockRejectedValue(erroHttp(429))
+    expect(await fetchQuote('PETR4', 'stock')).toBeNull()
+    expect(getMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('deixa o token queimado de molho e vai direto no reserva no ticker seguinte', async () => {
+    getMock.mockRejectedValueOnce(erroHttp(429))
+    getMock.mockResolvedValue(acaoOk)
+
+    await fetchQuote('PETR4', 'stock')
+    ;(mockedAxios.create as jest.Mock).mockClear()
+    await fetchQuote('VALE3', 'stock')
+
+    expect(authDaChamada(0)).toBe('Bearer reserva')
+  })
+
+  it('volta a tentar o principal depois que o molho de 30 minutos vence', async () => {
+    jest.useFakeTimers()
+    getMock.mockRejectedValueOnce(erroHttp(429))
+    getMock.mockResolvedValue(acaoOk)
+
+    await fetchQuote('PETR4', 'stock')
+    jest.advanceTimersByTime(31 * 60 * 1000)
+    ;(mockedAxios.create as jest.Mock).mockClear()
+    await fetchQuote('VALE3', 'stock')
+
+    expect(authDaChamada(0)).toBe('Bearer principal')
+    jest.useRealTimers()
+  })
+
+  it('reabilita o token assim que ele volta a responder', async () => {
+    getMock.mockRejectedValueOnce(erroHttp(429))
+    getMock.mockResolvedValue(acaoOk)
+
+    await fetchQuote('PETR4', 'stock') // principal cai, reserva atende
+    ;(mockedAxios.create as jest.Mock).mockClear()
+    await fetchQuote('VALE3', 'stock') // reserva atende de novo e limpa o próprio molho
+    ;(mockedAxios.create as jest.Mock).mockClear()
+    await fetchQuote('ITUB4', 'stock')
+
+    // O principal segue de molho; o reserva continua na frente.
+    expect(authDaChamada(0)).toBe('Bearer reserva')
+  })
+})
+
+// --- Criptomoeda fora do plano gratuito da brapi ---
+
+const erroPlano = () =>
+  Object.assign(new Error('Request failed with status code 403'), {
+    response: {
+      status: 403,
+      data: {
+        error: true,
+        code: 'FEATURE_NOT_AVAILABLE',
+        message: 'Criptomoedas requer o plano Startup (R$ 119,99/mês). Seu plano atual: Gratuito.',
+      },
+    },
+  })
+
+describe('plano que não cobre criptomoedas', () => {
+  const original = { ...process.env }
+
+  beforeEach(() => {
+    process.env.BRAPI_TOKEN = 'principal'
+    process.env.BRAPI_TOKEN_2 = 'reserva'
+  })
+
+  afterEach(() => {
+    process.env.BRAPI_TOKEN = original.BRAPI_TOKEN
+    process.env.BRAPI_TOKEN_2 = original.BRAPI_TOKEN_2
+  })
+
+  it('reconhece o 403 de recurso fora do plano', () => {
+    expect(isFeatureUnavailable(erroPlano())).toBe(true)
+    expect(isFeatureUnavailable(erroHttp(403))).toBe(false)
+  })
+
+  it('não conta recurso fora do plano como token recusado', () => {
+    expect(isTokenFailure(erroPlano())).toBe(false)
+    // 403 sem o código de plano continua sendo problema de credencial.
+    expect(isTokenFailure(erroHttp(403))).toBe(true)
+  })
+
+  it('ainda tenta o segundo token — ele pode estar em outro plano', async () => {
+    getMock.mockRejectedValueOnce(erroPlano())
+    getMock.mockResolvedValueOnce(criptoOk)
+    expect((await fetchQuote('BTC', 'crypto'))?.price).toBe(350000)
+    expect(getMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('informa o motivo real quando nenhum token cobre cripto', async () => {
+    getMock.mockRejectedValue(erroPlano())
+    expect(await validateTicker('BTC', 'crypto')).toEqual({
+      ok: false,
+      motivo: 'plano_nao_cobre',
+    })
+  })
+
+  it('não deixa o token de molho por cripto — ele segue bom para ações', async () => {
+    getMock.mockRejectedValue(erroPlano())
+    await fetchQuote('BTC', 'crypto')
+
+    getMock.mockResolvedValue(acaoOk)
+    ;(mockedAxios.create as jest.Mock).mockClear()
+    await fetchQuote('PETR4', 'stock')
+
+    expect(authDaChamada(0)).toBe('Bearer principal')
   })
 })

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
-import { fetchQuote, validateTicker } from '../services/brapi'
+import { fetchQuote, validateTicker, MotivoIndisponivel } from '../services/brapi'
 import {
   AssetKind,
   investedValue,
@@ -43,6 +43,23 @@ function validarCampos(body: any): string | null {
 // preservando null em target_price/stop_price. Normaliza is_active (1/0 do MySQL)
 // para booleano. Usado nas rotas de escrita para devolver a linha no mesmo formato
 // que o GET já entrega.
+// Resposta para quando a brapi não devolveu cotação. Dizer o motivo real importa:
+// ticker errado o usuário corrige sozinho, mas "criptomoedas exigem plano pago"
+// ele nunca ia descobrir por trás de um "não encontrei cotação".
+function responderIndisponivel(res: Response, symbol: string, motivo?: MotivoIndisponivel) {
+  if (motivo === 'plano_nao_cobre') {
+    return res.status(422).json({
+      error: 'a brapi.dev só libera criptomoedas em plano pago — o token gratuito cobre ações e FIIs',
+    })
+  }
+  if (motivo === 'falha_na_consulta') {
+    return res.status(503).json({
+      error: `não consegui consultar a cotação de ${symbol} agora — tente de novo em instantes`,
+    })
+  }
+  return res.status(422).json({ error: `não encontrei cotação para ${symbol}` })
+}
+
 function numerarAtivo(a: any): any {
   return {
     ...a,
@@ -161,9 +178,8 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(409).json({ error: `${symbol} já está na sua carteira` })
     }
 
-    if (!(await validateTicker(symbol, kind))) {
-      return res.status(422).json({ error: `não encontrei cotação para ${symbol}` })
-    }
+    const check = await validateTicker(symbol, kind)
+    if (!check.ok) return responderIndisponivel(res, symbol, check.motivo)
 
     await pool.query(
       `INSERT INTO assets (user_id, ticker, kind, quantity, avg_price, target_price, stop_price)
@@ -191,6 +207,7 @@ router.post('/', async (req: Request, res: Response) => {
 
 // PATCH /api/assets/:id
 router.patch('/:id', async (req: Request, res: Response) => {
+  let symbolFinal: string | undefined
   try {
     const erro = validarCampos(req.body)
     if (erro) return res.status(400).json({ error: erro })
@@ -198,6 +215,34 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (req.body.is_active !== undefined && typeof req.body.is_active !== 'boolean') {
       return res.status(400).json({ error: 'is_active deve ser booleano' })
     }
+
+    // Ticker e tipo passaram a ser editáveis: quem cadastrou PETR3 no lugar de
+    // PETR4 corrige no mesmo ativo, sem apagar e perder o histórico de snapshots.
+    let novoTicker: string | undefined
+    if (req.body.ticker !== undefined) {
+      if (typeof req.body.ticker !== 'string' || !req.body.ticker.trim()) {
+        return res.status(400).json({ error: 'ticker é obrigatório' })
+      }
+      const normalizado: string = req.body.ticker.trim().toUpperCase()
+      if (!TICKER_REGEX.test(normalizado)) {
+        return res.status(400).json({ error: 'ticker inválido — use letras, números, ponto ou hífen, até 20 caracteres' })
+      }
+      novoTicker = normalizado
+    }
+
+    let novoKind: AssetKind | undefined
+    if (req.body.kind !== undefined) {
+      if (!KINDS.includes(req.body.kind)) {
+        return res.status(400).json({ error: `tipo inválido — use um de: ${KINDS.join(', ')}` })
+      }
+      novoKind = req.body.kind
+    }
+
+    const [[atual]]: any = await pool.query(
+      'SELECT * FROM assets WHERE id = ? AND user_id = ?',
+      [req.params.id, req.userId]
+    )
+    if (!atual) return res.status(404).json({ error: 'ativo não encontrado' })
 
     const campos: string[] = []
     const valores: any[] = []
@@ -216,27 +261,44 @@ router.patch('/:id', async (req: Request, res: Response) => {
     // Mudar o preço-alvo ou o stop reabre o alerta correspondente: sem isso, quem
     // sobe o alvo depois de um disparo fica com o alerta pausado para sempre, sem
     // entender por quê. Só zera quando o valor de fato muda.
-    if (req.body.target_price !== undefined || req.body.stop_price !== undefined) {
-      const [[atual]]: any = await pool.query(
-        'SELECT target_price, stop_price FROM assets WHERE id = ? AND user_id = ?',
-        [req.params.id, req.userId]
-      )
-      if (!atual) return res.status(404).json({ error: 'ativo não encontrado' })
+    if (req.body.target_price !== undefined) {
+      const novoAlvo = req.body.target_price === null ? null : Number(req.body.target_price)
+      const alvoAtual = atual.target_price === null ? null : Number(atual.target_price)
+      if (novoAlvo !== alvoAtual) campos.push('target_triggered_at = NULL')
+    }
+    if (req.body.stop_price !== undefined) {
+      const novoStop = req.body.stop_price === null ? null : Number(req.body.stop_price)
+      const stopAtual = atual.stop_price === null ? null : Number(atual.stop_price)
+      if (novoStop !== stopAtual) campos.push('stop_triggered_at = NULL')
+    }
 
-      if (req.body.target_price !== undefined) {
-        const novoAlvo = req.body.target_price === null ? null : Number(req.body.target_price)
-        const alvoAtual = atual.target_price === null ? null : Number(atual.target_price)
-        if (novoAlvo !== alvoAtual) {
-          campos.push('target_triggered_at = NULL')
+    symbolFinal = novoTicker ?? atual.ticker
+    const kindFinal: AssetKind = novoKind ?? atual.kind
+
+    if (symbolFinal !== atual.ticker || kindFinal !== atual.kind) {
+      if (symbolFinal !== atual.ticker) {
+        const [duplicado]: any = await pool.query(
+          'SELECT id FROM assets WHERE user_id = ? AND ticker = ? AND id <> ?',
+          [req.userId, symbolFinal, req.params.id]
+        )
+        if (duplicado.length) {
+          return res.status(409).json({ error: `${symbolFinal} já está na sua carteira` })
         }
       }
-      if (req.body.stop_price !== undefined) {
-        const novoStop = req.body.stop_price === null ? null : Number(req.body.stop_price)
-        const stopAtual = atual.stop_price === null ? null : Number(atual.stop_price)
-        if (novoStop !== stopAtual) {
-          campos.push('stop_triggered_at = NULL')
-        }
-      }
+
+      const check = await validateTicker(symbolFinal!, kindFinal)
+      if (!check.ok) return responderIndisponivel(res, symbolFinal!, check.motivo)
+
+      campos.push('ticker = ?', 'kind = ?')
+      valores.push(symbolFinal, kindFinal)
+      // Virou outro papel: a última cotação e os alertas já disparados eram do
+      // ativo anterior e não valem mais nada aqui.
+      campos.push(
+        'last_price = NULL',
+        'last_quote_at = NULL',
+        'target_triggered_at = NULL',
+        'stop_triggered_at = NULL',
+      )
     }
 
     if (!campos.length) return res.status(400).json({ error: 'nenhum campo para atualizar' })
@@ -254,6 +316,11 @@ router.patch('/:id', async (req: Request, res: Response) => {
     )
     res.json(numerarAtivo(rows[0]))
   } catch (err: any) {
+    // Renomear para um ticker que outra requisição acabou de gravar bate na
+    // unique key — mesma resposta 409 do caminho já detectado, não 500.
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: `${symbolFinal} já está na sua carteira` })
+    }
     console.error('[assets] erro no PATCH /:id:', err.message)
     res.status(500).json({ error: 'Erro interno do servidor' })
   }
