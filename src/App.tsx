@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import { ToastProvider } from './context/ToastContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout/Layout'
-import Dashboard from './pages/Dashboard'
+import Home from './pages/Home'
 import ContasShell from './pages/contas/ContasShell'
 import ContasLista from './pages/contas/ContasLista'
 import ContasAnalise from './pages/contas/ContasAnalise'
@@ -48,7 +48,7 @@ const App: React.FC = () => {
             <Route path="/login" element={<LoginGuard />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
-                <Route path="/" element={<Dashboard />} />
+                <Route path="/" element={<Home />} />
                 <Route path="/contas" element={<ContasShell />}>
                   <Route index element={<Navigate to="lista" replace />} />
                   <Route path="lista" element={<ContasLista />} />
