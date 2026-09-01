@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { assetsApi, CreateAssetPayload } from '../api/assets'
-import type { AssetKind, AssetWithQuote } from '../types'
-import { useToast } from '../context/ToastContext'
-import Modal from '../components/ui/Modal'
+import { assetsApi, CreateAssetPayload } from '../../api/assets'
+import type { AssetKind, AssetWithQuote } from '../../types'
+import { useToast } from '../../context/ToastContext'
+import Modal from '../../components/ui/Modal'
 
 const KIND_LABELS: Record<AssetKind, string> = {
   stock: 'Ação',
@@ -29,7 +29,7 @@ const FORM_INICIAL: CreateAssetPayload = {
   ticker: '', kind: 'stock', quantity: 0, avg_price: 0, target_price: null, stop_price: null,
 }
 
-const Ativos: React.FC = () => {
+const AtivosCarteira: React.FC = () => {
   const { showToast } = useToast()
   const [ativos, setAtivos] = useState<AssetWithQuote[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -346,4 +346,4 @@ const Ativos: React.FC = () => {
   )
 }
 
-export default Ativos
+export default AtivosCarteira
