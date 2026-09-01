@@ -17,6 +17,7 @@ import ChecklistsAnalise from './pages/checklists/ChecklistsAnalise'
 import Analise from './pages/Analise'
 import AtivosShell from './pages/ativos/AtivosShell'
 import AtivosCarteira from './pages/ativos/AtivosCarteira'
+import AtivosAnalise from './pages/ativos/AtivosAnalise'
 // Protects all children — redirects to /login if not authenticated
 const ProtectedRoute: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -58,6 +59,7 @@ const App: React.FC = () => {
                 <Route path="/ativos" element={<AtivosShell />}>
                   <Route index element={<Navigate to="carteira" replace />} />
                   <Route path="carteira" element={<AtivosCarteira />} />
+                  <Route path="analise" element={<AtivosAnalise />} />
                 </Route>
                 <Route path="/contas/nova" element={<BillForm />} />
                 <Route path="/contas/:id/editar" element={<BillForm />} />
