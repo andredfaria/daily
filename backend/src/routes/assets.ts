@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
-import { fetchQuote, validateTicker, MotivoIndisponivel } from '../services/brapi'
+import { fetchQuote, validateTicker, MotivoIndisponivel } from '../services/quotes'
 import {
   AssetKind,
   investedValue,
@@ -49,7 +49,7 @@ function validarCampos(body: any): string | null {
 function responderIndisponivel(res: Response, symbol: string, motivo?: MotivoIndisponivel) {
   if (motivo === 'plano_nao_cobre') {
     return res.status(422).json({
-      error: 'a brapi.dev só libera criptomoedas em plano pago — o token gratuito cobre ações e FIIs',
+      error: `o plano atual da brapi.dev não cobre ${symbol} — confira o token em BRAPI_TOKEN`,
     })
   }
   if (motivo === 'falha_na_consulta') {

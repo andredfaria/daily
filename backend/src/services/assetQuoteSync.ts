@@ -1,5 +1,5 @@
 import pool from '../db'
-import { fetchQuote, Quote } from './brapi'
+import { fetchQuote, Quote } from './quotes'
 import { buildSnapshotRow } from './assetSnapshotMath'
 import { formatDateSaoPaulo } from './assetMath'
 

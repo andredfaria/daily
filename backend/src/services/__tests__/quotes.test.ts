@@ -1,12 +1,10 @@
 import axios from 'axios'
+import { fetchQuote, validateTicker, clearQuoteCache } from '../quotes'
 import {
-  fetchQuote,
-  isFeatureUnavailable,
-  validateTicker,
-  clearQuoteCache,
   configuredTokens,
   orderTokens,
   isTokenFailure,
+  isFeatureUnavailable,
 } from '../brapi'
 
 jest.mock('axios')
@@ -34,17 +32,18 @@ const acaoOk = {
   },
 }
 
+// Formato do CoinGecko: cripto não passa mais pela brapi.
 const criptoOk = {
-  data: {
-    coins: [
-      {
-        coin: 'BTC',
-        coinName: 'Bitcoin',
-        regularMarketPrice: 350000,
-        regularMarketTime: '2026-08-31T20:00:00.000Z',
-      },
-    ],
-  },
+  data: [
+    {
+      id: 'bitcoin',
+      symbol: 'btc',
+      name: 'Bitcoin',
+      current_price: 350000,
+      market_cap_rank: 1,
+      last_updated: '2026-08-31T20:00:00.000Z',
+    },
+  ],
 }
 
 describe('fetchQuote', () => {
@@ -65,12 +64,14 @@ describe('fetchQuote', () => {
     expect(getMock.mock.calls[0][0]).toContain('/quote/')
   })
 
-  it('usa o endpoint de cripto para kind crypto', async () => {
+  it('busca cripto no CoinGecko, não na brapi', async () => {
     getMock.mockResolvedValue(criptoOk)
     const quote = await fetchQuote('BTC', 'crypto')
-    expect(getMock.mock.calls[0][0]).toContain('/v2/crypto')
+    expect(getMock.mock.calls[0][0]).toBe('/coins/markets')
+    expect(getMock.mock.calls[0][1]).toEqual({ params: { vs_currency: 'brl', symbols: 'btc' } })
     expect(quote?.price).toBe(350000)
     expect(quote?.ticker).toBe('BTC')
+    expect(quote?.shortName).toBe('Bitcoin')
   })
 
   it('retorna null quando a API responde sem resultados', async () => {
@@ -160,11 +161,13 @@ describe('cache de cotações', () => {
     jest.useRealTimers()
   })
 
-  it('mantém caches negativos separados por tipo (kind:symbol)', async () => {
+  it('mantém caches separados por tipo (kind:symbol)', async () => {
     getMock.mockRejectedValueOnce(new Error('erro de rede'))
-    getMock.mockResolvedValueOnce(acaoOk)
+    getMock.mockResolvedValueOnce(criptoOk)
+    // BTC como ação falha, mas o cache negativo não pode contaminar BTC cripto,
+    // que vai para outro provedor.
     expect(await fetchQuote('BTC', 'stock')).toBeNull()
-    expect((await fetchQuote('BTC', 'crypto'))).toBeNull()
+    expect((await fetchQuote('BTC', 'crypto'))?.price).toBe(350000)
     expect(getMock).toHaveBeenCalledTimes(2)
   })
 })
@@ -402,27 +405,69 @@ describe('plano que não cobre criptomoedas', () => {
 
   it('ainda tenta o segundo token — ele pode estar em outro plano', async () => {
     getMock.mockRejectedValueOnce(erroPlano())
-    getMock.mockResolvedValueOnce(criptoOk)
-    expect((await fetchQuote('BTC', 'crypto'))?.price).toBe(350000)
+    getMock.mockResolvedValueOnce(acaoOk)
+    expect((await fetchQuote('MXRF11', 'fii'))?.price).toBe(42.3)
     expect(getMock).toHaveBeenCalledTimes(2)
   })
 
-  it('informa o motivo real quando nenhum token cobre cripto', async () => {
+  it('informa o motivo real quando nenhum token cobre o recurso', async () => {
     getMock.mockRejectedValue(erroPlano())
-    expect(await validateTicker('BTC', 'crypto')).toEqual({
+    expect(await validateTicker('MXRF11', 'fii')).toEqual({
       ok: false,
       motivo: 'plano_nao_cobre',
     })
   })
 
-  it('não deixa o token de molho por cripto — ele segue bom para ações', async () => {
+  it('não deixa o token de molho por limite de plano — ele segue bom para o resto', async () => {
     getMock.mockRejectedValue(erroPlano())
-    await fetchQuote('BTC', 'crypto')
+    await fetchQuote('MXRF11', 'fii')
 
     getMock.mockResolvedValue(acaoOk)
     ;(mockedAxios.create as jest.Mock).mockClear()
     await fetchQuote('PETR4', 'stock')
 
     expect(authDaChamada(0)).toBe('Bearer principal')
+  })
+})
+
+describe('roteamento por tipo de ativo', () => {
+  const original = { ...process.env }
+
+  beforeEach(() => {
+    process.env.BRAPI_TOKEN = 'principal'
+  })
+
+  afterEach(() => {
+    process.env.BRAPI_TOKEN = original.BRAPI_TOKEN
+  })
+
+  it('não manda token da brapi para o CoinGecko', async () => {
+    getMock.mockResolvedValue(criptoOk)
+    await fetchQuote('BTC', 'crypto')
+    expect((mockedAxios.create as jest.Mock).mock.calls[0][0].baseURL).toContain('coingecko')
+    expect(authDaChamada(0)).toBeUndefined()
+  })
+
+  it('cripto não consome os tokens da brapi quando falha', async () => {
+    getMock.mockRejectedValue(erroHttp(429))
+    expect(await fetchQuote('BTC', 'crypto')).toBeNull()
+    // Uma tentativa só: o loop de contingência é exclusivo da brapi.
+    expect(getMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('traduz o limite do CoinGecko como falha temporária, não ticker inexistente', async () => {
+    getMock.mockRejectedValue(erroHttp(429))
+    expect(await validateTicker('BTC', 'crypto')).toEqual({
+      ok: false,
+      motivo: 'falha_na_consulta',
+    })
+  })
+
+  it('símbolo inexistente no CoinGecko vira sem_cotacao', async () => {
+    getMock.mockResolvedValue({ data: [] })
+    expect(await validateTicker('XPTO99', 'crypto')).toEqual({
+      ok: false,
+      motivo: 'sem_cotacao',
+    })
   })
 })
