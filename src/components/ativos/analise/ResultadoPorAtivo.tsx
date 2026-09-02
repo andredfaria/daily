@@ -28,7 +28,7 @@ export const ResultadoPorAtivo: React.FC<{ resultados: ResultadoAtivo[] }> = ({ 
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-on-surface">{r.ticker}</span>
                 <span className={positivo ? 'text-tertiary' : 'text-error'}>
-                  {positivo ? '+' : '−'}R$ {formatBRL(Math.abs(r.resultado))} ({positivo ? '+' : '−'}{Math.abs(r.resultadoPct).toFixed(1)}%)
+                  {positivo ? '+' : '−'}{formatBRL(Math.abs(r.resultado))} ({positivo ? '+' : '−'}{Math.abs(r.resultadoPct).toFixed(1)}%)
                 </span>
               </div>
               <div className="relative h-2 bg-surface-container rounded-full">

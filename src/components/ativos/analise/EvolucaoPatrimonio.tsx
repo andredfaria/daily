@@ -50,7 +50,7 @@ export const EvolucaoPatrimonio: React.FC<Props> = ({ pontos, desde }) => (
             />
             <Tooltip
               formatter={(valor: any, nome: any) => [
-                `R$ ${formatBRL(Number(valor))}`,
+                formatBRL(Number(valor)),
                 nome === 'current_value' ? 'Patrimônio' : 'Custo',
               ]}
               labelFormatter={(d: any) => formatDate(String(d))}

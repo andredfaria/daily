@@ -81,21 +81,21 @@ const AtivosAnalise: React.FC = () => {
         <StatCard
           icon="account_balance_wallet"
           label="Patrimônio"
-          value={`R$ ${formatBRL(posicao.patrimonio)}`}
+          value={formatBRL(posicao.patrimonio)}
           iconColor="text-primary"
           iconBg="bg-primary/15"
         />
         <StatCard
           icon="payments"
           label="Investido"
-          value={`R$ ${formatBRL(posicao.investido)}`}
+          value={formatBRL(posicao.investido)}
           iconColor="text-on-surface-variant"
           iconBg="bg-surface-container-high"
         />
         <StatCard
           icon={positivo ? 'trending_up' : 'trending_down'}
           label="Resultado"
-          value={`${positivo ? '+' : '−'}R$ ${formatBRL(Math.abs(posicao.resultado))}`}
+          value={`${positivo ? '+' : '−'}${formatBRL(Math.abs(posicao.resultado))}`}
           sub={`${positivo ? '+' : '−'}${Math.abs(posicao.resultadoPct).toFixed(1)}%`}
           iconColor={positivo ? 'text-tertiary' : 'text-error'}
           iconBg={positivo ? 'bg-tertiary/15' : 'bg-error/15'}

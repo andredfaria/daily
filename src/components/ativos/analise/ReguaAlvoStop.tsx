@@ -25,7 +25,7 @@ export const ReguaAlvoStop: React.FC<{ ativos: AssetWithQuote[] }> = ({ ativos }
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-on-surface">{a.ticker}</span>
                   <span className="text-on-surface-variant">
-                    {a.current_price !== null ? `R$ ${formatBRL(a.current_price)}` : 'sem cotação'}
+                    {a.current_price !== null ? formatBRL(a.current_price) : 'sem cotação'}
                     {disparado && <span className="ml-2 text-yellow-400">· alerta pausado</span>}
                   </span>
                 </div>
@@ -39,13 +39,13 @@ export const ReguaAlvoStop: React.FC<{ ativos: AssetWithQuote[] }> = ({ ativos }
                       />
                     </div>
                     <div className="flex justify-between text-[11px] text-on-surface-variant">
-                      <span>stop R$ {formatBRL(a.stop_price!)}</span>
-                      <span>alvo R$ {formatBRL(a.target_price!)}</span>
+                      <span>stop {formatBRL(a.stop_price!)}</span>
+                      <span>alvo {formatBRL(a.target_price!)}</span>
                     </div>
                   </>
                 ) : (
                   <p className="text-[11px] text-on-surface-variant">
-                    {a.target_price !== null ? `alvo R$ ${formatBRL(a.target_price)}` : `stop R$ ${formatBRL(a.stop_price!)}`}
+                    {a.target_price !== null ? `alvo ${formatBRL(a.target_price)}` : `stop ${formatBRL(a.stop_price!)}`}
                     {' · '}defina os dois limites para ver a régua
                   </p>
                 )}
