@@ -1,7 +1,7 @@
 import pool from '../db'
 import { sendWhatsAppText } from './waha'
 import { fechamentoMensal } from './financialAnalytics'
-import { claimMessage, releaseMessageClaim, claimKeyDia, claimKeyMesAnterior } from './messageClaim'
+import { claimMessage, releaseMessageClaimIfUndelivered, claimKeyDia, claimKeyMesAnterior } from './messageClaim'
 
 function formatBRL(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -67,7 +67,7 @@ export async function sendWeeklySummary(userId: string): Promise<void> {
   try {
     await sendWhatsAppText(userRows[0].whatsapp_number, msg)
   } catch (err) {
-    await releaseMessageClaim(userId, 'weekly_summary', refKey)
+    await releaseMessageClaimIfUndelivered(userId, 'weekly_summary', refKey, err)
     throw err
   }
   console.log(`[summary] resumo semanal enviado para ${userId}`)
@@ -118,7 +118,7 @@ export async function sendMonthlySummary(userId: string): Promise<void> {
   try {
     await sendWhatsAppText(userRows[0].whatsapp_number, msg)
   } catch (err) {
-    await releaseMessageClaim(userId, 'monthly_summary', refKey)
+    await releaseMessageClaimIfUndelivered(userId, 'monthly_summary', refKey, err)
     throw err
   }
   console.log(`[summary] sumário mensal enviado para ${userId}`)

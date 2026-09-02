@@ -2,7 +2,8 @@ import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { sendWhatsAppPoll, sendWhatsAppText, WhatsAppNumberNotFoundError } from './waha'
 import { nextMissState, buildInactivityMessage, INACTIVITY_THRESHOLD } from './checklistInactivity'
-import { claimMessage, releaseMessageClaim } from './messageClaim'
+import { shouldSendToday, getDayOfWeekSaoPaulo } from './checklistRecurrence'
+import { claimMessage, releaseMessageClaim, releaseMessageClaimIfUndelivered } from './messageClaim'
 
 export function getTodaySaoPaulo(): string {
   // formatToParts garante YYYY-MM-DD independente da versão do ICU/Node
@@ -72,9 +73,9 @@ async function applyInactivityCheck(checklistId: string, userId: string, today: 
       await sendWhatsAppText(phone, buildInactivityMessage(checklistRows[0].name))
     } catch (err: any) {
       // Falhar o aviso não pode desfazer a pausa — o checklist já está pausado
-      // e o usuário ainda encontra o botão de reativar na tela. Mas o claim volta,
-      // para que uma execução posterior possa avisar.
-      await releaseMessageClaim(userId, 'checklist_inactivity', `${checklistId}:${today}`)
+      // e o usuário ainda encontra o botão de reativar na tela. O claim só volta
+      // se a mensagem comprovadamente não saiu.
+      await releaseMessageClaimIfUndelivered(userId, 'checklist_inactivity', `${checklistId}:${today}`, err)
       console.error(`[checklistDispatcher] erro ao enviar aviso de pausa:`, err.message)
     }
   }
@@ -134,11 +135,15 @@ export async function sendDailyPoll(
       const locked = await applyInactivityCheck(checklistId, userId, today)
       if (locked) return
     } else {
-      // Force: remove o poll do dia para permitir reenvio
+      // Force é reenvio manual e explícito. Precisa limpar o registro do dia E a
+      // trava: só apagar o registro deixava o claim da manhã de pé, o envio era
+      // barrado logo abaixo e o usuário ficava sem mensagem e sem o poll do dia.
+      // Duplicar aqui é decisão de quem clicou, não acidente do agendador.
       await pool.query(
         'DELETE FROM checklist_daily_polls WHERE checklist_id = ? AND poll_date = ?',
         [checklistId, today],
       )
+      await releaseMessageClaim(userId, 'checklist_poll', `${checklistId}:${today}`)
     }
 
     const [itemRows]: any = await pool.query(
@@ -171,7 +176,7 @@ export async function sendDailyPoll(
     try {
       result = await sendWhatsAppPoll(phone, pollName, options)
     } catch (err) {
-      await releaseMessageClaim(userId, 'checklist_poll', `${checklistId}:${today}`)
+      await releaseMessageClaimIfUndelivered(userId, 'checklist_poll', `${checklistId}:${today}`, err)
       throw err
     }
 
@@ -190,14 +195,6 @@ export async function sendDailyPoll(
     }
     console.error(`[checklistDispatcher] erro ao enviar poll:`, err.message)
   }
-}
-
-function shouldSendToday(recurrenceType: string, recurrenceDays: number[] | null): boolean {
-  const dayOfWeek = new Date().getDay() // 0=Dom, 6=Sáb
-  if (recurrenceType === 'daily') return true
-  if (recurrenceType === 'weekdays') return dayOfWeek >= 1 && dayOfWeek <= 5
-  if (recurrenceType === 'custom' && recurrenceDays) return recurrenceDays.includes(dayOfWeek)
-  return true
 }
 
 export async function sendPollsForHour(hour: number): Promise<void> {
@@ -223,7 +220,7 @@ export async function sendPollsForHour(hour: number): Promise<void> {
           ? row.recurrence_days
           : (row.recurrence_days ? JSON.parse(row.recurrence_days) : null)
 
-        if (!shouldSendToday(row.recurrence_type || 'daily', rDays)) {
+        if (!shouldSendToday(row.recurrence_type || 'daily', rDays, getDayOfWeekSaoPaulo())) {
           console.log(`[checklistDispatcher] checklist ${row.id} não enviado hoje (recurrence=${row.recurrence_type})`)
           continue
         }

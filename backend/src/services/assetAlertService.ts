@@ -8,7 +8,7 @@ import {
   buildAlertMessage,
   formatDateSaoPaulo,
 } from './assetMath'
-import { claimMessage, releaseMessageClaim, claimKeyDia } from './messageClaim'
+import { claimMessage, releaseMessageClaimIfUndelivered, claimKeyDia } from './messageClaim'
 
 export async function checkAssetAlerts(userId: string, synced: SyncedAsset[]): Promise<void> {
   if (!synced.length) return
@@ -67,7 +67,7 @@ export async function checkAssetAlerts(userId: string, synced: SyncedAsset[]): P
   try {
     await sendWhatsAppText(userRows[0].whatsapp_number, buildAlertMessage(hits))
   } catch (err) {
-    await releaseMessageClaim(userId, 'asset_alert', refKey)
+    await releaseMessageClaimIfUndelivered(userId, 'asset_alert', refKey, err)
     throw err
   }
 

@@ -66,3 +66,62 @@ export async function releaseMessageClaim(
     console.error('[messageClaim] erro ao liberar claim:', err.message)
   }
 }
+
+// Erros em que a requisição nem chegou a sair da máquina.
+const CODIGOS_SEM_ENTREGA = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ERR_INVALID_URL'])
+
+/**
+ * Dá para afirmar que a mensagem NÃO foi entregue?
+ *
+ * Liberar a trava depois de um erro ambíguo é o que transforma a garantia em
+ * "pelo menos uma vez": o cliente WAHA tem timeout de 10s, e um timeout do
+ * axios não cancela o envio do lado do WhatsApp — a mensagem sai, o claim volta
+ * e a próxima execução manda de novo. Então só liberamos quando a não-entrega
+ * é certa; na dúvida, a trava fica de pé e o dia passa sem mensagem.
+ * Perder uma mensagem incomoda, receber duas quebra a confiança no app.
+ */
+export function isDeliveryRuledOut(err: any): boolean {
+  // O número não existe no WhatsApp: nem chegamos a pedir o envio.
+  if (err?.name === 'WhatsAppNumberNotFoundError') return true
+
+  const status = err?.response?.status
+  if (typeof status === 'number') {
+    // O WAHA respondeu recusando. 4xx é recusa definitiva — menos 408 e 429,
+    // em que a mensagem pode ter sido processada antes de o limite bater.
+    // 5xx fica de fora: um 502/504 de proxy costuma vir com a requisição já
+    // entregue ao WAHA.
+    return status >= 400 && status < 500 && status !== 408 && status !== 429
+  }
+
+  // Sem resposta: só é seguro quando a conexão sequer foi estabelecida.
+  // Timeout (ECONNABORTED/ETIMEDOUT) e conexão derrubada no meio (ECONNRESET)
+  // são justamente os casos em que a mensagem pode ter saído.
+  return CODIGOS_SEM_ENTREGA.has(err?.code)
+}
+
+function descreveFalha(err: any): string {
+  const status = err?.response?.status
+  if (typeof status === 'number') return `HTTP ${status}`
+  return err?.code ?? err?.message ?? 'erro desconhecido'
+}
+
+/**
+ * Libera a trava apenas quando a não-entrega é certa. Devolve true se liberou,
+ * ou seja, se uma execução posterior pode tentar de novo sem risco de duplicar.
+ */
+export async function releaseMessageClaimIfUndelivered(
+  userId: string,
+  kind: ClaimKind,
+  refKey: string,
+  err: any,
+): Promise<boolean> {
+  if (!isDeliveryRuledOut(err)) {
+    console.warn(
+      `[messageClaim] ${kind} (${refKey}) ficou em estado indefinido (${descreveFalha(err)}) — ` +
+        'trava mantida para não duplicar; não haverá reenvio automático',
+    )
+    return false
+  }
+  await releaseMessageClaim(userId, kind, refKey)
+  return true
+}

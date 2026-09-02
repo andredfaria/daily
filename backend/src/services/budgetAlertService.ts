@@ -1,6 +1,6 @@
 import pool from '../db'
 import { sendWhatsAppText } from './waha'
-import { claimMessage, releaseMessageClaim, claimKeyDia } from './messageClaim'
+import { claimMessage, releaseMessageClaimIfUndelivered, claimKeyDia } from './messageClaim'
 
 export async function checkBudgetAlert(userId: string): Promise<void> {
   const [userRows]: any = await pool.query(
@@ -35,7 +35,7 @@ export async function checkBudgetAlert(userId: string): Promise<void> {
     try {
       await sendWhatsAppText(userRows[0].whatsapp_number, msg)
     } catch (err) {
-      await releaseMessageClaim(userId, 'budget_alert', refKey)
+      await releaseMessageClaimIfUndelivered(userId, 'budget_alert', refKey, err)
       throw err
     }
     console.log(`[budgetAlert] alerta enviado para ${userId}`)
