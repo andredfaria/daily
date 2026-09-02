@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { assetsApi } from '../../api/assets'
 import type { AssetKind, AssetWithQuote } from '../../types'
 import { useToast } from '../../context/ToastContext'
@@ -23,7 +23,7 @@ const KIND_PLACEHOLDER: Record<AssetKind, string> = {
 const KIND_HINT: Record<AssetKind, string> = {
   stock: 'Ticker da B3, como PETR4 ou VALE3',
   fii: 'Ticker do fundo, como MXRF11 ou HGLG11',
-  crypto: 'Símbolo da moeda, como BTC, ETH ou SOL — cotação em BRL',
+  crypto: 'Símbolo da moeda, como BTC, ETH ou SOL — cotação em BRL pelo CoinGecko',
 }
 
 const brl = (v: number) =>
@@ -72,6 +72,7 @@ const AtivosCarteira: React.FC = () => {
   const [erros, setErros] = useState<ErrosAtivo>({})
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; ticker: string } | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
   const [excluindo, setExcluindo] = useState(false)
 
   const carregar = async () => {
@@ -86,6 +87,21 @@ const AtivosCarteira: React.FC = () => {
   }
 
   useEffect(() => { carregar() }, [])
+
+  // O botão de editar fica lá embaixo, na lista, e o formulário abre no topo da
+  // tela: sem levar a rolagem até ele, o clique parece não ter feito nada.
+  // Reage também à troca de ativo em edição, quando o formulário já está aberto.
+  useEffect(() => {
+    const alvo = formRef.current
+    if (!formAberto || !alvo) return
+
+    const semAnimacao = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    alvo.scrollIntoView({ behavior: semAnimacao ? 'auto' : 'smooth', block: 'start' })
+
+    // Foco no container, não no primeiro campo: o leitor de tela anuncia o
+    // formulário sem que o teclado do celular suba por cima dele.
+    alvo.focus({ preventScroll: true })
+  }, [formAberto, editingId])
 
   const fecharForm = () => {
     setForm(FORM_INICIAL)
@@ -213,7 +229,15 @@ const AtivosCarteira: React.FC = () => {
       </div>
 
       {formAberto && (
-        <form onSubmit={salvar} className="rounded-2xl bg-surface-container-lowest border border-outline-variant/50 p-4 space-y-3">
+        <form
+          ref={formRef}
+          tabIndex={-1}
+          aria-label={editingId ? 'Editar ativo' : 'Novo ativo'}
+          onSubmit={salvar}
+          // scroll-mt compensa o header sticky (h-14 no mobile, h-16 no md+),
+          // senão o topo do formulário para escondido atrás dele.
+          className="scroll-mt-20 md:scroll-mt-24 focus:outline-none rounded-2xl bg-surface-container-lowest border border-outline-variant/50 p-4 space-y-3"
+        >
           {editingId && (
             <p className="text-xs text-on-surface-variant">
               Editando {ativos.find((a) => a.id === editingId)?.ticker ?? form.ticker}. Trocar o
@@ -262,19 +286,6 @@ const AtivosCarteira: React.FC = () => {
               </select>
             </div>
 
-            {form.kind === 'crypto' && (
-              <div
-                role="status"
-                className="sm:col-span-2 flex items-start gap-2 rounded-xl border border-yellow-400/40 bg-yellow-400/10 p-3"
-              >
-                <span className="material-symbols-outlined text-yellow-400 text-lg shrink-0">info</span>
-                <p className="text-xs text-on-surface-variant">
-                  A brapi.dev liberou criptomoedas só nos planos pagos. Com um token do plano
-                  gratuito o cadastro vai falhar na busca da cotação — ações e FIIs seguem
-                  funcionando normalmente.
-                </p>
-              </div>
-            )}
             <NumberField
               label="Quantidade"
               required
