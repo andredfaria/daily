@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext'
 import { SkeletonStatCard } from '../../components/ui/Skeleton'
 import { ProgressBar } from '../../components/checklist/ProgressBar'
 import { ChecklistCard } from '../../components/checklist/ChecklistCard'
+import { LinhaItemHoje } from '../../components/checklist/LinhaItemHoje'
 import { RECURRENCE_LABELS, DAYS_LABELS } from '../../components/checklist/constants'
 
 // -------- Checklist Page --------
@@ -209,6 +210,10 @@ const ChecklistsLista: React.FC = () => {
   const dashChecklist = dashboard?.checklist
   const today = dashboard?.today
   const statsMap = new Map(stats.map((s) => [s.checklist_id, s]))
+  // itemStats vem indexado por texto porque é assim que o backend casa item e
+  // resposta (computeItemStats usa options.includes(text)). Renomear um item o
+  // desliga do próprio histórico — mesma limitação que já existe no ranking.
+  const statsPorTexto = new Map((dashboard?.itemStats ?? []).map((s) => [s.text, s]))
 
   // -------- Today's Poll Section --------
   const renderTodaySection = () => {
@@ -264,15 +269,15 @@ const ChecklistsLista: React.FC = () => {
           </div>
         </div>
         <ProgressBar pct={today.completion_pct} />
-        {today.selected_options.length > 0 && (
-          <div className="mt-4 space-y-1.5">
-            {today.selected_options.map((opt, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-on-surface">
-                <span className="material-symbols-outlined text-tertiary text-base" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  check_circle
-                </span>
-                {opt}
-              </div>
+        {dashChecklist.items.length > 0 && (
+          <div className="mt-4 space-y-2.5">
+            {dashChecklist.items.map((item) => (
+              <LinhaItemHoje
+                key={item.id}
+                texto={item.text}
+                marcado={today.selected_options.includes(item.text)}
+                stat={statsPorTexto.get(item.text)}
+              />
             ))}
           </div>
         )}
