@@ -100,5 +100,9 @@ node_modules/*
 */node_modules/*
 */node_modules
 
+# Artefatos de ferramentas de agente (ruflo / claude-flow)
+.claude-flow/
+ruvector.db
+
 # Visual brainstorming
 .superpowers/
