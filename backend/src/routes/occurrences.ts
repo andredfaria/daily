@@ -147,17 +147,25 @@ router.get('/export', async (req: Request, res: Response) => {
       values
     )
 
-    const header = 'Conta,Valor (R$),Vencimento\n'
+    // Ponto e vírgula, e não vírgula: o valor sai em formato pt-BR ("1234,56") e
+    // é esse o separador de lista que o Excel em português espera. Com vírgula,
+    // o decimal do valor virava uma coluna extra e desalinhava a planilha toda.
+    const SEP = ';'
+    // Todo campo entre aspas (RFC 4180) — assim separador, aspas e quebra de
+    // linha dentro do nome da conta não vazam para fora da célula.
+    const cell = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+
+    const header = ['Conta', 'Valor (R$)', 'Vencimento'].map(cell).join(SEP)
     const csvRows = rows.map((r: any) => {
       const dueDate = r.due_date instanceof Date
         ? r.due_date.toISOString().slice(0, 10)
         : String(r.due_date).slice(0, 10)
       const amount = Number(r.amount).toFixed(2).replace('.', ',')
-      const safeStr = (s: string) => `"${String(s ?? '').replace(/"/g, '""')}"`
-      return [safeStr(r.bill_name ?? ''), amount, dueDate].join(',')
+      return [cell(r.bill_name ?? ''), cell(amount), cell(dueDate)].join(SEP)
     })
 
-    const csv = header + csvRows.join('\n')
+    // CRLF é o fim de linha que o RFC 4180 pede e o Excel trata sem surpresa.
+    const csv = [header, ...csvRows].join('\r\n')
     const filename = `billsync-historico-${new Date().toISOString().slice(0, 10)}.csv`
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')
