@@ -6,6 +6,7 @@ import { StatCard } from '../../components/ui/StatCard'
 import { ChecklistHeatmap } from '../../components/checklist/analise/ChecklistHeatmap'
 import { ChecklistItemRanking } from '../../components/checklist/analise/ChecklistItemRanking'
 import { WeeklyTrendSparkline } from '../../components/checklist/analise/WeeklyTrendSparkline'
+import { ConstanciaCard } from '../../components/checklist/analise/ConstanciaCard'
 
 const ChecklistsAnalise: React.FC = () => {
   const navigate = useNavigate()
@@ -74,7 +75,9 @@ const ChecklistsAnalise: React.FC = () => {
   const hoje = dashboard?.today
   const historico = dashboard?.history ?? []
   const itemStats = dashboard?.itemStats ?? []
-  const melhorSequencia = itemStats.reduce((max, s) => Math.max(max, s.streak_current), 0)
+  // O backend sempre preenche `constancia` (zerada quando não há dado ainda) —
+  // o `?? 0` aqui é cinto de segurança, não fluxo esperado.
+  const sequenciaAtual = dashboard?.constancia?.sequencia.atual ?? 0
 
   return (
     <div className="space-y-6">
@@ -115,14 +118,16 @@ const ChecklistsAnalise: React.FC = () => {
           />
           <StatCard
             icon="local_fire_department"
-            label="Melhor Sequência"
-            value={melhorSequencia > 0 ? `${melhorSequencia} ${melhorSequencia === 1 ? 'dia' : 'dias'}` : '—'}
+            label="Sequência Atual"
+            value={`${sequenciaAtual} ${sequenciaAtual === 1 ? 'dia' : 'dias'}`}
             iconColor="text-orange-400"
             iconBg="bg-orange-400/15"
           />
           <StatCard icon="bar_chart" label="Dias Registrados" value={historico.length} iconColor="text-primary" iconBg="bg-primary/15" />
         </div>
       )}
+
+      {dashboard?.constancia && <ConstanciaCard constancia={dashboard.constancia} />}
 
       <WeeklyTrendSparkline history={historico} />
 

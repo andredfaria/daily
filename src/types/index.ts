@@ -154,6 +154,25 @@ export interface ChecklistItemStat {
   streak_best: number
 }
 
+// Contrato compartilhado com o backend (backend/src/services/checklistConsistency.ts)
+// — qualquer mudança de forma aqui quebra a integração.
+export interface JanelaConstancia {
+  dias_com_poll: number      // denominador: polls enviados na janela
+  dias_respondidos: number   // completed_count > 0
+  dias_completos: number     // completion_pct >= 100
+}
+
+export interface ComparativoConstancia {
+  atual: JanelaConstancia
+  anterior: JanelaConstancia
+}
+
+export interface ConstanciaChecklist {
+  semana: ComparativoConstancia
+  mes: ComparativoConstancia
+  sequencia: { atual: number; melhor: number }
+}
+
 export interface ChecklistDashboardData {
   checklist: Checklist | null
   today: DailyPoll | null
@@ -165,6 +184,7 @@ export interface ChecklistDashboardData {
     status: string
   }>
   itemStats: ChecklistItemStat[]
+  constancia: ConstanciaChecklist
 }
 
 export interface DashboardStats {
