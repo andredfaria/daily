@@ -298,6 +298,18 @@ CREATE TABLE IF NOT EXISTS message_claims (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `),
   },
+  {
+    // A coluna nasceu com ENUM('monthly','weekly','once') no 001_create_schema, mas
+    // a tela, a validação do POST /api/bills e o occurrenceGenerator já tratam
+    // quinzenal, trimestral, semestral e anual. Num banco criado do zero, salvar
+    // "Trimestral" batia em ER_DATA_TRUNCATED e virava 500.
+    name: '018_bills_recurrence_types',
+    statements: splitStatements(`
+ALTER TABLE bills
+  MODIFY COLUMN recurrence_type
+    ENUM('monthly','weekly','once','biweekly','quarterly','semiannual','annual') NOT NULL
+    `),
+  },
 ]
 
 export async function runMigrations(): Promise<void> {
