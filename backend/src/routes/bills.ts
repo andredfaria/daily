@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { generateOccurrencesForBill, regenerateOccurrencesForBill } from '../services/occurrenceGenerator'
 import { encryptPix, decryptPix } from '../services/pixCrypto'
+import { validarConta } from '../services/billValidation'
 
 const router = Router()
 
@@ -64,29 +65,14 @@ router.post('/', async (req: Request, res: Response) => {
     const {
       name, description, amount, recurrence_type,
       recurrence_day_of_month, recurrence_day_of_week,
-      due_date, days_before_alert, is_active = true, category,
+      // O default acompanha o da coluna (NOT NULL DEFAULT 3): sem ele, um corpo
+      // sem days_before_alert chegava como undefined no bind do mysql2 e quebrava.
+      due_date, days_before_alert = 3, is_active = true, category,
     } = req.body
 
-    // B4 — validação de campos obrigatórios
-    if (!name || typeof name !== 'string' || name.trim() === '') {
-      return res.status(400).json({ error: 'Campo obrigatório: name' })
-    }
-    if (amount === undefined || amount === null || isNaN(Number(amount)) || Number(amount) < 0) {
-      return res.status(400).json({ error: 'Campo obrigatório: amount (número >= 0)' })
-    }
-    const validRecurrenceTypes = ['monthly', 'weekly', 'once', 'biweekly', 'quarterly', 'semiannual', 'annual']
-    if (!recurrence_type || !validRecurrenceTypes.includes(recurrence_type)) {
-      return res.status(400).json({ error: `Campo obrigatório: recurrence_type (${validRecurrenceTypes.join(', ')})` })
-    }
-    if (recurrence_type === 'monthly' && (recurrence_day_of_month === undefined || recurrence_day_of_month === null)) {
-      return res.status(400).json({ error: 'recurrence_day_of_month é obrigatório para recorrência mensal' })
-    }
-    if (recurrence_type === 'weekly' && (recurrence_day_of_week === undefined || recurrence_day_of_week === null)) {
-      return res.status(400).json({ error: 'recurrence_day_of_week é obrigatório para recorrência semanal' })
-    }
-    if (recurrence_type === 'once' && !due_date) {
-      return res.status(400).json({ error: 'due_date é obrigatório para recorrência pontual' })
-    }
+    // B4 — validação de campos obrigatórios (mesma regra do PATCH)
+    const erro = validarConta({ ...req.body, days_before_alert })
+    if (erro) return res.status(400).json({ error: erro })
 
     const id = uuidv4()
     const now = new Date()
@@ -148,6 +134,19 @@ router.patch('/:id', async (req: Request, res: Response) => {
     }
 
     if (!fields.length) return res.status(400).json({ error: 'No fields to update' })
+
+    // Precisa da linha atual antes de gravar: a validação é sobre o estado final
+    // da conta, não sobre os campos soltos que vieram no corpo. Trocar só o
+    // recurrence_type para 'weekly' sem mandar o dia da semana é inválido mesmo
+    // com o corpo parecendo inofensivo.
+    const [atuais]: any = await pool.query(
+      'SELECT * FROM bills WHERE id = ? AND user_id = ?',
+      [req.params.id, req.userId]
+    )
+    if (!atuais.length) return res.status(404).json({ error: 'Not found' })
+
+    const erro = validarConta({ ...atuais[0], ...req.body })
+    if (erro) return res.status(400).json({ error: erro })
 
     fields.push('updated_at = ?')
     values.push(new Date())
