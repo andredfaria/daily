@@ -179,7 +179,15 @@ Card grid:          grid-cols-1 md:grid-cols-2
 Form split:         col-span-12 lg:col-span-7 / lg:col-span-5
 Config split:       col-span-12 lg:col-span-8 / lg:col-span-4
 Full width layout:  xl:grid-cols-3 (2/3 + 1/3 em XL, coluna única abaixo)
+Card grid 3-up:     grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 (carteira de ativos)
 ```
+
+> **Por que a carteira foge do `Card grid` padrão.** O `md:grid-cols-2` acima não
+> desconta a sidebar de 220px. Em `md` (768px) a largura útil é
+> `768 − 220 − 48 = 500px`, então duas colunas dão 244px de card — mais estreito
+> que os 343px que o mesmo card tem num telefone de 375px. Onde o card precisa de
+> três colunas, o corte é em `xl`: 1280px rende 329px por card, e 1366px rende
+> 358px. Antes de escolher breakpoint, faça a conta `viewport − 220 − 48`.
 
 ---
 

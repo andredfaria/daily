@@ -5,12 +5,9 @@ import { useToast } from '../../context/ToastContext'
 import Modal from '../../components/ui/Modal'
 import NumberField from '../../components/ui/NumberField'
 import { formatNumericInput, parseNumericInput } from '../../utils/numberInput'
-
-const KIND_LABELS: Record<AssetKind, string> = {
-  stock: 'Ação',
-  fii: 'FII',
-  crypto: 'Cripto',
-}
+import { SkeletonCard } from '../../components/ui/Skeleton'
+import { AtivoCard } from '../../components/ativos/AtivoCard'
+import { totalCarteira } from '../../utils/carteira'
 
 // O formato do código muda por tipo — o campo precisa dizer isso antes de o
 // usuário errar: ação/FII usam o ticker da B3, cripto usa o símbolo da moeda.
@@ -28,18 +25,6 @@ const KIND_HINT: Record<AssetKind, string> = {
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-
-// Espelha formatPct de backend/src/services/assetMath.ts — mesma casa decimal
-// no WhatsApp e na tela, para não mostrar "+20,9%" lá e "+20.9%" aqui.
-const formatPct = (value: number) =>
-  Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-
-// Espelha formatQuantity de backend/src/services/assetMath.ts — quantidade
-// fracionária (cripto) sai com vírgula, não ponto: "0,005", não "0.005".
-const formatQuantity = (quantity: number) =>
-  Number.isInteger(quantity)
-    ? String(quantity)
-    : quantity.toLocaleString('pt-BR', { maximumFractionDigits: 8 })
 
 // Campos numéricos ficam como string para o usuário poder deixá-los vazios
 // enquanto digita. A conversão para número acontece só no envio.
@@ -205,23 +190,32 @@ const AtivosCarteira: React.FC = () => {
 
   if (carregando) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <span className="material-symbols-outlined text-primary text-4xl animate-spin">progress_activity</span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
       </div>
     )
   }
 
+  const { total, semCotacao } = totalCarteira(ativos)
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-on-surface-variant">
-          {ativos.length === 0
-            ? 'Nenhum ativo na carteira'
-            : `${ativos.length} ativo${ativos.length > 1 ? 's' : ''} monitorado${ativos.length > 1 ? 's' : ''}`}
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-1 self-start">
+          <span className="px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-semibold self-start tabular-nums">
+            TOTAL R$ {brl(total)}
+          </span>
+          {semCotacao > 0 && (
+            <span className="text-[11px] text-on-surface-variant">
+              {semCotacao} {semCotacao === 1 ? 'ativo sem cotação ficou' : 'ativos sem cotação ficaram'} fora da soma
+            </span>
+          )}
+        </div>
         <button
           onClick={() => (formAberto ? fecharForm() : setFormAberto(true))}
-          className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-xl bg-primary text-on-primary text-sm font-medium"
+          className="flex items-center justify-center gap-1.5 px-4 min-h-[48px] rounded-xl bg-primary text-on-primary text-sm font-medium w-full md:w-auto"
         >
           <span className="material-symbols-outlined text-[20px]">{formAberto ? 'close' : 'add'}</span>
           {formAberto ? 'Cancelar' : 'Novo ativo'}
@@ -340,102 +334,29 @@ const AtivosCarteira: React.FC = () => {
       )}
 
       {ativos.length === 0 && !formAberto && (
-        <div className="rounded-2xl bg-surface-container-lowest border border-outline-variant/50 p-8 text-center space-y-2">
-          <span className="material-symbols-outlined text-on-surface-variant text-4xl">trending_up</span>
-          <p className="text-sm font-medium text-on-surface">Sua carteira está vazia</p>
-          <p className="text-xs text-on-surface-variant">
+        <div className="glass-card rounded-2xl border border-outline-variant/50 p-16 text-center">
+          <span className="material-symbols-outlined text-5xl text-on-surface-variant mb-4 block">trending_up</span>
+          <h3 className="text-base font-semibold text-on-surface mb-2">Sua carteira está vazia</h3>
+          <p className="text-sm text-on-surface-variant mb-6">
             Cadastre um ativo com preço-alvo e receba um aviso no WhatsApp quando a cotação chegar lá.
           </p>
+          <button onClick={() => setFormAberto(true)} className="btn-primary mx-auto">
+            <span className="material-symbols-outlined text-lg">add</span>
+            Adicionar primeiro ativo
+          </button>
         </div>
       )}
 
-      <div className="space-y-3">
-        {ativos.map((a) => {
-          const pausado = !!a.target_triggered_at || !!a.stop_triggered_at
-          const lucro = a.profit_loss ?? 0
-          const positivo = lucro >= 0
-          return (
-            <div key={a.id} className="rounded-2xl bg-surface-container-lowest border border-outline-variant/50 p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-on-surface">{a.ticker}</h3>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant">
-                      {KIND_LABELS[a.kind]}
-                    </span>
-                  </div>
-                  <p className="text-xs text-on-surface-variant truncate">{a.short_name}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-base font-bold text-on-surface">
-                    {a.current_price === null ? '—' : `R$ ${brl(a.current_price)}`}
-                  </p>
-                  {a.quote_stale && (
-                    <p className="text-[10px] text-on-surface-variant">cotação indisponível</p>
-                  )}
-                </div>
-              </div>
-
-              {a.quantity > 0 && a.profit_loss !== null && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-on-surface-variant">
-                    {formatQuantity(a.quantity)} un. · pago R$ {brl(a.avg_price)}
-                  </span>
-                  <span className={`font-semibold ${positivo ? 'text-tertiary' : 'text-error'}`}>
-                    {positivo ? '+' : '-'}R$ {brl(Math.abs(lucro))} ({positivo ? '+' : '-'}
-                    {formatPct(a.profit_loss_pct ?? 0)}%)
-                  </span>
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-2 text-[11px] text-on-surface-variant">
-                {a.target_price !== null && (
-                  <span className="inline-flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">flag</span>
-                    alvo R$ {brl(a.target_price)}
-                  </span>
-                )}
-                {a.stop_price !== null && (
-                  <span className="inline-flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">shield</span>
-                    stop R$ {brl(a.stop_price)}
-                  </span>
-                )}
-              </div>
-
-              {pausado && (
-                <div className="flex items-center justify-between gap-2 rounded-xl bg-primary/10 px-3 py-2">
-                  <span className="text-xs text-on-surface">
-                    {a.target_triggered_at ? 'Alvo atingido' : 'Stop atingido'} — alertas pausados
-                  </span>
-                  <button
-                    onClick={() => reativar(a.id, a.ticker)}
-                    className="text-xs font-medium text-primary px-3 min-h-[48px]"
-                  >
-                    Reativar
-                  </button>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => iniciarEdicao(a)}
-                  className="flex items-center gap-1 text-xs text-on-surface-variant px-3 min-h-[48px]"
-                >
-                  <span className="material-symbols-outlined text-[18px]">edit</span>
-                  Editar
-                </button>
-                <button
-                  onClick={() => setDeleteTarget({ id: a.id, ticker: a.ticker })}
-                  className="flex items-center gap-1 text-xs text-error px-3 min-h-[48px]"
-                >
-                  <span className="material-symbols-outlined text-[18px]">delete</span>
-                  Remover
-                </button>
-              </div>
-            </div>
-          )
-        })}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+        {ativos.map((a) => (
+          <AtivoCard
+            key={a.id}
+            ativo={a}
+            onEdit={iniciarEdicao}
+            onDelete={setDeleteTarget}
+            onReativar={reativar}
+          />
+        ))}
       </div>
 
       <Modal
