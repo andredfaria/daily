@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { sendDailyPoll, getTodaySaoPaulo } from '../services/checklistDispatcher'
 import { computeItemStats, computeItemStreaks } from '../services/checklistStats'
+import { computeConsistency, constanciaZerada, PollResumo } from '../services/checklistConsistency'
 
 const router = Router()
 
@@ -311,7 +312,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
     } else {
       checklist = await getMostRecentChecklist(req.userId!)
     }
-    if (!checklist) return res.json({ checklist: null, today: null, history: [], itemStats: [] })
+    if (!checklist) return res.json({ checklist: null, today: null, history: [], itemStats: [], constancia: constanciaZerada() })
 
     const today = getTodaySaoPaulo()
 
@@ -361,7 +362,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
     const itemStats = computeItemStats(items.map((i: any) => i.text), pollsSelectedOptions)
 
     const [streakPollRows]: any = await pool.query(
-      `SELECT selected_options
+      `SELECT poll_date, completed_count, completion_pct, selected_options
          FROM checklist_daily_polls
         WHERE checklist_id = ? AND status IN ('sent', 'completed')
         ORDER BY poll_date ASC`,
@@ -372,6 +373,15 @@ router.get('/dashboard', async (req: Request, res: Response) => {
       return Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : [])
     })
     const itemStreaks = computeItemStreaks(items.map((i: any) => i.text), pollsChronological)
+
+    const pollsResumo: PollResumo[] = streakPollRows.map((r: any) => ({
+      poll_date: r.poll_date instanceof Date
+        ? r.poll_date.toISOString().slice(0, 10)
+        : String(r.poll_date).slice(0, 10),
+      completed_count: r.completed_count,
+      completion_pct: r.completion_pct,
+    }))
+    const constancia = computeConsistency(pollsResumo, today)
     const streaksByText = new Map(itemStreaks.map((s) => [s.text, s]))
     const itemStatsWithStreak = itemStats.map((stat) => {
       const streak = streaksByText.get(stat.text)
@@ -382,7 +392,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
       }
     })
 
-    res.json({ checklist: { ...checklist, items }, today: todayPoll, history, itemStats: itemStatsWithStreak })
+    res.json({ checklist: { ...checklist, items }, today: todayPoll, history, itemStats: itemStatsWithStreak, constancia })
   } catch (err: any) {
     console.error('[checklists] GET /dashboard', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
