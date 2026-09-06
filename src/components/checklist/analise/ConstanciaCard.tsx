@@ -45,30 +45,45 @@ const LinhaMetrica: React.FC<{
   </div>
 )
 
-const JanelaBloco: React.FC<{ titulo: string; comparativo: ComparativoConstancia }> = ({ titulo, comparativo }) => (
-  <div>
-    <p className="text-xs font-medium text-on-surface-variant mb-2">{titulo}</p>
-    <div className="space-y-2">
-      <LinhaMetrica
-        label="respondeu"
-        valor={comparativo.atual.dias_respondidos}
-        denominador={comparativo.atual.dias_com_poll}
-        anterior={comparativo.anterior.dias_respondidos}
-      />
-      <LinhaMetrica
-        label="completou"
-        valor={comparativo.atual.dias_completos}
-        denominador={comparativo.atual.dias_com_poll}
-        anterior={comparativo.anterior.dias_completos}
-      />
+// `semana` e `mes` vêm de computeConsistency (backend) calculadas de forma
+// independente sobre a mesma lista de polls — não há regra ligando as duas.
+// Um checklist pausado esta semana mas com polls entre 8 e 30 dias atrás tem
+// semana.atual.dias_com_poll === 0 e mes.atual.dias_com_poll > 0, então o
+// vazio é decidido por bloco, nunca por um flag único que descartaria dado
+// mensal real.
+const JanelaBloco: React.FC<{ titulo: string; comparativo: ComparativoConstancia }> = ({ titulo, comparativo }) => {
+  const semDados = comparativo.atual.dias_com_poll === 0
+  return (
+    <div>
+      <p className="text-xs font-medium text-on-surface-variant mb-2">{titulo}</p>
+      {semDados ? (
+        <p className="text-sm text-on-surface-variant">Sem poll enviado nesse período.</p>
+      ) : (
+        <div className="space-y-2">
+          <LinhaMetrica
+            label="respondeu"
+            valor={comparativo.atual.dias_respondidos}
+            denominador={comparativo.atual.dias_com_poll}
+            anterior={comparativo.anterior.dias_respondidos}
+          />
+          <LinhaMetrica
+            label="completou"
+            valor={comparativo.atual.dias_completos}
+            denominador={comparativo.atual.dias_com_poll}
+            anterior={comparativo.anterior.dias_completos}
+          />
+        </div>
+      )}
     </div>
-  </div>
-)
+  )
+}
 
 export const ConstanciaCard: React.FC<ConstanciaCardProps> = ({ constancia }) => {
-  // Sem poll enviado ainda na janela mais curta: "0 de 0" não informa nada,
-  // então a mensagem substitui a grade em vez de mostrar uma fração vazia.
-  const semHistorico = constancia.semana.atual.dias_com_poll === 0
+  // Vazio de verdade só quando as duas janelas não têm poll nenhum — se só
+  // uma estiver zerada, o bloco dela mesma mostra a mensagem (ver
+  // JanelaBloco), preservando o dado real da outra janela.
+  const semHistoricoTotal =
+    constancia.semana.atual.dias_com_poll === 0 && constancia.mes.atual.dias_com_poll === 0
 
   return (
     <section className="glass-card rounded-2xl border border-outline-variant/50 p-6">
@@ -85,8 +100,8 @@ export const ConstanciaCard: React.FC<ConstanciaCardProps> = ({ constancia }) =>
         </div>
       </div>
 
-      {semHistorico ? (
-        <p className="text-sm text-on-surface-variant">Ainda não há poll enviado nos últimos 7 dias.</p>
+      {semHistoricoTotal ? (
+        <p className="text-sm text-on-surface-variant">Ainda não há poll enviado.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <JanelaBloco titulo="últimos 7 dias" comparativo={constancia.semana} />
