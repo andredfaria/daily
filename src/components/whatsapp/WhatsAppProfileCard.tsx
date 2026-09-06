@@ -18,9 +18,10 @@ interface Props {
   onRefresh?: () => void
 }
 
-// A URL da foto do WhatsApp expira, então uma imagem pode quebrar a qualquer
-// momento. Trocar por estado (em vez de esconder o <img> no onError) mantém a
-// caixa do mesmo tamanho e evita o buraco de layout que o card antigo deixava.
+// A foto chega como data URI (o backend baixa do CDN da Meta, porque o CSP do
+// app é `img-src 'self' data:`). Mesmo assim o onError vira estado, em vez de
+// esconder o <img>: mantém a caixa do mesmo tamanho e evita o buraco de layout
+// que o card antigo deixava quando a imagem não renderizava.
 const Avatar: React.FC<{ url: string | null; tamanho: string }> = ({ url, tamanho }) => {
   const [quebrou, setQuebrou] = useState(false)
 

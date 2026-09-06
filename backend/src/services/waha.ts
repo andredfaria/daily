@@ -180,10 +180,103 @@ export interface WhatsAppProfile {
   pushName: string | null
   // Como a conta que envia os lembretes tem esse número salvo na agenda.
   savedName: string | null
+  // Data URI, não a URL do CDN — ver o comentário de baixarFotoComoDataUri.
   profilePicUrl: string | null
   // null quando a verificação não pôde ser feita — diferente de false, que
   // significa "o WhatsApp respondeu que este número não existe".
   numberExists: boolean | null
+}
+
+// O whatsapp_number nem sempre é um telefone: usuário que só apareceu pelo
+// webhook fica gravado com o LID (`51810291171433@lid`). Jogar isso num
+// replace(/\D/g,'') virava `51810291171433@c.us`, um id que não existe — a
+// busca respondia "número não encontrado" para quem tinha conta válida.
+export function buildContactId(phone: string): string {
+  const bruto = phone.trim()
+  if (bruto.includes('@')) return bruto
+  return `${bruto.replace(/\D/g, '')}@c.us`
+}
+
+// A grafia do campo muda entre engines (GOWS manda profilePictureURL); e o
+// contato sem foto responde 200 com null, não 404.
+export function parseProfilePictureUrl(data: any): string | null {
+  const url = data?.profilePictureURL || data?.profilePicUrl || data?.url || null
+  return typeof url === 'string' && url.length > 0 ? url : null
+}
+
+// Teto do que entra no JSON do perfil. As fotos do WhatsApp são 640x640 e giram
+// em torno de 60 KB; 2 MB é folga para um caso fora da curva sem risco de a
+// resposta do /profile virar um download.
+export const TETO_FOTO_BYTES = 2 * 1024 * 1024
+
+export function bufferParaDataUri(buf: Buffer, contentType?: string): string | null {
+  if (!buf?.length || buf.length > TETO_FOTO_BYTES) return null
+  const tipo = String(contentType ?? '').split(';')[0].trim().toLowerCase()
+  // O CDN às vezes devolve application/octet-stream; jpeg é o formato que o
+  // WhatsApp serve, então é o palpite seguro em vez de recusar a foto.
+  const mime = tipo.startsWith('image/') ? tipo : 'image/jpeg'
+  return `data:${mime};base64,${buf.toString('base64')}`
+}
+
+// O app roda sob `img-src 'self' data:` (nginx.conf). A URL que o WAHA devolve
+// aponta para pps.whatsapp.net, então o navegador bloqueava a imagem e o card
+// caía no ícone genérico — parecia "não achou a foto", mas a API sempre
+// respondeu certo. Baixar aqui e mandar embutido resolve sem afrouxar o CSP e
+// ainda tira de cima a URL assinada, que expira.
+async function baixarFotoComoDataUri(url: string): Promise<string | null> {
+  const emCache = fotoCache.get(url)
+  if (emCache && emCache.expiraEm > Date.now()) return emCache.dataUri
+
+  try {
+    // Cliente próprio: é o CDN da Meta, não o WAHA — mandar o X-Api-Key para lá
+    // seria vazar a chave.
+    const resp = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 })
+    const dataUri = bufferParaDataUri(Buffer.from(resp.data), resp.headers['content-type'])
+    if (dataUri) guardarFoto(url, dataUri)
+    return dataUri
+  } catch (err: any) {
+    console.warn(`[waha] falha ao baixar foto de perfil: ${err?.message ?? err}`)
+    return null
+  }
+}
+
+// Cache curto porque a URL assinada já muda sozinha; serve só para as duas
+// telas que pedem o perfil não baixarem 60 KB da Meta a cada abertura.
+const fotoCache = new Map<string, { dataUri: string; expiraEm: number }>()
+const FOTO_TTL_MS = 10 * 60 * 1000
+
+function guardarFoto(url: string, dataUri: string): void {
+  // Poda o que já venceu antes de crescer: sem isso o Map só aumenta, já que
+  // cada refresh do WhatsApp gera uma URL nova.
+  const agora = Date.now()
+  for (const [k, v] of fotoCache) if (v.expiraEm <= agora) fotoCache.delete(k)
+  fotoCache.set(url, { dataUri, expiraEm: agora + FOTO_TTL_MS })
+}
+
+interface DadosContato {
+  savedName: string | null
+  pushName: string | null
+  picUrl: string | null
+}
+
+async function buscarContato(contactId: string, session: string): Promise<DadosContato> {
+  const client = wahaClient()
+  // allSettled: foto indisponível não pode apagar o nome, e vice-versa.
+  const [contatoR, fotoR] = await Promise.allSettled([
+    client.get('/api/contacts', { params: { contactId, session } }),
+    client.get('/api/contacts/profile-picture', { params: { contactId, session } }),
+  ])
+
+  const { savedName, pushName } =
+    contatoR.status === 'fulfilled'
+      ? parseContactPayload(contatoR.value.data)
+      : { savedName: null, pushName: null }
+
+  return {
+    savedName,
+    pushName,
+    picUrl: fotoR.status === 'fulfilled' ? parseProfilePictureUrl(fotoR.value.data) : null,
+  }
 }
 
 // Não busca `about`: /api/contacts/about responde 501 no engine GOWS
@@ -193,43 +286,43 @@ export interface WhatsAppProfile {
 export async function fetchWhatsAppProfile(phone: string): Promise<WhatsAppProfile> {
   const session = process.env.WAHA_SESSION || 'default'
   const digits = phone.replace(/\D/g, '')
-  const contactId = `${digits}@c.us`
   const client = wahaClient()
 
   // Número brasileiro existe em duas formas (com e sem o 9º dígito) e o envio já
   // tenta as duas via buildPhoneCandidates. Checar só uma delas faria o selo
   // dizer "não encontrado" para quem recebe as mensagens normalmente.
-  const variante = generatePhoneVariant(digits)
-  const candidatos = [...new Set([digits, ...(variante ? [variante] : [])])]
+  // Um LID não é telefone: mandá-lo para /check-exists devolve "não existe" e o
+  // card acusava conta inválida de quem recebe mensagem todo dia. Sem candidato,
+  // numberExists fica null — "não dá para saber", que é a verdade.
+  const ehLid = phone.includes('@')
+  const variante = ehLid ? null : generatePhoneVariant(digits)
+  const candidatos = ehLid ? [] : [...new Set([digits, ...(variante ? [variante] : [])])]
 
-  // allSettled: foto indisponível não pode apagar o nome, e vice-versa.
-  const [contatoR, fotoR, ...existeRs] = await Promise.allSettled([
-    client.get('/api/contacts', { params: { contactId, session } }),
-    client.get('/api/contacts/profile-picture', { params: { contactId, session } }),
-    ...candidatos.map((p) => client.get('/api/contacts/check-exists', { params: { phone: p, session } })),
+  const [contatoPrincipal, ...existeRs] = await Promise.all([
+    buscarContato(buildContactId(phone), session),
+    ...candidatos.map((p) =>
+      client
+        .get('/api/contacts/check-exists', { params: { phone: p, session } })
+        .then((r) => r.data)
+        .catch(() => null)
+    ),
   ])
 
-  const { savedName, pushName } =
-    contatoR.status === 'fulfilled'
-      ? parseContactPayload(contatoR.value.data)
-      : { savedName: null, pushName: null }
-
-  let profilePicUrl: string | null = null
-  if (fotoR.status === 'fulfilled') {
-    const d: any = fotoR.value.data
-    const url = d?.profilePictureURL || d?.profilePicUrl || d?.url || null
-    profilePicUrl = typeof url === 'string' && url.length > 0 ? url : null
+  // A forma errada do número responde 200 com tudo vazio, não erro. Quando não
+  // veio nome nem foto, a outra grafia do 9º dígito ainda pode ser a certa.
+  let contato = contatoPrincipal
+  if (variante && !contato.picUrl && !contato.savedName && !contato.pushName) {
+    contato = await buscarContato(buildContactId(variante), session)
   }
+
+  const profilePicUrl = contato.picUrl ? await baixarFotoComoDataUri(contato.picUrl) : null
 
   // Basta um candidato existir. Só devolve null quando nenhuma checagem
   // completou — aí não se sabe, que é diferente de saber que não existe.
-  const respostas = existeRs.filter((r) => r.status === 'fulfilled') as
-    PromiseFulfilledResult<{ data: any }>[]
-  const numberExists = respostas.length
-    ? respostas.some((r) => Boolean(r.value.data?.numberExists))
-    : null
+  const respostas = existeRs.filter((d) => d !== null)
+  const numberExists = respostas.length ? respostas.some((d: any) => Boolean(d?.numberExists)) : null
 
-  return { pushName, savedName, profilePicUrl, numberExists }
+  return { pushName: contato.pushName, savedName: contato.savedName, profilePicUrl, numberExists }
 }
 
 export async function getWahaWebhookStatus(backendPublicUrl: string): Promise<{
