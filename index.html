@@ -6,14 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BillSync</title>
     <!-- Fontes (Inter + Material Symbols) self-hosted via npm em src/main.tsx;
-         servidas pela mesma origem para respeitar o CSP estrito (font-src 'self'). -->
+         servidas pela mesma origem para respeitar o CSP estrito (font-src 'self').
+         A dos ícones é um subset instanciado em wght=400 (src/index.css). -->
     <style>
       .material-symbols-outlined {
-        font-variation-settings:
-          'FILL' 0,
-          'wght' 400,
-          'GRAD' 0,
-          'opsz' 24;
+        /* Só FILL: wght, GRAD e opsz foram fixados dentro da própria fonte pelo
+           scripts/subset-icons.mjs, então declará-los aqui não teria efeito. */
+        font-variation-settings: 'FILL' 0;
         user-select: none;
       }
     </style>

@@ -2,6 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fonte de ícones instanciada em wght=400 (330 KB) no lugar da variável completa
+   do pacote material-symbols (3,8 MB). O eixo FILL continua livre — é o que o
+   design system usa no estado ativo. Regenerar com: npm run icons */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 400;
+  /* block, e não swap: com swap o nome do ícone aparece como texto até a fonte
+     carregar, que é justamente o que o -webkit-font-feature-settings abaixo
+     tenta evitar no Safari. */
+  font-display: block;
+  src: url('./assets/material-symbols-outlined-wght400.woff2') format('woff2');
+}
+
+@layer base {
+  /* Vem do outlined.css do pacote, que deixou de ser importado. Dentro de
+     @layer base para que as utilities do Tailwind (text-lg, text-xs...)
+     continuem sobrescrevendo o font-size. */
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+}
+
 @layer base {
   * {
     box-sizing: border-box;
