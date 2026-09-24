@@ -46,7 +46,7 @@ router.get('/stats', async (req: Request, res: Response) => {
     const [[dueWeek]]: any = await pool.query(
       `SELECT COUNT(*) AS due_this_week FROM bill_occurrences bo
        JOIN bills b ON b.id = bo.bill_id
-       WHERE bo.due_date BETWEEN ? AND ? AND b.user_id = ?`,
+       WHERE bo.due_date BETWEEN ? AND ? AND b.user_id = ? AND b.is_active = 1`,
       [now, weekEnd, req.userId]
     )
 
@@ -64,6 +64,8 @@ router.get('/stats', async (req: Request, res: Response) => {
 })
 
 // GET /api/occurrences/upcoming
+// Desativar a conta não apaga as ocorrências já geradas, então o filtro por
+// is_active é o que tira a conta inativa dos próximos vencimentos da home.
 router.get('/upcoming', async (req: Request, res: Response) => {
   try {
     const days = Number(req.query.days) || 30
@@ -74,8 +76,8 @@ router.get('/upcoming', async (req: Request, res: Response) => {
     const [rows] = await pool.query(
       `SELECT o.*, b.name AS bill_name, b.amount AS bill_amount
        FROM bill_occurrences o
-       LEFT JOIN bills b ON b.id = o.bill_id
-       WHERE o.due_date BETWEEN ? AND ? AND b.user_id = ?
+       JOIN bills b ON b.id = o.bill_id
+       WHERE o.due_date BETWEEN ? AND ? AND b.user_id = ? AND b.is_active = 1
        ORDER BY o.due_date ASC`,
       [from, to, req.userId]
     )
