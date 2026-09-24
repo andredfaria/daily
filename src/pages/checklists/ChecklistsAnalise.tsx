@@ -139,7 +139,7 @@ const ChecklistsAnalise: React.FC = () => {
 
       <section className="space-y-3">
         <h3 className="text-base font-semibold text-on-surface">Histórico (12 semanas)</h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="space-y-3">
           {checklists.map((c) => {
             const hist = historicos[c.id] ?? []
             const { completos, enviados } = resumirHistorico(hist)
@@ -170,21 +170,24 @@ const ChecklistsAnalise: React.FC = () => {
                 {c.items.length === 0 ? (
                   <p className="text-xs text-on-surface-variant">Checklist sem itens.</p>
                 ) : (
-                  <div className="space-y-5">
-                    {c.items.map((item) => {
-                      const { marcados } = resumirItem(hist, item.text)
-                      return (
-                        <div key={item.id}>
-                          <div className="flex items-baseline justify-between gap-3 mb-2">
-                            <p className="text-sm text-on-surface truncate">{item.text}</p>
-                            <span className="text-xs text-on-surface-variant tabular-nums flex-shrink-0">
-                              {marcados} de {enviados} {enviados === 1 ? 'dia' : 'dias'}
-                            </span>
+                  <div className="space-y-4">
+                    {/* Colunas automáticas: cabem quantas grades de 12 semanas a largura permitir */}
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(272px,100%),1fr))] gap-3">
+                      {c.items.map((item) => {
+                        const { marcados } = resumirItem(hist, item.text)
+                        return (
+                          <div key={item.id} className="rounded-xl border border-outline-variant/40 bg-surface-container/40 p-3">
+                            <div className="flex items-baseline justify-between gap-3 mb-2">
+                              <p className="text-sm text-on-surface truncate">{item.text}</p>
+                              <span className="text-xs text-on-surface-variant tabular-nums flex-shrink-0">
+                                {marcados} de {enviados} {enviados === 1 ? 'dia' : 'dias'}
+                              </span>
+                            </div>
+                            <ChecklistHeatmap history={hist} itemText={item.text} showLegend={false} />
                           </div>
-                          <ChecklistHeatmap history={hist} itemText={item.text} showLegend={false} />
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
                     <HeatmapLegend />
                   </div>
                 )}
