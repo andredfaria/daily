@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { checklistsApi } from '../../api/checklists'
 import type { Checklist, ChecklistDashboardData, ChecklistHistoryDay } from '../../types'
 import { StatCard } from '../../components/ui/StatCard'
-import { ChecklistHeatmap } from '../../components/checklist/analise/ChecklistHeatmap'
+import { ChecklistHeatmap, resumirHistorico } from '../../components/checklist/analise/ChecklistHeatmap'
 import { ChecklistItemRanking } from '../../components/checklist/analise/ChecklistItemRanking'
 import { WeeklyTrendSparkline } from '../../components/checklist/analise/WeeklyTrendSparkline'
 import { ConstanciaCard } from '../../components/checklist/analise/ConstanciaCard'
@@ -137,22 +137,42 @@ const ChecklistsAnalise: React.FC = () => {
 
       <WeeklyTrendSparkline history={historico} />
 
-      <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
-        <h3 className="text-base font-semibold text-on-surface mb-4">Histórico (12 semanas)</h3>
-        <div className="space-y-6">
-          {checklists.map((c, i) => (
-            <div key={c.id}>
-              {checklists.length > 1 && (
-                <p className={`text-sm font-medium mb-2 ${c.is_active ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                  {c.name}
-                  {!c.is_active && <span className="ml-2 text-xs">(inativo)</span>}
-                </p>
-              )}
-              <ChecklistHeatmap history={historicos[c.id] ?? []} showLegend={i === checklists.length - 1} />
-            </div>
-          ))}
+      <section className="space-y-3">
+        <h3 className="text-base font-semibold text-on-surface">Histórico (12 semanas)</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {checklists.map((c) => {
+            const hist = historicos[c.id] ?? []
+            const { completos, enviados } = resumirHistorico(hist)
+            return (
+              <div
+                key={c.id}
+                className={`glass-card rounded-2xl border p-4 sm:p-5 ${
+                  selecionado === c.id ? 'border-primary/40' : 'border-outline-variant/50'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="min-w-0">
+                    <p className={`text-sm font-semibold truncate ${c.is_active ? 'text-on-surface' : 'text-on-surface-variant'}`}>
+                      {c.name}
+                    </p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      {enviados === 0
+                        ? 'Nenhum envio nas últimas 12 semanas'
+                        : `${enviados} ${enviados === 1 ? 'dia' : 'dias'} com envio`}
+                      {!c.is_active && ' · inativo'}
+                    </p>
+                  </div>
+                  <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-tertiary/15 text-tertiary text-xs font-semibold tabular-nums flex-shrink-0">
+                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                    {completos} {completos === 1 ? 'completo' : 'completos'}
+                  </span>
+                </div>
+                <ChecklistHeatmap history={hist} />
+              </div>
+            )
+          })}
         </div>
-      </div>
+      </section>
 
       <ChecklistItemRanking itemStats={itemStats} />
     </div>

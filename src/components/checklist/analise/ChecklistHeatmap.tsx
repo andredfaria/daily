@@ -11,32 +11,73 @@ interface ChecklistHeatmapProps {
   showLegend?: boolean
 }
 
-type Bucket = 'empty' | 'zero' | 'low' | 'mid' | 'full'
+export type Bucket = 'empty' | 'zero' | 'low' | 'mid' | 'high' | 'full'
 
 const DAY_ROWS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+// Como no GitHub, só dias alternados ganham rótulo — a grade fica legível sem apertar.
+const DAY_ROWS_VISIBLE = new Set([1, 3, 5])
 
+// Escala no estilo do GitHub: cinza quando não houve envio, verde cada vez mais
+// forte conforme a conclusão. O verde é o `tertiary` do design system.
 const BUCKET_CLASS: Record<Bucket, string> = {
-  empty: 'bg-surface-container',
-  zero: 'bg-primary/15',
-  low: 'bg-primary/40',
-  mid: 'bg-primary/70',
+  empty: 'bg-surface-container-high/50',
+  zero: 'bg-surface-container-highest',
+  low: 'bg-tertiary/25',
+  mid: 'bg-tertiary/50',
+  high: 'bg-tertiary/75',
   full: 'bg-tertiary',
 }
 
+const BUCKET_LABEL: Record<Bucket, string> = {
+  empty: 'Sem envio',
+  zero: '0%',
+  low: '1–49%',
+  mid: '50–74%',
+  high: '75–99%',
+  full: '100%',
+}
+
+const LEGEND_ORDER: Bucket[] = ['empty', 'zero', 'low', 'mid', 'high', 'full']
+
 // MySQL2 retorna colunas DATE como objetos Date — normaliza para string YYYY-MM-DD
-const toDateStr = (v: unknown): string => {
+export const toDateStr = (v: unknown): string => {
   if (!v) return ''
   if (v instanceof Date) return v.toISOString().slice(0, 10)
   return String(v).slice(0, 10)
 }
 
-function pctToBucket(pct: number | undefined): Bucket {
-  if (pct === undefined) return 'empty'
-  if (pct === 0) return 'zero'
-  if (pct < 51) return 'low'
-  if (pct < 100) return 'mid'
+export function pctToBucket(pct: number | undefined): Bucket {
+  if (pct === undefined || Number.isNaN(pct)) return 'empty'
+  if (pct <= 0) return 'zero'
+  if (pct < 50) return 'low'
+  if (pct < 75) return 'mid'
+  if (pct < 100) return 'high'
   return 'full'
 }
+
+// Resumo da janela para o cabeçalho do card: quantos dias fecharam 100% e em
+// quantos houve envio.
+export function resumirHistorico(history: HistoryDay[]): { completos: number; enviados: number } {
+  const porDia = new Map<string, number>()
+  history.forEach((h) => porDia.set(toDateStr(h.poll_date), Number(h.completion_pct)))
+  let completos = 0
+  porDia.forEach((pct) => { if (pct >= 100) completos++ })
+  return { completos, enviados: porDia.size }
+}
+
+const formatDate = (dateStr: string) =>
+  new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', weekday: 'short', day: '2-digit', month: '2-digit' })
+    .format(new Date(dateStr + 'T00:00:00Z'))
+
+export const HeatmapLegend: React.FC = () => (
+  <div className="flex items-center justify-end gap-1 text-[11px] text-on-surface-variant">
+    <span className="mr-1">Menos</span>
+    {LEGEND_ORDER.map((b) => (
+      <span key={b} title={BUCKET_LABEL[b]} className={`h-3 w-3 rounded-[3px] ${BUCKET_CLASS[b]}`} />
+    ))}
+    <span className="ml-1">Mais</span>
+  </div>
+)
 
 export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ history, days = 84, showLegend = true }) => {
   const pctByDate = new Map<string, number>()
@@ -51,6 +92,7 @@ export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ history, day
     d.setDate(d.getDate() - i)
     dates.push(d.toISOString().slice(0, 10))
   }
+  const hoje = dates[dates.length - 1]
 
   // Alinha a primeira coluna ao domingo anterior à data mais antiga, pra grade ficar retangular.
   const firstDate = new Date(dates[0] + 'T00:00:00')
@@ -64,63 +106,68 @@ export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ history, day
     columns.push(cells.slice(w * 7, w * 7 + 7))
   }
 
-  const formatDate = (dateStr: string) =>
-    new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', day: '2-digit', month: '2-digit' }).format(new Date(dateStr + 'T00:00:00'))
-
   let lastMonth = ''
   const monthLabels = columns.map((week) => {
-    const firstDate = week.find((d) => d !== null)
-    if (!firstDate) return ''
-    const m = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', month: 'short' }).format(new Date(firstDate + 'T00:00:00'))
+    const first = week.find((d) => d !== null)
+    if (!first) return ''
+    const m = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', month: 'short' })
+      .format(new Date(first + 'T00:00:00Z'))
+      .replace('.', '')
     if (m === lastMonth) return ''
     lastMonth = m
     return m
   })
 
+  const { completos, enviados } = resumirHistorico(history)
+
   return (
     <div>
-      <div className="overflow-x-auto pb-1 no-scrollbar">
-        <div className="flex gap-1 mb-1">
-          <div className="w-7 mr-1 flex-shrink-0" />
-          {monthLabels.map((m, i) => (
-            <div key={i} className="w-3.5 text-[9px] text-on-surface-variant flex-shrink-0 capitalize whitespace-nowrap">
-              {m}
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-1">
-          <div className="flex flex-col gap-1 mr-1 flex-shrink-0">
-            {DAY_ROWS.map((label) => (
-              <div key={label} className="h-3.5 w-7 text-[9px] text-on-surface-variant flex items-center justify-end pr-1">
-                {label}
+      <div
+        role="img"
+        aria-label={`Histórico de ${days / 7} semanas: ${completos} dias completos em ${enviados} dias com envio.`}
+        className="overflow-x-auto pb-1 no-scrollbar"
+      >
+        <div className="inline-flex flex-col">
+          <div className="flex gap-[3px] mb-1 pl-8">
+            {monthLabels.map((m, i) => (
+              <div key={i} className="w-3.5 text-[11px] leading-none text-on-surface-variant flex-shrink-0 capitalize whitespace-nowrap">
+                {m}
               </div>
             ))}
           </div>
-          {columns.map((week, wi) => (
-            <div key={wi} className="flex flex-col gap-1 flex-shrink-0">
-              {week.map((dateStr, di) => {
-                if (!dateStr) return <div key={di} className="h-3.5 w-3.5" />
-                const pct = pctByDate.get(dateStr)
-                const bucket = pctToBucket(pct)
-                return (
-                  <div
-                    key={di}
-                    title={`${formatDate(dateStr)} — ${pct !== undefined ? `${pct}%` : 'sem envio'}`}
-                    className={`h-3.5 w-3.5 rounded-sm ${BUCKET_CLASS[bucket]}`}
-                  />
-                )
-              })}
+          <div className="flex gap-[3px]">
+            <div className="flex flex-col gap-[3px] w-8 flex-shrink-0">
+              {DAY_ROWS.map((label, i) => (
+                <div key={label} className="h-3.5 text-[11px] leading-none text-on-surface-variant flex items-center">
+                  {DAY_ROWS_VISIBLE.has(i) ? label : ''}
+                </div>
+              ))}
             </div>
-          ))}
+            {columns.map((week, wi) => (
+              <div key={wi} className="flex flex-col gap-[3px] flex-shrink-0">
+                {week.map((dateStr, di) => {
+                  if (!dateStr) return <div key={di} className="h-3.5 w-3.5" />
+                  const pct = pctByDate.get(dateStr)
+                  const bucket = pctToBucket(pct)
+                  const ehHoje = dateStr === hoje
+                  return (
+                    <div
+                      key={di}
+                      title={`${formatDate(dateStr)} — ${pct !== undefined ? `${pct}% concluído` : 'sem envio'}`}
+                      className={`h-3.5 w-3.5 rounded-[3px] ${BUCKET_CLASS[bucket]} ${
+                        ehHoje ? 'ring-1 ring-on-surface/70 ring-offset-1 ring-offset-surface' : ''
+                      }`}
+                    />
+                  )
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       {showLegend && (
-        <div className="flex items-center gap-3 mt-3 text-[10px] text-on-surface-variant flex-wrap">
-          <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.empty}`} /> Sem envio</span>
-          <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.zero}`} /> 0%</span>
-          <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.low}`} /> 1–50%</span>
-          <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.mid}`} /> 51–99%</span>
-          <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.full}`} /> 100%</span>
+        <div className="mt-3">
+          <HeatmapLegend />
         </div>
       )}
     </div>
