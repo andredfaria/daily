@@ -300,6 +300,36 @@ router.get('/stats', async (req: Request, res: Response) => {
   }
 })
 
+// -------- GET /api/checklists/history - histórico de 12 semanas de cada checklist --------
+// Uma consulta só para a análise desenhar um heatmap por checklist, sem chamar
+// o /dashboard (que calcula itens e constância) para cada um.
+router.get('/history', async (req: Request, res: Response) => {
+  try {
+    const today = getTodaySaoPaulo()
+    const [rows]: any = await pool.query(
+      `SELECT cdp.checklist_id, cdp.poll_date, cdp.completion_pct
+       FROM checklist_daily_polls cdp
+       JOIN checklists c ON c.id = cdp.checklist_id
+       WHERE c.user_id = ? AND cdp.poll_date >= DATE_SUB(?, INTERVAL 83 DAY)
+       ORDER BY cdp.poll_date`,
+      [req.userId!, today],
+    )
+
+    const porChecklist: Record<string, Array<{ poll_date: string; completion_pct: number }>> = {}
+    for (const r of rows) {
+      ;(porChecklist[r.checklist_id] ??= []).push({
+        poll_date: r.poll_date,
+        completion_pct: Number(r.completion_pct),
+      })
+    }
+
+    res.json(porChecklist)
+  } catch (err: any) {
+    console.error('[checklists] GET /history', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
 // -------- GET /api/checklists/dashboard - dados do dashboard do checklist --------
 router.get('/dashboard', async (req: Request, res: Response) => {
   try {

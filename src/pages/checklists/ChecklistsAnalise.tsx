@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { checklistsApi } from '../../api/checklists'
-import type { Checklist, ChecklistDashboardData } from '../../types'
+import type { Checklist, ChecklistDashboardData, ChecklistHistoryDay } from '../../types'
 import { StatCard } from '../../components/ui/StatCard'
 import { ChecklistHeatmap } from '../../components/checklist/analise/ChecklistHeatmap'
 import { ChecklistItemRanking } from '../../components/checklist/analise/ChecklistItemRanking'
@@ -12,6 +12,7 @@ const ChecklistsAnalise: React.FC = () => {
   const navigate = useNavigate()
   const [checklists, setChecklists] = useState<Checklist[]>([])
   const [dashboard, setDashboard] = useState<ChecklistDashboardData | null>(null)
+  const [historicos, setHistoricos] = useState<Record<string, ChecklistHistoryDay[]>>({})
   const [selecionado, setSelecionado] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState(false)
@@ -20,9 +21,14 @@ const ChecklistsAnalise: React.FC = () => {
     setLoading(true)
     setErro(false)
     try {
-      const [lista, dash] = await Promise.all([checklistsApi.get(), checklistsApi.dashboard()])
+      const [lista, dash, hist] = await Promise.all([
+        checklistsApi.get(),
+        checklistsApi.dashboard(),
+        checklistsApi.history(),
+      ])
       setChecklists(lista)
       setDashboard(dash)
+      setHistoricos(hist)
       if (dash.checklist) setSelecionado(dash.checklist.id)
     } catch {
       setErro(true)
@@ -133,7 +139,19 @@ const ChecklistsAnalise: React.FC = () => {
 
       <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
         <h3 className="text-base font-semibold text-on-surface mb-4">Histórico (12 semanas)</h3>
-        <ChecklistHeatmap history={historico} />
+        <div className="space-y-6">
+          {checklists.map((c, i) => (
+            <div key={c.id}>
+              {checklists.length > 1 && (
+                <p className={`text-sm font-medium mb-2 ${c.is_active ? 'text-on-surface' : 'text-on-surface-variant'}`}>
+                  {c.name}
+                  {!c.is_active && <span className="ml-2 text-xs">(inativo)</span>}
+                </p>
+              )}
+              <ChecklistHeatmap history={historicos[c.id] ?? []} showLegend={i === checklists.length - 1} />
+            </div>
+          ))}
+        </div>
       </div>
 
       <ChecklistItemRanking itemStats={itemStats} />

@@ -8,6 +8,7 @@ interface HistoryDay {
 interface ChecklistHeatmapProps {
   history: HistoryDay[]
   days?: number
+  showLegend?: boolean
 }
 
 type Bucket = 'empty' | 'zero' | 'low' | 'mid' | 'full'
@@ -37,7 +38,7 @@ function pctToBucket(pct: number | undefined): Bucket {
   return 'full'
 }
 
-export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ history, days = 84 }) => {
+export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ history, days = 84, showLegend = true }) => {
   const pctByDate = new Map<string, number>()
   history.forEach((h) => pctByDate.set(toDateStr(h.poll_date), Number(h.completion_pct)))
 
@@ -113,13 +114,15 @@ export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ history, day
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-3 mt-3 text-[10px] text-on-surface-variant flex-wrap">
-        <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.empty}`} /> Sem envio</span>
-        <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.zero}`} /> 0%</span>
-        <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.low}`} /> 1–50%</span>
-        <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.mid}`} /> 51–99%</span>
-        <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.full}`} /> 100%</span>
-      </div>
+      {showLegend && (
+        <div className="flex items-center gap-3 mt-3 text-[10px] text-on-surface-variant flex-wrap">
+          <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.empty}`} /> Sem envio</span>
+          <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.zero}`} /> 0%</span>
+          <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.low}`} /> 1–50%</span>
+          <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.mid}`} /> 51–99%</span>
+          <span className="flex items-center gap-1"><span className={`h-3 w-3 rounded-sm ${BUCKET_CLASS.full}`} /> 100%</span>
+        </div>
+      )}
     </div>
   )
 }

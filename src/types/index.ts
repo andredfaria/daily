@@ -145,6 +145,11 @@ export interface ChecklistStatsEntry {
   total_count: number
 }
 
+export interface ChecklistHistoryDay {
+  poll_date: string
+  completion_pct: number
+}
+
 export interface ChecklistItemStat {
   text: string
   marked_count: number

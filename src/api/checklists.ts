@@ -1,5 +1,5 @@
 import client from './client'
-import type { Checklist, ChecklistDashboardData, ChecklistPollNotif, ChecklistRecurrenceType, ChecklistStatsEntry } from '../types'
+import type { Checklist, ChecklistDashboardData, ChecklistHistoryDay, ChecklistPollNotif, ChecklistRecurrenceType, ChecklistStatsEntry } from '../types'
 
 export interface CreateChecklistPayload {
   name?: string
@@ -49,6 +49,12 @@ export const checklistsApi = {
     const res = await client.get<ChecklistDashboardData>('/checklists/dashboard', {
       params: checklistId ? { checklistId } : undefined,
     })
+    return res.data
+  },
+
+  // Histórico de 12 semanas de todos os checklists, indexado por checklist_id
+  history: async (): Promise<Record<string, ChecklistHistoryDay[]>> => {
+    const res = await client.get<Record<string, ChecklistHistoryDay[]>>('/checklists/history')
     return res.data
   },
 
