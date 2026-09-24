@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { checklistsApi, CreateChecklistPayload, UpdateChecklistPayload } from '../../api/checklists'
 import type { Checklist, ChecklistDashboardData, ChecklistRecurrenceType, ChecklistStatsEntry } from '../../types'
 import { useToast } from '../../context/ToastContext'
-import { SkeletonStatCard } from '../../components/ui/Skeleton'
+import { SkeletonCard } from '../../components/ui/Skeleton'
+import Modal from '../../components/ui/Modal'
 import { ProgressBar } from '../../components/checklist/ProgressBar'
 import { ChecklistCard } from '../../components/checklist/ChecklistCard'
 import { LinhaItemHoje } from '../../components/checklist/LinhaItemHoje'
@@ -39,6 +40,8 @@ const ChecklistsLista: React.FC = () => {
   // Send now
   const [sendingId, setSendingId] = useState<string | null>(null)
 
+  const editorRef = useRef<HTMLDivElement>(null)
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true)
@@ -60,6 +63,13 @@ const ChecklistsLista: React.FC = () => {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Editar a partir de um card lá embaixo leva o editor para a vista, como na Carteira.
+  useEffect(() => {
+    if (!showForm || !editorRef.current) return
+    const semAnimacao = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    editorRef.current.scrollIntoView({ behavior: semAnimacao ? 'auto' : 'smooth', block: 'start' })
+  }, [showForm, editTarget])
 
   // -------- Populate form when editing --------
   const openEdit = (c: Checklist) => {
@@ -194,15 +204,8 @@ const ChecklistsLista: React.FC = () => {
   // -------- Loading state --------
   if (loading) {
     return (
-      <div className="space-y-6 animate-fadeIn">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => <SkeletonStatCard key={i} />)}
-        </div>
-        <div className="glass-card rounded-2xl border border-outline-variant/50 p-6 space-y-4">
-          <div className="h-6 shimmer-bg rounded w-1/3" />
-          <div className="h-3 shimmer-bg rounded-full" />
-          <div className="h-4 shimmer-bg rounded w-2/3" />
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
       </div>
     )
   }
@@ -249,7 +252,7 @@ const ChecklistsLista: React.FC = () => {
           <div>
             <h3 className="text-base font-semibold text-on-surface">Progresso de Hoje</h3>
             <p className="text-xs text-on-surface-variant">
-              {today.completed_count} de {today.total_count} concluídos
+              {dashChecklist.name} · {today.completed_count} de {today.total_count} concluídos
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -258,6 +261,7 @@ const ChecklistsLista: React.FC = () => {
               onClick={() => handleSendNow(dashChecklist, true)}
               disabled={!!sendingId}
               title="Reenviar checklist"
+              aria-label="Reenviar checklist"
               className="w-11 h-11 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
             >
               {sendingId ? (
@@ -293,7 +297,11 @@ const ChecklistsLista: React.FC = () => {
     const isEdit = editTarget !== 'new'
 
     return (
-      <div className="glass-card rounded-2xl border border-outline-variant/50 p-6">
+      <div
+        ref={editorRef}
+        // scroll-mt compensa o header sticky, senão o topo do editor fica escondido
+        className="scroll-mt-20 md:scroll-mt-24 glass-card rounded-2xl border border-outline-variant/50 p-6 animate-fadeIn"
+      >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-on-surface">
             {isEdit ? 'Editar Checklist' : 'Novo Checklist'}
@@ -305,8 +313,9 @@ const ChecklistsLista: React.FC = () => {
 
         {/* Name */}
         <div className="mb-4">
-          <label className="label mb-1">Nome do Checklist</label>
+          <label htmlFor="checklist-nome" className="label mb-1">Nome do Checklist</label>
           <input
+            id="checklist-nome"
             className="input-field"
             value={formName}
             onChange={(e) => setFormName(e.target.value)}
@@ -316,6 +325,7 @@ const ChecklistsLista: React.FC = () => {
         </div>
 
         {/* Items */}
+        <p className="label mb-1">Itens</p>
         <div className="space-y-2 mb-4">
           {formItems.map((item, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -325,11 +335,13 @@ const ChecklistsLista: React.FC = () => {
                 value={item}
                 onChange={(e) => updateItem(i, e.target.value)}
                 placeholder="Digite a tarefa..."
+                aria-label={`Item ${i + 1}`}
                 maxLength={255}
               />
               <button
                 onClick={() => removeItem(i)}
                 disabled={formItems.length <= 2}
+                aria-label={`Remover item ${i + 1}`}
                 className="w-11 h-11 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors disabled:opacity-30"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
@@ -346,13 +358,14 @@ const ChecklistsLista: React.FC = () => {
         )}
 
         {hasDuplicates && (
-          <p className="text-xs text-error mb-3">Itens duplicados nao sao permitidos.</p>
+          <p role="alert" className="text-xs text-error mb-3">Itens duplicados não são permitidos.</p>
         )}
 
         {/* Send Time */}
         <div className="mb-4">
-          <label className="label mb-1">Horario de Envio</label>
+          <label htmlFor="checklist-horario" className="label mb-1">Horário de Envio</label>
           <select
+            id="checklist-horario"
             className="input-field"
             value={formSendTime}
             onChange={(e) => setFormSendTime(Number(e.target.value))}
@@ -365,8 +378,9 @@ const ChecklistsLista: React.FC = () => {
 
         {/* Recurrence */}
         <div className="mb-4">
-          <label className="label mb-1">Recorrencia</label>
+          <label htmlFor="checklist-recorrencia" className="label mb-1">Recorrência</label>
           <select
+            id="checklist-recorrencia"
             className="input-field"
             value={formRecurrenceType}
             onChange={(e) => setFormRecurrenceType(e.target.value as ChecklistRecurrenceType)}
@@ -379,14 +393,15 @@ const ChecklistsLista: React.FC = () => {
 
         {formRecurrenceType === 'custom' && (
           <div className="mb-4">
-            <label className="label mb-2">Dias da Semana</label>
+            <p className="label mb-2">Dias da Semana</p>
             <div className="flex flex-wrap gap-2">
               {DAYS_LABELS.map((label, day) => (
                 <button
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  aria-pressed={formRecurrenceDays.includes(day)}
+                  className={`px-3 min-h-[44px] min-w-[44px] rounded-lg text-xs font-semibold border transition-colors ${
                     formRecurrenceDays.includes(day)
                       ? 'bg-primary text-on-primary border-primary'
                       : 'bg-surface-container text-on-surface-variant border-outline-variant/30 hover:border-primary/50'
@@ -422,40 +437,45 @@ const ChecklistsLista: React.FC = () => {
   }
 
   // -------- Main --------
+  const ativos = checklists.filter((c) => c.is_active).length
+
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        {!showForm && (
-          <button onClick={openNew} className="btn-primary">
-            <span className="material-symbols-outlined text-lg">add</span>
-            Novo Checklist
-          </button>
-        )}
+      {/* Cabeçalho no padrão de Contas e Carteira: resumo à esquerda, ação à direita */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <span className="px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-semibold self-start tabular-nums">
+          {ativos} {ativos === 1 ? 'ATIVO' : 'ATIVOS'}
+          {checklists.length > ativos && ` · ${checklists.length - ativos} PAUSADO${checklists.length - ativos === 1 ? '' : 'S'}`}
+        </span>
+        <button
+          onClick={() => (showForm ? setShowForm(false) : openNew())}
+          className="btn-primary justify-center w-full md:w-auto min-h-[44px]"
+        >
+          <span className="material-symbols-outlined text-lg">{showForm ? 'close' : 'add'}</span>
+          {showForm ? 'Cancelar' : 'Novo Checklist'}
+        </button>
       </div>
 
-      {/* Form (create or edit) */}
+      {/* Editor (criar ou editar) */}
       {showForm && renderEditor()}
 
-      {/* Empty state */}
+      {/* Estado vazio */}
       {!showForm && checklists.length === 0 && (
-        <div className="glass-card rounded-2xl border border-outline-variant/50 p-12 text-center">
-          <span className="material-symbols-outlined text-4xl text-on-surface-variant mb-3 block">checklist</span>
-          <p className="text-on-surface font-semibold mb-1">Nenhum checklist criado</p>
-          <p className="text-sm text-on-surface-variant mb-4">
+        <div className="glass-card rounded-2xl border border-outline-variant/50 p-16 text-center">
+          <span className="material-symbols-outlined text-5xl text-on-surface-variant mb-4 block">checklist</span>
+          <h3 className="text-base font-semibold text-on-surface mb-2">Nenhum checklist criado</h3>
+          <p className="text-sm text-on-surface-variant mb-6">
             Crie um checklist para receber no WhatsApp e acompanhar seu progresso.
           </p>
           <button onClick={openNew} className="btn-primary mx-auto">
             <span className="material-symbols-outlined text-lg">add</span>
-            Criar Checklist
+            Criar Primeiro Checklist
           </button>
         </div>
       )}
 
-      {/* Checklists list */}
-      {!showForm && checklists.length > 0 && (
+      {checklists.length > 0 && (
         <>
-          {/* Checklist cards grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {checklists.map((c) => (
               <ChecklistCard
@@ -473,63 +493,31 @@ const ChecklistsLista: React.FC = () => {
           </div>
 
           {/* Progresso de hoje do checklist mais recente */}
-          {dashChecklist && renderTodaySection()}
+          {!showForm && dashChecklist && renderTodaySection()}
         </>
       )}
 
-      {/* Delete confirm modal */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="glass-card rounded-2xl border border-outline-variant/50 p-6 max-w-sm w-full mx-4 animate-fadeIn">
-            <h3 className="text-base font-semibold text-on-surface mb-2">Excluir Checklist</h3>
-            <p className="text-sm text-on-surface-variant mb-6">
-              Tem certeza que deseja excluir <strong>{deleteTarget.name}</strong>? Esta acao nao pode ser desfeita.
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleDelete}
-                disabled={saving}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-error/10 text-error border border-error/30 hover:bg-error/20 transition-colors"
-              >
-                {saving ? 'Excluindo...' : 'Sim, Excluir'}
-              </button>
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-surface-container text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-high transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Excluir Checklist"
+        description={`Tem certeza que deseja excluir "${deleteTarget?.name}"? Esta ação não pode ser desfeita.`}
+        confirmLabel="Excluir"
+        variant="danger"
+        loading={saving}
+      />
 
-      {/* Clear history confirm modal */}
-      {clearHistoryTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="glass-card rounded-2xl border border-outline-variant/50 p-6 max-w-sm w-full mx-4 animate-fadeIn">
-            <h3 className="text-base font-semibold text-on-surface mb-2">Limpar Histórico</h3>
-            <p className="text-sm text-on-surface-variant mb-6">
-              Tem certeza que deseja limpar todo o histórico de <strong>{clearHistoryTarget.name}</strong>? Os polls salvos serao apagados, mas o checklist e seus itens continuam. Esta acao nao pode ser desfeita.
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleClearHistory}
-                disabled={saving}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-error/10 text-error border border-error/30 hover:bg-error/20 transition-colors"
-              >
-                {saving ? 'Limpando...' : 'Sim, Limpar'}
-              </button>
-              <button
-                onClick={() => setClearHistoryTarget(null)}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-surface-container text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-high transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={!!clearHistoryTarget}
+        onClose={() => setClearHistoryTarget(null)}
+        onConfirm={handleClearHistory}
+        title="Limpar Histórico"
+        description={`Tem certeza que deseja limpar todo o histórico de "${clearHistoryTarget?.name}"? Os envios salvos serão apagados, mas o checklist e seus itens continuam. Esta ação não pode ser desfeita.`}
+        confirmLabel="Limpar"
+        variant="danger"
+        loading={saving}
+      />
     </div>
   )
 }
