@@ -148,6 +148,8 @@ export interface ChecklistStatsEntry {
 export interface ChecklistHistoryDay {
   poll_date: string
   completion_pct: number
+  // Texto dos itens marcados no dia — é o que pinta o heatmap de cada item
+  selected_options: string[]
 }
 
 export interface ChecklistItemStat {

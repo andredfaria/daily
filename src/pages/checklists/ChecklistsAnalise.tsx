@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { checklistsApi } from '../../api/checklists'
 import type { Checklist, ChecklistDashboardData, ChecklistHistoryDay } from '../../types'
 import { StatCard } from '../../components/ui/StatCard'
-import { ChecklistHeatmap, resumirHistorico } from '../../components/checklist/analise/ChecklistHeatmap'
+import { ChecklistHeatmap, HeatmapLegend, resumirHistorico, resumirItem } from '../../components/checklist/analise/ChecklistHeatmap'
 import { ChecklistItemRanking } from '../../components/checklist/analise/ChecklistItemRanking'
 import { WeeklyTrendSparkline } from '../../components/checklist/analise/WeeklyTrendSparkline'
 import { ConstanciaCard } from '../../components/checklist/analise/ConstanciaCard'
@@ -167,7 +167,27 @@ const ChecklistsAnalise: React.FC = () => {
                     {completos} {completos === 1 ? 'completo' : 'completos'}
                   </span>
                 </div>
-                <ChecklistHeatmap history={hist} />
+                {c.items.length === 0 ? (
+                  <p className="text-xs text-on-surface-variant">Checklist sem itens.</p>
+                ) : (
+                  <div className="space-y-5">
+                    {c.items.map((item) => {
+                      const { marcados } = resumirItem(hist, item.text)
+                      return (
+                        <div key={item.id}>
+                          <div className="flex items-baseline justify-between gap-3 mb-2">
+                            <p className="text-sm text-on-surface truncate">{item.text}</p>
+                            <span className="text-xs text-on-surface-variant tabular-nums flex-shrink-0">
+                              {marcados} de {enviados} {enviados === 1 ? 'dia' : 'dias'}
+                            </span>
+                          </div>
+                          <ChecklistHeatmap history={hist} itemText={item.text} showLegend={false} />
+                        </div>
+                      )
+                    })}
+                    <HeatmapLegend />
+                  </div>
+                )}
               </div>
             )
           })}

@@ -301,13 +301,13 @@ router.get('/stats', async (req: Request, res: Response) => {
 })
 
 // -------- GET /api/checklists/history - histórico de 12 semanas de cada checklist --------
-// Uma consulta só para a análise desenhar um heatmap por checklist, sem chamar
-// o /dashboard (que calcula itens e constância) para cada um.
+// Uma consulta só para a análise desenhar um heatmap por item de cada checklist,
+// sem chamar o /dashboard (que calcula ranking e constância) para cada um.
 router.get('/history', async (req: Request, res: Response) => {
   try {
     const today = getTodaySaoPaulo()
     const [rows]: any = await pool.query(
-      `SELECT cdp.checklist_id, cdp.poll_date, cdp.completion_pct
+      `SELECT cdp.checklist_id, cdp.poll_date, cdp.completion_pct, cdp.selected_options
        FROM checklist_daily_polls cdp
        JOIN checklists c ON c.id = cdp.checklist_id
        WHERE c.user_id = ? AND cdp.poll_date >= DATE_SUB(?, INTERVAL 83 DAY)
@@ -315,11 +315,13 @@ router.get('/history', async (req: Request, res: Response) => {
       [req.userId!, today],
     )
 
-    const porChecklist: Record<string, Array<{ poll_date: string; completion_pct: number }>> = {}
+    const porChecklist: Record<string, Array<{ poll_date: string; completion_pct: number; selected_options: string[] }>> = {}
     for (const r of rows) {
+      const raw = r.selected_options
       ;(porChecklist[r.checklist_id] ??= []).push({
         poll_date: r.poll_date,
         completion_pct: Number(r.completion_pct),
+        selected_options: Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : []),
       })
     }
 

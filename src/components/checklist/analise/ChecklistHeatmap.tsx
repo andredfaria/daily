@@ -3,41 +3,37 @@ import React from 'react'
 interface HistoryDay {
   poll_date: string
   completion_pct: number
+  selected_options: string[] | null
 }
 
 interface ChecklistHeatmapProps {
   history: HistoryDay[]
+  itemText: string
   days?: number
   showLegend?: boolean
 }
 
-export type Bucket = 'empty' | 'zero' | 'low' | 'mid' | 'high' | 'full'
+export type ItemDayState = 'empty' | 'unchecked' | 'checked'
 
 const DAY_ROWS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 // Como no GitHub, só dias alternados ganham rótulo — a grade fica legível sem apertar.
 const DAY_ROWS_VISIBLE = new Set([1, 3, 5])
 
-// Escala no estilo do GitHub: cinza quando não houve envio, verde cada vez mais
-// forte conforme a conclusão. O verde é o `tertiary` do design system.
-const BUCKET_CLASS: Record<Bucket, string> = {
+// Um item por grade: cinza apagado quando não houve envio, cinza forte quando o
+// poll saiu e o item ficou sem marcar, verde (`tertiary`) quando foi marcado.
+const STATE_CLASS: Record<ItemDayState, string> = {
   empty: 'bg-surface-container-high/50',
-  zero: 'bg-surface-container-highest',
-  low: 'bg-tertiary/25',
-  mid: 'bg-tertiary/50',
-  high: 'bg-tertiary/75',
-  full: 'bg-tertiary',
+  unchecked: 'bg-surface-container-highest',
+  checked: 'bg-tertiary',
 }
 
-const BUCKET_LABEL: Record<Bucket, string> = {
+const STATE_LABEL: Record<ItemDayState, string> = {
   empty: 'Sem envio',
-  zero: '0%',
-  low: '1–49%',
-  mid: '50–74%',
-  high: '75–99%',
-  full: '100%',
+  unchecked: 'Não marcado',
+  checked: 'Marcado',
 }
 
-const LEGEND_ORDER: Bucket[] = ['empty', 'zero', 'low', 'mid', 'high', 'full']
+const LEGEND_ORDER: ItemDayState[] = ['empty', 'unchecked', 'checked']
 
 // MySQL2 retorna colunas DATE como objetos Date — normaliza para string YYYY-MM-DD
 export const toDateStr = (v: unknown): string => {
@@ -46,13 +42,19 @@ export const toDateStr = (v: unknown): string => {
   return String(v).slice(0, 10)
 }
 
-export function pctToBucket(pct: number | undefined): Bucket {
-  if (pct === undefined || Number.isNaN(pct)) return 'empty'
-  if (pct <= 0) return 'zero'
-  if (pct < 50) return 'low'
-  if (pct < 75) return 'mid'
-  if (pct < 100) return 'high'
-  return 'full'
+// O item conta como marcado pelo texto, a mesma regra do ranking: renomear o
+// item deixa o histórico anterior sob o nome antigo.
+export function estadoDoItem(dia: HistoryDay | undefined, itemText: string): ItemDayState {
+  if (!dia) return 'empty'
+  return (dia.selected_options ?? []).includes(itemText) ? 'checked' : 'unchecked'
+}
+
+export function resumirItem(history: HistoryDay[], itemText: string): { marcados: number; enviados: number } {
+  const porDia = new Map<string, HistoryDay>()
+  history.forEach((h) => porDia.set(toDateStr(h.poll_date), h))
+  let marcados = 0
+  porDia.forEach((dia) => { if (estadoDoItem(dia, itemText) === 'checked') marcados++ })
+  return { marcados, enviados: porDia.size }
 }
 
 // Resumo da janela para o cabeçalho do card: quantos dias fecharam 100% e em
@@ -71,17 +73,18 @@ const formatDate = (dateStr: string) =>
 
 export const HeatmapLegend: React.FC = () => (
   <div className="flex items-center justify-end gap-1 text-[11px] text-on-surface-variant">
-    <span className="mr-1">Menos</span>
-    {LEGEND_ORDER.map((b) => (
-      <span key={b} title={BUCKET_LABEL[b]} className={`h-3 w-3 rounded-[3px] ${BUCKET_CLASS[b]}`} />
+    {LEGEND_ORDER.map((e) => (
+      <span key={e} className="flex items-center gap-1 ml-2 first:ml-0">
+        <span className={`h-3 w-3 rounded-[3px] ${STATE_CLASS[e]}`} />
+        {STATE_LABEL[e]}
+      </span>
     ))}
-    <span className="ml-1">Mais</span>
   </div>
 )
 
-export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ history, days = 84, showLegend = true }) => {
-  const pctByDate = new Map<string, number>()
-  history.forEach((h) => pctByDate.set(toDateStr(h.poll_date), Number(h.completion_pct)))
+export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ history, itemText, days = 84, showLegend = true }) => {
+  const diaPorData = new Map<string, HistoryDay>()
+  history.forEach((h) => diaPorData.set(toDateStr(h.poll_date), h))
 
   // Gera os últimos `days` dias corridos (mais antigo primeiro), ancorados em hoje.
   const dates: string[] = []
@@ -118,13 +121,13 @@ export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ history, day
     return m
   })
 
-  const { completos, enviados } = resumirHistorico(history)
+  const { marcados, enviados } = resumirItem(history, itemText)
 
   return (
     <div>
       <div
         role="img"
-        aria-label={`Histórico de ${days / 7} semanas: ${completos} dias completos em ${enviados} dias com envio.`}
+        aria-label={`${itemText}: marcado em ${marcados} de ${enviados} dias com envio nas últimas ${days / 7} semanas.`}
         className="overflow-x-auto pb-1 no-scrollbar"
       >
         <div className="inline-flex flex-col">
@@ -147,14 +150,13 @@ export const ChecklistHeatmap: React.FC<ChecklistHeatmapProps> = ({ history, day
               <div key={wi} className="flex flex-col gap-[3px] flex-shrink-0">
                 {week.map((dateStr, di) => {
                   if (!dateStr) return <div key={di} className="h-3.5 w-3.5" />
-                  const pct = pctByDate.get(dateStr)
-                  const bucket = pctToBucket(pct)
+                  const estado = estadoDoItem(diaPorData.get(dateStr), itemText)
                   const ehHoje = dateStr === hoje
                   return (
                     <div
                       key={di}
-                      title={`${formatDate(dateStr)} — ${pct !== undefined ? `${pct}% concluído` : 'sem envio'}`}
-                      className={`h-3.5 w-3.5 rounded-[3px] ${BUCKET_CLASS[bucket]} ${
+                      title={`${formatDate(dateStr)} — ${STATE_LABEL[estado].toLowerCase()}`}
+                      className={`h-3.5 w-3.5 rounded-[3px] ${STATE_CLASS[estado]} ${
                         ehHoje ? 'ring-1 ring-on-surface/70 ring-offset-1 ring-offset-surface' : ''
                       }`}
                     />
