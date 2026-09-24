@@ -138,7 +138,6 @@ const ChecklistsAnalise: React.FC = () => {
       <WeeklyTrendSparkline history={historico} />
 
       <section className="space-y-3">
-        <h3 className="text-base font-semibold text-on-surface">Histórico (12 semanas)</h3>
         <div className="space-y-3">
           {checklists.map((c) => {
             const hist = historicos[c.id] ?? []
