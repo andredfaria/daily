@@ -2,6 +2,10 @@ import pool from '../db'
 import { sendWhatsAppText } from './waha'
 import { fechamentoMensal } from './financialAnalytics'
 import { claimMessage, releaseMessageClaimIfUndelivered, claimKeyDia, claimKeyMesAnterior } from './messageClaim'
+import { formatDateSaoPaulo } from './assetMath'
+import { variacaoPeriodo } from './benchmarkMath'
+import { contasDaSemana } from './whatsappCommandHandler'
+import { blocoCarteiraSemana, blocoChecklistsSemana, linhasContas, somarDias } from './whatsappCommands'
 
 function formatBRL(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -18,7 +22,9 @@ const NOMES_CATEGORIA: Record<string, string> = {
   outro: 'Outro',
 }
 
-// --- Resumo semanal (consertado: sem coluna status) ---
+// --- Resumo semanal: contas da semana, carteira e checklists ---
+// As datas saem de São Paulo: o container roda em UTC, e o resumo das 8h BRT
+// usando new Date() pegava o mês e a semana certos só por sorte do horário.
 export async function sendWeeklySummary(userId: string): Promise<void> {
   const [userRows]: any = await pool.query(
     'SELECT whatsapp_number, name FROM users WHERE id = ? AND is_active = 1 AND whatsapp_alerts_enabled = 1',
@@ -26,40 +32,31 @@ export async function sendWeeklySummary(userId: string): Promise<void> {
   )
   if (!userRows.length || !userRows[0].whatsapp_number) return
 
-  const now = new Date()
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  const nextWeek = new Date()
-  nextWeek.setDate(nextWeek.getDate() + 7)
+  const hoje = formatDateSaoPaulo(new Date())
+  const inicioDoMes = `${hoje.slice(0, 7)}-01`
+  const fimDoMes = somarDias(`${proximoMes(hoje)}-01`, -1)
 
   const [[stats]]: any = await pool.query(
     `SELECT SUM(o.amount) AS total
        FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id
       WHERE b.user_id = ? AND b.is_active = 1 AND o.due_date BETWEEN ? AND ?`,
-    [userId, firstOfMonth, lastOfMonth]
+    [userId, inicioDoMes, fimDoMes]
   )
-
-  const [upcoming]: any = await pool.query(
-    `SELECT b.name, o.due_date, o.amount
-       FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id
-      WHERE b.user_id = ? AND b.is_active = 1 AND o.due_date BETWEEN ? AND ?
-      ORDER BY o.due_date ASC LIMIT 5`,
-    [userId, now, nextWeek]
-  )
+  const proximas = await contasDaSemana(userId, hoje)
 
   const firstName = userRows[0].name ? `, ${userRows[0].name.split(' ')[0]}` : ''
   let msg = `📊 *Resumo BillSync${firstName}*\n\n`
   msg += `*Total deste mês:* R$ ${formatBRL(Number(stats.total) || 0)}\n`
 
-  if (upcoming.length) {
-    msg += `\n*Próximos 7 dias:*\n`
-    for (const o of upcoming) {
-      const d = (o.due_date instanceof Date ? o.due_date : new Date(o.due_date)).toLocaleDateString('pt-BR')
-      msg += `• ${o.name} — R$ ${formatBRL(Number(o.amount))} (${d})\n`
-    }
+  if (proximas.length) {
+    msg += `\n*Próximos 7 dias:*\n${linhasContas(proximas, hoje).join('\n')}\n`
   } else {
     msg += `\nNenhuma conta nos próximos 7 dias. 🎉\n`
   }
+
+  // Blocos sem dado somem: quem não tem ativo não recebe uma "Carteira" vazia.
+  const blocos = [await blocoCarteira(userId, hoje), await blocoChecklists(userId, hoje)].filter(Boolean)
+  if (blocos.length) msg += `\n${blocos.join('\n\n')}`
 
   const refKey = claimKeyDia()
   if (!await claimMessage(userId, 'weekly_summary', refKey)) return
@@ -71,6 +68,43 @@ export async function sendWeeklySummary(userId: string): Promise<void> {
     throw err
   }
   console.log(`[summary] resumo semanal enviado para ${userId}`)
+}
+
+function proximoMes(data: string): string {
+  const [ano, mes] = data.split('-').map(Number)
+  return mes === 12 ? `${ano + 1}-01` : `${ano}-${String(mes + 1).padStart(2, '0')}`
+}
+
+// Variação dos últimos 7 dias, sem contar aporte como ganho.
+async function blocoCarteira(userId: string, hoje: string): Promise<string | null> {
+  const [rows]: any = await pool.query(
+    `SELECT asset_id, DATE_FORMAT(snapshot_date, '%Y-%m-%d') AS date, price, quantity
+       FROM asset_snapshots
+      WHERE user_id = ? AND snapshot_date >= ?`,
+    [userId, somarDias(hoje, -7)]
+  )
+  return blocoCarteiraSemana(variacaoPeriodo(rows.map((r: any) => ({
+    assetId: r.asset_id,
+    date: r.date,
+    price: Number(r.price),
+    quantity: Number(r.quantity),
+  }))))
+}
+
+// Os 7 dias fechados antes de hoje: o poll de hoje ainda nem foi respondido às 8h.
+async function blocoChecklists(userId: string, hoje: string): Promise<string | null> {
+  const [rows]: any = await pool.query(
+    `SELECT p.checklist_id, c.name, p.completed_count, p.total_count
+       FROM checklist_daily_polls p JOIN checklists c ON c.id = p.checklist_id
+      WHERE p.user_id = ? AND p.poll_date BETWEEN ? AND ?`,
+    [userId, somarDias(hoje, -7), somarDias(hoje, -1)]
+  )
+  return blocoChecklistsSemana(rows.map((r: any) => ({
+    checklistId: r.checklist_id,
+    nome: r.name || 'Checklist',
+    completos: Number(r.completed_count) || 0,
+    total: Number(r.total_count) || 0,
+  })))
 }
 
 // --- Sumário mensal (novo): fechamento do mês anterior ---

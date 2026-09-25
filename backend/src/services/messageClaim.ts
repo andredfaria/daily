@@ -11,6 +11,9 @@ export type ClaimKind =
   | 'asset_alert'
   | 'checklist_poll'
   | 'checklist_inactivity'
+  // Resposta a um comando (/contas, /hoje...). A chave é o id da mensagem
+  // recebida: o WAHA pode reentregar o mesmo evento, e a resposta sai uma vez.
+  | 'command_reply'
 
 export function claimKeyDia(agora = new Date()): string {
   return formatDateSaoPaulo(agora)

@@ -3,12 +3,16 @@ import crypto from 'crypto'
 import rateLimit from 'express-rate-limit'
 import pool from '../db'
 import { wahaClient } from '../services/waha'
+import { handleIncomingMessage } from '../services/whatsappCommandHandler'
 
 const router = Router()
 
 const webhookLimiter = rateLimit({
   windowMs: 60 * 1000,  // 1 minuto
-  max: 100,             // máximo 100 req/min por IP
+  // Todo o tráfego vem do IP do WAHA, e com o evento `message` qualquer
+  // conversa no número conta aqui. 100/min deixava um pico de mensagens
+  // derrubar votos de checklist com 429; o HMAC é quem barra estranhos.
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas requisições. Tente novamente em breve.' },
@@ -35,10 +39,15 @@ function verifyHmac(payload: string, headerHmac: string): boolean {
 }
 
 // POST /api/webhooks/waha-poll
-// Recebe eventos poll.vote e poll.vote.failed do WAHA
+// Recebe do WAHA os eventos poll.vote e poll.vote.failed (checklists) e message
+// (comandos por texto). O nome da rota ficou do tempo em que só havia enquete.
 router.post('/waha-poll', webhookLimiter, async (req: Request, res: Response) => {
   try {
-    console.log('[webhook] payload raw:', JSON.stringify(req.body))
+    // Mensagem comum não vai para o log: todo texto que o número recebe passa
+    // por aqui, e conversa de usuário não é coisa de log.
+    if (req.body?.event !== 'message') {
+      console.log('[webhook] payload raw:', JSON.stringify(req.body))
+    }
     const payload = JSON.stringify(req.body)
     const headerHmac = req.headers['x-webhook-hmac'] as string | undefined
 
@@ -59,6 +68,16 @@ router.post('/waha-poll', webhookLimiter, async (req: Request, res: Response) =>
     if (!event) {
       console.log('[webhook] evento não especificado — payload ignorado')
       return res.status(200).json({ ok: true })
+    }
+
+    if (event === 'message') {
+      // Responde o WAHA na hora: a resposta do comando consulta banco e
+      // cotação, e segurar o webhook por isso só arriscaria uma reentrega.
+      res.json({ ok: true })
+      handleIncomingMessage(data).catch((err: any) =>
+        console.error('[comandos] erro ao responder comando:', err.message),
+      )
+      return
     }
 
     if (event === 'poll.vote.failed') {

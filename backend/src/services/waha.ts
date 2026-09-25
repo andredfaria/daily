@@ -97,6 +97,28 @@ export async function sendWhatsAppText(
   return { id: data.id ?? data.key?.id ?? null }
 }
 
+/**
+ * Envia para um chatId que já veio do WhatsApp (o `from` de uma mensagem
+ * recebida). Não passa por resolveWhatsAppChatId: o chat existe, e um LID não
+ * sobreviveria à checagem de número.
+ */
+export async function sendTextToChat(chatId: string, text: string): Promise<{ id: string | null }> {
+  const session = process.env.WAHA_SESSION || 'default'
+  const { data } = await wahaClient().post('/api/sendText', { session, chatId, text })
+  return { id: data?.id ?? data?.key?.id ?? null }
+}
+
+/** Telefone por trás de um LID (`123@lid` → `5511...@c.us`), ou null. */
+export async function resolveLid(lid: string): Promise<string | null> {
+  const session = process.env.WAHA_SESSION || 'default'
+  try {
+    const { data } = await wahaClient().get(`/api/${session}/lids/${encodeURIComponent(lid)}`)
+    return typeof data?.pn === 'string' && data.pn.length > 0 ? data.pn : null
+  } catch {
+    return null
+  }
+}
+
 export async function sendWhatsAppOtpButton(
   phone: string,
   code: string,
@@ -325,6 +347,8 @@ export async function fetchWhatsAppProfile(phone: string): Promise<WhatsAppProfi
   return { pushName: contato.pushName, savedName: contato.savedName, profilePicUrl, numberExists }
 }
 
+export const WEBHOOK_EVENTS = ['poll.vote', 'poll.vote.failed', 'message']
+
 export async function getWahaWebhookStatus(backendPublicUrl: string): Promise<{
   registered: boolean
   url: string
@@ -336,7 +360,13 @@ export async function getWahaWebhookStatus(backendPublicUrl: string): Promise<{
     : ''
   const { data } = await wahaClient().get(`/api/sessions/${session}`)
   const webhooks: any[] = data?.config?.webhooks ?? data?.webhooks ?? []
-  const registered = webhooks.some((w: any) => String(w.url ?? '').includes('/api/webhooks/waha-poll'))
+  // Registro antigo, sem o evento `message`, conta como não registrado: é o que
+  // faz a tela oferecer o re-registro e os comandos passarem a chegar.
+  const registered = webhooks.some(
+    (w: any) =>
+      String(w.url ?? '').includes('/api/webhooks/waha-poll') &&
+      WEBHOOK_EVENTS.every((e) => !Array.isArray(w.events) || w.events.includes(e)),
+  )
   return { registered, url: webhookUrl, webhooks }
 }
 
@@ -348,7 +378,15 @@ export async function configureWahaWebhook(backendPublicUrl: string): Promise<vo
 
   const session = process.env.WAHA_SESSION || 'default'
   const webhookUrl = `${backendPublicUrl.replace(/\/$/, '')}/api/webhooks/waha-poll`
-  const webhookEntry = { url: webhookUrl, events: ['poll.vote', 'poll.vote.failed'] }
+  // `message` alimenta os comandos por texto (/contas, /hoje...). A chave HMAC
+  // vai junto: sem ela o WAHA manda o evento sem x-webhook-hmac e a rota, que
+  // exige a assinatura em produção, recusa com 401.
+  const hmacKey = process.env.WHATSAPP_HOOK_HMAC_KEY || ''
+  const webhookEntry = {
+    url: webhookUrl,
+    events: WEBHOOK_EVENTS,
+    ...(hmacKey ? { hmac: { key: hmacKey } } : {}),
+  }
 
   try {
     try {
