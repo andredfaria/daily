@@ -693,6 +693,27 @@ const Configuracoes: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Comandos por WhatsApp — espelha a ajuda de services/whatsappCommands.ts */}
+          <div className="section-card">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="material-symbols-outlined text-primary">terminal</span>
+              <h3 className="text-base font-semibold text-on-surface">Comandos no WhatsApp</h3>
+            </div>
+            <p className="text-xs text-on-surface-variant mb-4 leading-relaxed">
+              Mande uma destas mensagens para o número do BillSync e receba a resposta na hora.
+            </p>
+            <ul className="space-y-2">
+              {COMANDOS_WHATSAPP.map((c) => (
+                <li key={c.comando} className="flex items-start gap-3 text-sm">
+                  <code className="shrink-0 px-2 py-0.5 rounded-md bg-surface-container text-primary font-mono text-xs">
+                    {c.comando}
+                  </code>
+                  <span className="text-on-surface-variant leading-relaxed">{c.descricao}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
 
@@ -710,6 +731,13 @@ const Configuracoes: React.FC = () => {
     </div>
   )
 }
+
+const COMANDOS_WHATSAPP = [
+  { comando: '/contas', descricao: 'O que vence nos próximos 7 dias' },
+  { comando: '/carteira', descricao: 'Patrimônio e variação do dia' },
+  { comando: '/hoje', descricao: 'Itens do checklist ainda não marcados' },
+  { comando: '/ajuda', descricao: 'Lista de comandos' },
+]
 
 // --- Helper Components ---
 interface ProfileFieldProps {
