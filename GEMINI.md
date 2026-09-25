@@ -6,7 +6,7 @@
 ### Core Architecture
 - **Frontend**: React 18, Vite (Port 3000), TypeScript, TailwindCSS. Proxies `/api` to `http://localhost:4000`.
 - **Backend**: Node.js, Express (Port 4000), currently in early development.
-- **Database**: PostgreSQL (planned via Supabase).
+- **Database**: MySQL 8.0.13+.
 - **Automation**: n8n (planned/self-hosted) for workflow orchestration.
 - **WhatsApp Gateway**: WAHA (planned/self-hosted) for WhatsApp integration.
 - **Infrastructure**: Docker-compose, Nginx, Easypanel.
