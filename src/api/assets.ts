@@ -1,5 +1,5 @@
 import client from './client'
-import type { Asset, AssetKind, AssetWithQuote, AssetHistoryResponse } from '../types'
+import type { Asset, AssetKind, AssetWithQuote, AssetHistoryResponse, AssetBenchmarkResponse } from '../types'
 
 export interface CreateAssetPayload {
   ticker: string
@@ -24,6 +24,11 @@ export const assetsApi = {
 
   history: async (days = 90): Promise<AssetHistoryResponse> => {
     const res = await client.get<AssetHistoryResponse>('/assets/history', { params: { days } })
+    return res.data
+  },
+
+  benchmark: async (days = 90): Promise<AssetBenchmarkResponse> => {
+    const res = await client.get<AssetBenchmarkResponse>('/assets/benchmark', { params: { days } })
     return res.data
   },
 

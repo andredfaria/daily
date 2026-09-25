@@ -284,3 +284,18 @@ export interface AssetHistoryPoint {
 export interface AssetHistoryResponse {
   pontos: AssetHistoryPoint[]
 }
+
+// Rentabilidade acumulada em %, todas a partir do primeiro dia da janela.
+// CDI e IBOV vêm null quando a fonte não respondeu.
+export interface AssetBenchmarkPoint {
+  date: string
+  carteira: number
+  cdi: number | null
+  ibov: number | null
+}
+
+export interface AssetBenchmarkResponse {
+  pontos: AssetBenchmarkPoint[]
+  cdi_disponivel: boolean
+  ibov_disponivel: boolean
+}

@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { assetsApi } from '../../api/assets'
-import type { AssetHistoryPoint, AssetWithQuote } from '../../types'
+import type { AssetBenchmarkResponse, AssetHistoryPoint, AssetWithQuote } from '../../types'
 import { agregarPosicao, alocacaoPorTipo, resultadoPorAtivo } from '../../utils/assetAnalytics'
 import { StatCard } from '../../components/ui/StatCard'
 import { AlocacaoPorTipo } from '../../components/ativos/analise/AlocacaoPorTipo'
 import { ResultadoPorAtivo } from '../../components/ativos/analise/ResultadoPorAtivo'
 import { EvolucaoPatrimonio } from '../../components/ativos/analise/EvolucaoPatrimonio'
+import { CarteiraVsIndices } from '../../components/ativos/analise/CarteiraVsIndices'
 import { ReguaAlvoStop } from '../../components/ativos/analise/ReguaAlvoStop'
 import { formatBRL, formatDate } from '../../utils/format'
 
@@ -14,15 +15,21 @@ const AtivosAnalise: React.FC = () => {
   const navigate = useNavigate()
   const [ativos, setAtivos] = useState<AssetWithQuote[]>([])
   const [pontos, setPontos] = useState<AssetHistoryPoint[]>([])
+  const [comparativo, setComparativo] = useState<AssetBenchmarkResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState(false)
 
   const carregar = useCallback(async () => {
     setLoading(true)
     setErro(false)
-    const [listaR, histR] = await Promise.allSettled([assetsApi.list(), assetsApi.history(90)])
+    const [listaR, histR, compR] = await Promise.allSettled([
+      assetsApi.list(),
+      assetsApi.history(90),
+      assetsApi.benchmark(90),
+    ])
     if (listaR.status === 'fulfilled') setAtivos(listaR.value)
     if (histR.status === 'fulfilled') setPontos(histR.value.pontos)
+    setComparativo(compR.status === 'fulfilled' ? compR.value : null)
     setErro(listaR.status === 'rejected')
     setLoading(false)
   }, [])
@@ -114,6 +121,8 @@ const AtivosAnalise: React.FC = () => {
       </div>
 
       <EvolucaoPatrimonio pontos={pontos} desde={pontos.length > 0 ? pontos[0].date : null} />
+
+      <CarteiraVsIndices dados={comparativo} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <AlocacaoPorTipo fatias={alocacaoPorTipo(ativos)} />

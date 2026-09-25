@@ -118,3 +118,22 @@ export async function fetchBrapiQuote(symbol: string, token?: string): Promise<Q
     quotedAt: parseQuotedAt(result.regularMarketTime),
   }
 }
+
+/**
+ * Fechamentos diários de um símbolo (usado para o ^BVSP no comparativo).
+ * `range` segue a brapi: 1mo, 3mo, 6mo, 1y. Erros sobem para o chamador.
+ */
+export async function fetchBrapiHistorico(
+  symbol: string,
+  range: string,
+  token?: string,
+): Promise<{ date: Date; close: number }[]> {
+  const { data } = await brapiClient(token).get(`/quote/${encodeURIComponent(symbol)}`, {
+    params: { range, interval: '1d' },
+  })
+  const historico = data?.results?.[0]?.historicalDataPrice
+  if (!Array.isArray(historico)) return []
+  return historico
+    .filter((h: any) => typeof h?.date === 'number' && h?.close != null)
+    .map((h: any) => ({ date: new Date(h.date * 1000), close: Number(h.close) }))
+}

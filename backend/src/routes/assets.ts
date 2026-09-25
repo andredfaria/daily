@@ -8,6 +8,8 @@ import {
   profitLoss,
   profitLossPct,
 } from '../services/assetMath'
+import { buscarCdi, buscarIbov } from '../services/benchmarks'
+import { montarComparativo } from '../services/benchmarkMath'
 
 const router = Router()
 
@@ -141,6 +143,50 @@ router.get('/history', async (req: Request, res: Response) => {
     })
   } catch (err: any) {
     console.error('[assets] erro ao buscar histórico:', err.message)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// GET /api/assets/benchmark — rentabilidade da carteira contra CDI e IBOV, em %
+// acumulado desde o primeiro snapshot da janela. Também precisa vir antes de /:id.
+router.get('/benchmark', async (req: Request, res: Response) => {
+  try {
+    const bruto = Number(req.query.days)
+    const days = Number.isFinite(bruto) ? Math.min(Math.max(Math.trunc(bruto), 1), 365) : 90
+
+    const desde = new Date()
+    desde.setDate(desde.getDate() - days)
+
+    const [rows]: any = await pool.query(
+      `SELECT asset_id, DATE_FORMAT(snapshot_date, '%Y-%m-%d') AS date, price, quantity
+         FROM asset_snapshots
+        WHERE user_id = ? AND snapshot_date >= ?
+        ORDER BY snapshot_date`,
+      [req.userId, desde]
+    )
+
+    const snapshots = rows.map((r: any) => ({
+      assetId: r.asset_id,
+      date: r.date,
+      price: Number(r.price),
+      quantity: Number(r.quantity),
+    }))
+
+    if (snapshots.length === 0) {
+      return res.json({ pontos: [], cdi_disponivel: false, ibov_disponivel: false })
+    }
+
+    // CDI e IBOV são independentes: um fora do ar não segura o outro.
+    const [cdi, ibov] = await Promise.all([buscarCdi(snapshots[0].date), buscarIbov(days)])
+    const pontos = montarComparativo(snapshots, cdi, ibov)
+
+    res.json({
+      pontos,
+      cdi_disponivel: pontos.some((p) => p.cdi !== null),
+      ibov_disponivel: pontos.some((p) => p.ibov !== null),
+    })
+  } catch (err: any) {
+    console.error('[assets] erro ao montar comparativo:', err.message)
     res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })
