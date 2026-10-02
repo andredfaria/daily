@@ -8,6 +8,8 @@ RUN npm ci
 COPY index.html vite.config.ts tsconfig.json tsconfig.node.json ./
 COPY postcss.config.js tailwind.config.ts ./
 COPY src ./src
+# public/ = arquivos servidos como estão (favicon, apple-touch-icon); o vite copia para dist/
+COPY public ./public
 RUN npm run build
 
 # ─────────────────────────────────────────
