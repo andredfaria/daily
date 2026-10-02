@@ -1,5 +1,6 @@
 import { generatePhoneVariant } from './waha'
 import type { VariacaoPeriodo } from './benchmarkMath'
+import { CategoriaGasto, ROTULO_CATEGORIA, extrairCategoria, inferirCategoria } from './expenseCategories'
 
 /**
  * Parte pura dos comandos por WhatsApp e dos blocos do resumo semanal: ler o
@@ -56,12 +57,14 @@ export function parseValor(token: string): number | null {
 export interface GastoDigitado {
   valor: number
   descricao: string
+  categoria: CategoriaGasto
 }
 
 /**
  * Valor no começo ou no fim: "/gasto 45 mercado" e "/gasto mercado 45" valem
  * igual. Sem descrição o gasto entra assim mesmo — melhor anotado sem nome do
- * que perdido.
+ * que perdido. A categoria vem de um "#lazer" no texto ou é deduzida da
+ * descrição.
  */
 export function parseGasto(args: string): GastoDigitado | null {
   const tokens = args.split(/\s+/).filter((t) => t && t.toLowerCase() !== 'r$')
@@ -75,16 +78,28 @@ export function parseGasto(args: string): GastoDigitado | null {
   }
   if (valor === null) return null
 
-  const descricao = resto.join(' ').slice(0, 120).trim()
-  return { valor, descricao: descricao || 'Sem descrição' }
+  const extraido = extrairCategoria(resto.join(' '))
+  const descricao = extraido.descricao.slice(0, 120).trim()
+  return {
+    valor,
+    descricao: descricao || 'Sem descrição',
+    categoria: extraido.categoria ?? inferirCategoria(descricao),
+  }
 }
 
 export function textoUsoGasto(): string {
-  return 'Para anotar um gasto, mande o valor e o que foi:\n/gasto 45 mercado\n/gasto 12,50 café'
+  return (
+    'Para anotar um gasto, mande o valor e o que foi:\n/gasto 45 mercado\n/gasto 12,50 café\n\n' +
+    'A categoria é deduzida pelo nome. Para escolher, use #: /gasto 80 presente #lazer'
+  )
 }
 
 export function textoGastoAnotado(g: GastoDigitado, totalDoMes: number): string {
-  return `💸 Anotado: *${g.descricao}* — ${formatBRL(g.valor)}\n\nGastos do mês: ${formatBRL(totalDoMes)}`
+  return (
+    `💸 Anotado: *${g.descricao}* — ${formatBRL(g.valor)}\n` +
+    `Categoria: ${ROTULO_CATEGORIA[g.categoria]}\n\n` +
+    `Gastos do mês: ${formatBRL(totalDoMes)}`
+  )
 }
 
 // --- /marcar ---

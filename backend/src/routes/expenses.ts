@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import pool from '../db'
 import { formatDateSaoPaulo } from '../services/assetMath'
 import { parseValor } from '../services/whatsappCommands'
+import { inferirCategoria, normalizarCategoria } from '../services/expenseCategories'
 
 const router = Router()
 
@@ -19,7 +20,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const [rows]: any = await pool.query(
-      `SELECT id, amount, description, DATE_FORMAT(spent_on, '%Y-%m-%d') AS spent_on, source, created_at
+      `SELECT id, amount, description, category, DATE_FORMAT(spent_on, '%Y-%m-%d') AS spent_on, source, created_at
          FROM expenses
         WHERE user_id = ? AND spent_on BETWEEN ? AND ?
         ORDER BY spent_on DESC, created_at DESC`,
@@ -34,11 +35,12 @@ router.get('/', async (req: Request, res: Response) => {
   }
 })
 
-type CamposGasto = { amount?: number; description?: string; spent_on?: string }
+type CamposGasto = { amount?: number; description?: string; category?: string; spent_on?: string }
 
 /**
- * Valida os campos enviados. Na criação os três são exigidos (spent_on cai em
- * hoje); na edição só os presentes no corpo são validados e alterados.
+ * Valida os campos enviados. Na criação valor e descrição são exigidos,
+ * spent_on cai em hoje e categoria vazia é deduzida da descrição; na edição só
+ * os presentes no corpo são validados e alterados.
  */
 function validarGasto(body: any, parcial: boolean): { campos: CamposGasto } | { erro: string } {
   const campos: CamposGasto = {}
@@ -57,6 +59,14 @@ function validarGasto(body: any, parcial: boolean): { campos: CamposGasto } | { 
     campos.description = description
   }
 
+  if (body.category !== undefined && body.category !== null && body.category !== '') {
+    const category = normalizarCategoria(body.category)
+    if (!category) return { erro: 'Categoria inválida' }
+    campos.category = category
+  } else if (!parcial) {
+    campos.category = inferirCategoria(campos.description!)
+  }
+
   if (body.spent_on !== undefined || !parcial) {
     const spentOn = body.spent_on ?? formatDateSaoPaulo(new Date())
     if (typeof spentOn !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(spentOn) || isNaN(Date.parse(spentOn))) {
@@ -68,16 +78,16 @@ function validarGasto(body: any, parcial: boolean): { campos: CamposGasto } | { 
   return { campos }
 }
 
-// POST /api/expenses — { amount, description, spent_on? }
+// POST /api/expenses — { amount, description, category?, spent_on? }
 router.post('/', async (req: Request, res: Response) => {
   try {
     const v = validarGasto(req.body, false)
     if ('erro' in v) return res.status(400).json({ error: v.erro })
-    const { amount, description, spent_on } = v.campos
+    const { amount, description, category, spent_on } = v.campos
 
     await pool.query(
-      `INSERT INTO expenses (user_id, amount, description, spent_on, source) VALUES (?, ?, ?, ?, 'app')`,
-      [req.userId, amount, description, spent_on],
+      `INSERT INTO expenses (user_id, amount, description, category, spent_on, source) VALUES (?, ?, ?, ?, ?, 'app')`,
+      [req.userId, amount, description, category, spent_on],
     )
     res.status(201).json({ ok: true })
   } catch (err: any) {
@@ -86,7 +96,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 })
 
-// PATCH /api/expenses/:id — qualquer subconjunto de { amount, description, spent_on }
+// PATCH /api/expenses/:id — qualquer subconjunto de { amount, description, category, spent_on }
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const v = validarGasto(req.body, true)

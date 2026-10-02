@@ -217,10 +217,10 @@ async function anotarGasto(userId: string, args: string, hoje: string, refKey: s
   // saiu, e aí o WAHA reentrega a mensagem. message_ref faz a reentrega
   // responder de novo sem anotar o gasto pela segunda vez.
   await pool.query(
-    `INSERT INTO expenses (user_id, amount, description, spent_on, source, message_ref)
-     VALUES (?, ?, ?, ?, 'whatsapp', ?)
+    `INSERT INTO expenses (user_id, amount, description, category, spent_on, source, message_ref)
+     VALUES (?, ?, ?, ?, ?, 'whatsapp', ?)
      ON DUPLICATE KEY UPDATE id = id`,
-    [userId, gasto.valor, gasto.descricao, hoje, refKey],
+    [userId, gasto.valor, gasto.descricao, gasto.categoria, hoje, refKey],
   )
   const [[{ total }]]: any = await pool.query(
     'SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND spent_on BETWEEN ? AND ?',

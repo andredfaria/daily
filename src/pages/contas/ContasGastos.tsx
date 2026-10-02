@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { expensesApi } from '../../api/expenses'
+import { expensesApi, type DadosGasto } from '../../api/expenses'
 import type { Expense } from '../../types'
 import { formatBRL, formatDate } from '../../utils/format'
 import { formatNumericInput, parseNumericInput } from '../../utils/numberInput'
@@ -7,6 +7,7 @@ import NumberField from '../../components/ui/NumberField'
 import Modal from '../../components/ui/Modal'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 import { useToast } from '../../context/ToastContext'
+import { CATEGORIAS_GASTO, infoCategoria, type CategoriaGasto } from '../../utils/categoriasGasto'
 
 const hojeLocal = (): string => {
   const d = new Date()
@@ -30,9 +31,38 @@ function porDia(gastos: Expense[]): Array<{ dia: string; itens: Expense[] }> {
   return grupos
 }
 
+interface SeletorProps {
+  id: string
+  valor: CategoriaGasto | ''
+  onChange: (valor: CategoriaGasto | '') => void
+  /** Mostra a opção "Automática" (o backend deduz pela descrição). */
+  automatica?: boolean
+}
+
+const SeletorCategoria: React.FC<SeletorProps> = ({ id, valor, onChange, automatica }) => (
+  <div>
+    <label className="label" htmlFor={id}>Categoria</label>
+    <select id={id} value={valor} onChange={(e) => onChange(e.target.value as CategoriaGasto | '')} className="input-field">
+      {automatica && <option value="">Automática (pelo nome)</option>}
+      {CATEGORIAS_GASTO.map((c) => (
+        <option key={c.valor} value={c.valor}>{c.rotulo}</option>
+      ))}
+    </select>
+  </div>
+)
+
+/** Total por categoria, do maior para o menor. */
+function totaisPorCategoria(gastos: Expense[]): Array<{ categoria: CategoriaGasto; total: number }> {
+  const mapa = new Map<CategoriaGasto, number>()
+  for (const g of gastos) mapa.set(g.category, (mapa.get(g.category) ?? 0) + g.amount)
+  return [...mapa.entries()]
+    .map(([categoria, total]) => ({ categoria, total: Math.round(total * 100) / 100 }))
+    .sort((a, b) => b.total - a.total)
+}
+
 interface EdicaoProps {
   gasto: Expense
-  onSalvar: (dados: { amount: number; description: string; spent_on: string }) => Promise<boolean>
+  onSalvar: (dados: DadosGasto) => Promise<boolean>
   onCancelar: () => void
 }
 
@@ -40,6 +70,7 @@ interface EdicaoProps {
 const EdicaoGasto: React.FC<EdicaoProps> = ({ gasto, onSalvar, onCancelar }) => {
   const [valor, setValor] = useState(formatNumericInput(gasto.amount, 2, { padDecimals: true }))
   const [descricao, setDescricao] = useState(gasto.description)
+  const [categoria, setCategoria] = useState<CategoriaGasto | ''>(gasto.category)
   const [dia, setDia] = useState(gasto.spent_on)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -50,7 +81,7 @@ const EdicaoGasto: React.FC<EdicaoProps> = ({ gasto, onSalvar, onCancelar }) => 
     if (amount === null || amount <= 0) return setErro('Informe o valor.')
     if (!descricao.trim()) return setErro('Informe o que foi o gasto.')
     setSalvando(true)
-    const ok = await onSalvar({ amount, description: descricao.trim(), spent_on: dia })
+    const ok = await onSalvar({ amount, description: descricao.trim(), category: categoria || undefined, spent_on: dia })
     if (!ok) setSalvando(false)
   }
 
@@ -62,7 +93,7 @@ const EdicaoGasto: React.FC<EdicaoProps> = ({ gasto, onSalvar, onCancelar }) => 
         className="space-y-3"
         aria-label={`Editar gasto ${gasto.description}`}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr_150px] gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <NumberField label="Valor" mode="currency" min={0} prefix="R$" value={valor} onChange={setValor} />
           <div>
             <label className="label" htmlFor={`desc-${gasto.id}`}>O que foi</label>
@@ -75,6 +106,7 @@ const EdicaoGasto: React.FC<EdicaoProps> = ({ gasto, onSalvar, onCancelar }) => 
               className="input-field"
             />
           </div>
+          <SeletorCategoria id={`cat-${gasto.id}`} valor={categoria} onChange={setCategoria} />
           <div>
             <label className="label" htmlFor={`dia-${gasto.id}`}>Dia</label>
             <input
@@ -108,7 +140,9 @@ const ContasGastos: React.FC = () => {
 
   const [valor, setValor] = useState('')
   const [descricao, setDescricao] = useState('')
+  const [categoria, setCategoria] = useState<CategoriaGasto | ''>('')
   const [dia, setDia] = useState(hojeLocal())
+  const [filtro, setFiltro] = useState<CategoriaGasto | null>(null)
   const [salvando, setSalvando] = useState(false)
 
   const [editando, setEditando] = useState<string | null>(null)
@@ -139,9 +173,10 @@ const ContasGastos: React.FC = () => {
 
     setSalvando(true)
     try {
-      await expensesApi.create({ amount, description: descricao.trim(), spent_on: dia })
+      await expensesApi.create({ amount, description: descricao.trim(), category: categoria || undefined, spent_on: dia })
       setValor('')
       setDescricao('')
+      setCategoria('')
       success('Gasto anotado!')
       // Gasto lançado em outro mês: leva até ele em vez de "sumir" da lista.
       if (dia.slice(0, 7) !== mes) setMes(dia.slice(0, 7))
@@ -153,7 +188,7 @@ const ContasGastos: React.FC = () => {
     }
   }
 
-  const salvarEdicao = async (id: string, dados: { amount: number; description: string; spent_on: string }) => {
+  const salvarEdicao = async (id: string, dados: DadosGasto) => {
     try {
       await expensesApi.update(id, dados)
       success('Gasto atualizado!')
@@ -183,13 +218,18 @@ const ContasGastos: React.FC = () => {
     }
   }
 
+  const totais = totaisPorCategoria(gastos)
+  // Filtro de categoria que sumiu (mês trocado, gasto apagado) deixa de valer.
+  const filtroAtivo = filtro && totais.some((t) => t.categoria === filtro) ? filtro : null
+  const visiveis = filtroAtivo ? gastos.filter((g) => g.category === filtroAtivo) : gastos
+
   const nomeMes = formatDate(`${mes}-01`, "MMMM 'de' yyyy").replace(/^./, (c) => c.toUpperCase())
 
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Anotar */}
       <form onSubmit={anotar} className="glass-card rounded-2xl border border-outline-variant/50 p-5 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr_160px] gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <NumberField
             label="Valor"
             required
@@ -211,6 +251,7 @@ const ContasGastos: React.FC = () => {
               className="input-field"
             />
           </div>
+          <SeletorCategoria id="gasto-categoria" valor={categoria} onChange={setCategoria} automatica />
           <div>
             <label className="label" htmlFor="gasto-dia">Dia</label>
             <input
@@ -259,6 +300,30 @@ const ContasGastos: React.FC = () => {
         </span>
       </div>
 
+      {/* Por categoria — tocar filtra a lista */}
+      {!loading && totais.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap" role="group" aria-label="Filtrar por categoria">
+          {totais.map(({ categoria: c, total: t }) => {
+            const info = infoCategoria(c)
+            const ativo = filtroAtivo === c
+            return (
+              <button
+                key={c}
+                onClick={() => setFiltro(ativo ? null : c)}
+                aria-pressed={ativo}
+                className={`shrink-0 flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                  ativo ? 'bg-primary text-on-primary-fixed' : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">{info.icone}</span>
+                {info.rotulo}
+                <span className={ativo ? '' : 'text-on-surface'}>{formatBRL(t)}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Lista */}
       {loading ? (
         <div className="space-y-3">
@@ -274,7 +339,7 @@ const ContasGastos: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-5">
-          {porDia(gastos).map(({ dia: d, itens }) => (
+          {porDia(visiveis).map(({ dia: d, itens }) => (
             <section key={d}>
               <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">
                 {formatDate(d, "EEEE, dd/MM")}
@@ -288,14 +353,26 @@ const ContasGastos: React.FC = () => {
                     onCancelar={() => setEditando(null)}
                   />
                 ) : (
-                  <li key={g.id} className="flex items-center gap-3 pl-4 pr-1.5 py-1.5">
-                    <span
-                      className="material-symbols-outlined text-base text-on-surface-variant"
-                      title={g.source === 'whatsapp' ? 'Anotado pelo WhatsApp' : 'Anotado no app'}
-                    >
-                      {g.source === 'whatsapp' ? 'chat' : 'edit_note'}
+                  <li key={g.id} className="flex items-center gap-3 pl-3 pr-1.5 py-1.5">
+                    <span className="w-9 h-9 shrink-0 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
+                      <span className="material-symbols-outlined text-lg">{infoCategoria(g.category).icone}</span>
                     </span>
-                    <span className="flex-1 min-w-0 text-sm text-on-surface truncate">{g.description}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm text-on-surface truncate">{g.description}</span>
+                      <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-on-surface-variant">
+                        {infoCategoria(g.category).rotulo}
+                        {g.source === 'whatsapp' && (
+                          <span
+                            className="material-symbols-outlined text-xs"
+                            title="Anotado pelo WhatsApp"
+                            aria-label="anotado pelo WhatsApp"
+                            role="img"
+                          >
+                            chat
+                          </span>
+                        )}
+                      </span>
+                    </span>
                     <span className="text-sm font-semibold text-on-surface">{formatBRL(g.amount)}</span>
                     <button
                       onClick={() => setEditando(g.id)}

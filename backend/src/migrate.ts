@@ -1,4 +1,5 @@
 import pool from './db'
+import { inferirCategoria } from './services/expenseCategories'
 
 async function addColumnIfNotExists(table: string, column: string, definition: string, after?: string): Promise<void> {
   const [rows]: any = await pool.query(
@@ -337,6 +338,22 @@ CREATE TABLE IF NOT EXISTS expenses (
     name: '020_checklist_polls_command_marked',
     run: async () => {
       await addColumnIfNotExists('checklist_daily_polls', 'command_marked', 'JSON DEFAULT NULL', 'selected_options')
+    },
+  },
+  {
+    // Categoria do gasto avulso. Os que já existem recebem a deduzida pela
+    // descrição, a mesma regra do /gasto.
+    name: '021_expenses_category',
+    run: async () => {
+      await addColumnIfNotExists('expenses', 'category', "VARCHAR(30) NOT NULL DEFAULT 'outro'", 'description')
+      const [rows]: any = await pool.query('SELECT id, description FROM expenses')
+      for (const r of rows) {
+        const categoria = inferirCategoria(r.description)
+        if (categoria !== 'outro') {
+          await pool.query('UPDATE expenses SET category = ? WHERE id = ?', [categoria, r.id])
+        }
+      }
+      console.log(`[migrate] 021: ${rows.length} gasto(s) categorizado(s)`)
     },
   },
 ]

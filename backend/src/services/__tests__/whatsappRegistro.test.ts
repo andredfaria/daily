@@ -46,19 +46,24 @@ describe('parseValor', () => {
 
 describe('parseGasto', () => {
   it('valor no começo', () => {
-    expect(parseGasto('45 mercado')).toEqual({ valor: 45, descricao: 'mercado' })
+    expect(parseGasto('45 mercado')).toEqual({ valor: 45, descricao: 'mercado', categoria: 'alimentação' })
   })
 
   it('valor no fim', () => {
-    expect(parseGasto('pão de queijo 12,50')).toEqual({ valor: 12.5, descricao: 'pão de queijo' })
+    expect(parseGasto('pão de queijo 12,50')).toEqual({ valor: 12.5, descricao: 'pão de queijo', categoria: 'outro' })
   })
 
   it('R$ separado do número', () => {
-    expect(parseGasto('R$ 30 farmácia')).toEqual({ valor: 30, descricao: 'farmácia' })
+    expect(parseGasto('R$ 30 farmácia')).toEqual({ valor: 30, descricao: 'farmácia', categoria: 'saúde' })
   })
 
   it('sem descrição entra assim mesmo', () => {
-    expect(parseGasto('45')).toEqual({ valor: 45, descricao: 'Sem descrição' })
+    expect(parseGasto('45')).toEqual({ valor: 45, descricao: 'Sem descrição', categoria: 'outro' })
+  })
+
+  it('#categoria escolhe e sai da descrição', () => {
+    expect(parseGasto('80 presente #lazer')).toEqual({ valor: 80, descricao: 'presente', categoria: 'lazer' })
+    expect(parseGasto('#saude 50')).toEqual({ valor: 50, descricao: 'Sem descrição', categoria: 'saúde' })
   })
 
   it('sem valor não é gasto', () => {
