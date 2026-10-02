@@ -1,28 +1,29 @@
 /**
- * Categorias dos gastos avulsos. Espelha backend/src/services/expenseCategories.ts —
- * ao mudar a lista lá (inclusive as palavras que deduzem a categoria), atualizar aqui.
+ * Categorias de gasto vêm da API (GET /api/expenses/categories): as padrão,
+ * com o que o usuário renomeou/ocultou, e as que ele criou.
  */
-export type CategoriaGasto =
-  | 'alimentação'
-  | 'restaurante'
-  | 'transporte'
-  | 'saúde'
-  | 'lazer'
-  | 'compras'
-  | 'casa'
-  | 'outro'
+export interface CategoriaGasto {
+  /** Chave gravada no gasto: nome fixo na padrão, id na criada pelo usuário. */
+  key: string
+  nome: string
+  icone: string
+  padrao: boolean
+  oculta: boolean
+}
 
-export const CATEGORIAS_GASTO: Array<{ valor: CategoriaGasto; rotulo: string; icone: string }> = [
-  { valor: 'alimentação', rotulo: 'Alimentação', icone: 'shopping_cart' },
-  { valor: 'restaurante', rotulo: 'Restaurante', icone: 'restaurant' },
-  { valor: 'transporte', rotulo: 'Transporte', icone: 'directions_car' },
-  { valor: 'saúde', rotulo: 'Saúde', icone: 'medication' },
-  { valor: 'lazer', rotulo: 'Lazer', icone: 'celebration' },
-  { valor: 'compras', rotulo: 'Compras', icone: 'shopping_bag' },
-  { valor: 'casa', rotulo: 'Casa', icone: 'home' },
-  { valor: 'outro', rotulo: 'Outro', icone: 'more_horiz' },
+/**
+ * Ícones que dá para escolher. Espelha ICONES_CATEGORIA em
+ * backend/src/services/expenseCategories.ts — o backend recusa os demais.
+ */
+export const ICONES_CATEGORIA = [
+  'shopping_cart', 'restaurant', 'directions_car', 'medication', 'celebration',
+  'shopping_bag', 'home', 'more_horiz', 'pets', 'child_care', 'school',
+  'fitness_center', 'local_cafe', 'local_bar', 'flight', 'checkroom', 'spa',
+  'sports_esports', 'redeem', 'build', 'savings', 'work', 'favorite', 'devices',
 ]
 
-const OUTRO = CATEGORIAS_GASTO[CATEGORIAS_GASTO.length - 1]
+const RESERVA: CategoriaGasto = { key: 'outro', nome: 'Outro', icone: 'more_horiz', padrao: true, oculta: false }
 
-export const infoCategoria = (valor: string) => CATEGORIAS_GASTO.find((c) => c.valor === valor) ?? OUTRO
+/** Categoria de um gasto; chave que não existe mais cai em "outro", como no backend. */
+export const infoCategoria = (key: string, categorias: CategoriaGasto[]): CategoriaGasto =>
+  categorias.find((c) => c.key === key) ?? categorias.find((c) => c.key === 'outro') ?? RESERVA

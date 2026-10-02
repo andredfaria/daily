@@ -356,6 +356,28 @@ CREATE TABLE IF NOT EXISTS expenses (
       console.log(`[migrate] 021: ${rows.length} gasto(s) categorizado(s)`)
     },
   },
+  {
+    // Categorias de gasto do usuário. base_key preenchido = ajuste numa padrão
+    // (nome, ícone, oculta); vazio = categoria criada por ele, cuja chave em
+    // expenses.category é o id — daí o VARCHAR(36).
+    name: '022_expense_categories',
+    statements: splitStatements(`
+ALTER TABLE expenses MODIFY COLUMN category VARCHAR(36) NOT NULL DEFAULT 'outro';
+CREATE TABLE IF NOT EXISTS expense_categories (
+  id         CHAR(36)    NOT NULL DEFAULT (UUID()),
+  user_id    CHAR(36)    NOT NULL,
+  base_key   VARCHAR(30) DEFAULT NULL,
+  name       VARCHAR(30) NOT NULL,
+  icon       VARCHAR(40) NOT NULL,
+  hidden     BOOLEAN     NOT NULL DEFAULT FALSE,
+  created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_expense_cat_base (user_id, base_key),
+  KEY idx_expense_cat_user (user_id),
+  CONSTRAINT fk_expense_cat_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `),
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

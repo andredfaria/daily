@@ -1,6 +1,6 @@
 import { generatePhoneVariant } from './waha'
 import type { VariacaoPeriodo } from './benchmarkMath'
-import { CategoriaGasto, ROTULO_CATEGORIA, extrairCategoria, inferirCategoria } from './expenseCategories'
+import { CategoriaDoUsuario, extrairCategoria, inferirCategoria, montarCategorias } from './expenseCategories'
 
 /**
  * Parte pura dos comandos por WhatsApp e dos blocos do resumo semanal: ler o
@@ -57,7 +57,8 @@ export function parseValor(token: string): number | null {
 export interface GastoDigitado {
   valor: number
   descricao: string
-  categoria: CategoriaGasto
+  /** Chave da categoria (padrão ou id da criada pelo usuário). */
+  categoria: string
 }
 
 /**
@@ -66,7 +67,7 @@ export interface GastoDigitado {
  * que perdido. A categoria vem de um "#lazer" no texto ou é deduzida da
  * descrição.
  */
-export function parseGasto(args: string): GastoDigitado | null {
+export function parseGasto(args: string, categorias: CategoriaDoUsuario[] = montarCategorias([])): GastoDigitado | null {
   const tokens = args.split(/\s+/).filter((t) => t && t.toLowerCase() !== 'r$')
   if (tokens.length === 0) return null
 
@@ -78,12 +79,14 @@ export function parseGasto(args: string): GastoDigitado | null {
   }
   if (valor === null) return null
 
-  const extraido = extrairCategoria(resto.join(' '))
+  const extraido = extrairCategoria(resto.join(' '), categorias)
   const descricao = extraido.descricao.slice(0, 120).trim()
   return {
     valor,
     descricao: descricao || 'Sem descrição',
-    categoria: extraido.categoria ?? inferirCategoria(descricao),
+    categoria:
+      extraido.categoria ??
+      inferirCategoria(descricao, new Set(categorias.filter((c) => c.oculta).map((c) => c.key))),
   }
 }
 
@@ -94,10 +97,10 @@ export function textoUsoGasto(): string {
   )
 }
 
-export function textoGastoAnotado(g: GastoDigitado, totalDoMes: number): string {
+export function textoGastoAnotado(g: GastoDigitado, totalDoMes: number, nomeDaCategoria: string): string {
   return (
     `💸 Anotado: *${g.descricao}* — ${formatBRL(g.valor)}\n` +
-    `Categoria: ${ROTULO_CATEGORIA[g.categoria]}\n\n` +
+    `Categoria: ${nomeDaCategoria}\n\n` +
     `Gastos do mês: ${formatBRL(totalDoMes)}`
   )
 }

@@ -7,7 +7,8 @@ import NumberField from '../../components/ui/NumberField'
 import Modal from '../../components/ui/Modal'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 import { useToast } from '../../context/ToastContext'
-import { CATEGORIAS_GASTO, infoCategoria, type CategoriaGasto } from '../../utils/categoriasGasto'
+import { infoCategoria, type CategoriaGasto } from '../../utils/categoriasGasto'
+import GerenciarCategorias from '../../components/contas/GerenciarCategorias'
 
 const hojeLocal = (): string => {
   const d = new Date()
@@ -33,28 +34,35 @@ function porDia(gastos: Expense[]): Array<{ dia: string; itens: Expense[] }> {
 
 interface SeletorProps {
   id: string
-  valor: CategoriaGasto | ''
-  onChange: (valor: CategoriaGasto | '') => void
+  valor: string
+  onChange: (valor: string) => void
+  categorias: CategoriaGasto[]
   /** Mostra a opção "Automática" (o backend deduz pela descrição). */
   automatica?: boolean
 }
 
-const SeletorCategoria: React.FC<SeletorProps> = ({ id, valor, onChange, automatica }) => (
+/** Só categorias visíveis — e a atual, se estiver oculta, para editar gasto antigo sem trocá-la. */
+const SeletorCategoria: React.FC<SeletorProps> = ({ id, valor, onChange, categorias, automatica }) => (
   <div>
     <label className="label" htmlFor={id}>Categoria</label>
-    <select id={id} value={valor} onChange={(e) => onChange(e.target.value as CategoriaGasto | '')} className="input-field">
+    <select id={id} value={valor} onChange={(e) => onChange(e.target.value)} className="input-field">
       {automatica && <option value="">Automática (pelo nome)</option>}
-      {CATEGORIAS_GASTO.map((c) => (
-        <option key={c.valor} value={c.valor}>{c.rotulo}</option>
-      ))}
+      {categorias
+        .filter((c) => !c.oculta || c.key === valor)
+        .map((c) => (
+          <option key={c.key} value={c.key}>{c.nome}</option>
+        ))}
     </select>
   </div>
 )
 
-/** Total por categoria, do maior para o menor. */
-function totaisPorCategoria(gastos: Expense[]): Array<{ categoria: CategoriaGasto; total: number }> {
-  const mapa = new Map<CategoriaGasto, number>()
-  for (const g of gastos) mapa.set(g.category, (mapa.get(g.category) ?? 0) + g.amount)
+/** Total por categoria, do maior para o menor. Chave de categoria apagada soma em "outro". */
+function totaisPorCategoria(gastos: Expense[], categorias: CategoriaGasto[]): Array<{ categoria: string; total: number }> {
+  const mapa = new Map<string, number>()
+  for (const g of gastos) {
+    const key = infoCategoria(g.category, categorias).key
+    mapa.set(key, (mapa.get(key) ?? 0) + g.amount)
+  }
   return [...mapa.entries()]
     .map(([categoria, total]) => ({ categoria, total: Math.round(total * 100) / 100 }))
     .sort((a, b) => b.total - a.total)
@@ -62,15 +70,16 @@ function totaisPorCategoria(gastos: Expense[]): Array<{ categoria: CategoriaGast
 
 interface EdicaoProps {
   gasto: Expense
+  categorias: CategoriaGasto[]
   onSalvar: (dados: DadosGasto) => Promise<boolean>
   onCancelar: () => void
 }
 
 /** A linha vira formulário no lugar; Esc cancela. */
-const EdicaoGasto: React.FC<EdicaoProps> = ({ gasto, onSalvar, onCancelar }) => {
+const EdicaoGasto: React.FC<EdicaoProps> = ({ gasto, categorias, onSalvar, onCancelar }) => {
   const [valor, setValor] = useState(formatNumericInput(gasto.amount, 2, { padDecimals: true }))
   const [descricao, setDescricao] = useState(gasto.description)
-  const [categoria, setCategoria] = useState<CategoriaGasto | ''>(gasto.category)
+  const [categoria, setCategoria] = useState(infoCategoria(gasto.category, categorias).key)
   const [dia, setDia] = useState(gasto.spent_on)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -106,7 +115,7 @@ const EdicaoGasto: React.FC<EdicaoProps> = ({ gasto, onSalvar, onCancelar }) => 
               className="input-field"
             />
           </div>
-          <SeletorCategoria id={`cat-${gasto.id}`} valor={categoria} onChange={setCategoria} />
+          <SeletorCategoria id={`cat-${gasto.id}`} valor={categoria} onChange={setCategoria} categorias={categorias} />
           <div>
             <label className="label" htmlFor={`dia-${gasto.id}`}>Dia</label>
             <input
@@ -140,9 +149,11 @@ const ContasGastos: React.FC = () => {
 
   const [valor, setValor] = useState('')
   const [descricao, setDescricao] = useState('')
-  const [categoria, setCategoria] = useState<CategoriaGasto | ''>('')
+  const [categoria, setCategoria] = useState('')
   const [dia, setDia] = useState(hojeLocal())
-  const [filtro, setFiltro] = useState<CategoriaGasto | null>(null)
+  const [filtro, setFiltro] = useState<string | null>(null)
+  const [categorias, setCategorias] = useState<CategoriaGasto[]>([])
+  const [gerenciando, setGerenciando] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
   const [editando, setEditando] = useState<string | null>(null)
@@ -164,6 +175,16 @@ const ContasGastos: React.FC = () => {
   }, [mes, showError])
 
   useEffect(() => { carregar() }, [carregar])
+
+  useEffect(() => {
+    expensesApi.categorias().then(setCategorias).catch(() => showError('Erro ao carregar categorias.'))
+  }, [showError])
+
+  const categoriasMudaram = (novas: CategoriaGasto[], gastosMudaram?: boolean) => {
+    setCategorias(novas)
+    // Categoria apagada leva os gastos para "outro": a lista precisa refletir.
+    if (gastosMudaram) carregar()
+  }
 
   const anotar = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -218,10 +239,10 @@ const ContasGastos: React.FC = () => {
     }
   }
 
-  const totais = totaisPorCategoria(gastos)
+  const totais = totaisPorCategoria(gastos, categorias)
   // Filtro de categoria que sumiu (mês trocado, gasto apagado) deixa de valer.
   const filtroAtivo = filtro && totais.some((t) => t.categoria === filtro) ? filtro : null
-  const visiveis = filtroAtivo ? gastos.filter((g) => g.category === filtroAtivo) : gastos
+  const visiveis = filtroAtivo ? gastos.filter((g) => infoCategoria(g.category, categorias).key === filtroAtivo) : gastos
 
   const nomeMes = formatDate(`${mes}-01`, "MMMM 'de' yyyy").replace(/^./, (c) => c.toUpperCase())
 
@@ -251,7 +272,7 @@ const ContasGastos: React.FC = () => {
               className="input-field"
             />
           </div>
-          <SeletorCategoria id="gasto-categoria" valor={categoria} onChange={setCategoria} automatica />
+          <SeletorCategoria id="gasto-categoria" valor={categoria} onChange={setCategoria} categorias={categorias} automatica />
           <div>
             <label className="label" htmlFor="gasto-dia">Dia</label>
             <input
@@ -300,11 +321,21 @@ const ContasGastos: React.FC = () => {
         </span>
       </div>
 
-      {/* Por categoria — tocar filtra a lista */}
-      {!loading && totais.length > 0 && (
+      {/* Por categoria — tocar filtra a lista. O gerenciador vem primeiro: no fim
+          da faixa rolável ele ficava escondido no celular. */}
+      {gerenciando ? (
+        <GerenciarCategorias categorias={categorias} onMudou={categoriasMudaram} onFechar={() => setGerenciando(false)} />
+      ) : !loading && (
         <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap" role="group" aria-label="Filtrar por categoria">
+          <button
+            onClick={() => setGerenciando(true)}
+            className="shrink-0 flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl text-xs font-semibold border border-dashed border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary/50 transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base">tune</span>
+            Categorias
+          </button>
           {totais.map(({ categoria: c, total: t }) => {
-            const info = infoCategoria(c)
+            const info = infoCategoria(c, categorias)
             const ativo = filtroAtivo === c
             return (
               <button
@@ -316,7 +347,7 @@ const ContasGastos: React.FC = () => {
                 }`}
               >
                 <span className="material-symbols-outlined text-base">{info.icone}</span>
-                {info.rotulo}
+                {info.nome}
                 <span className={ativo ? '' : 'text-on-surface'}>{formatBRL(t)}</span>
               </button>
             )
@@ -349,18 +380,19 @@ const ContasGastos: React.FC = () => {
                   <EdicaoGasto
                     key={g.id}
                     gasto={g}
+                    categorias={categorias}
                     onSalvar={(dados) => salvarEdicao(g.id, dados)}
                     onCancelar={() => setEditando(null)}
                   />
                 ) : (
                   <li key={g.id} className="flex items-center gap-3 pl-3 pr-1.5 py-1.5">
                     <span className="w-9 h-9 shrink-0 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
-                      <span className="material-symbols-outlined text-lg">{infoCategoria(g.category).icone}</span>
+                      <span className="material-symbols-outlined text-lg">{infoCategoria(g.category, categorias).icone}</span>
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm text-on-surface truncate">{g.description}</span>
                       <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-on-surface-variant">
-                        {infoCategoria(g.category).rotulo}
+                        {infoCategoria(g.category, categorias).nome}
                         {g.source === 'whatsapp' && (
                           <span
                             className="material-symbols-outlined text-xs"

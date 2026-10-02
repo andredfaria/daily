@@ -1,5 +1,3 @@
-import type { CategoriaGasto } from '../utils/categoriasGasto'
-
 export type RecurrenceType = 'monthly' | 'weekly' | 'once' | 'biweekly' | 'quarterly' | 'semiannual' | 'annual'
 export type BillCategory = 'moradia' | 'assinaturas' | 'serviços' | 'saúde' | 'educação' | 'transporte' | 'alimentação' | 'outro'
 export type NotificationStatus = 'scheduled' | 'sent' | 'failed' | 'skipped'
@@ -241,7 +239,8 @@ export interface Expense {
   id: string
   amount: number
   description: string
-  category: CategoriaGasto
+  /** Chave da categoria (ver utils/categoriasGasto.ts). */
+  category: string
   spent_on: string
   source: 'whatsapp' | 'app'
   created_at: string

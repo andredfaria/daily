@@ -2,6 +2,8 @@ import crypto from 'crypto'
 import pool from '../db'
 import { sendTextToChat, resolveLid } from './waha'
 import { fetchQuote } from './quotes'
+import { carregarCategorias } from './expenseCategoryStore'
+import { nomeCategoria } from './expenseCategories'
 import { formatDateSaoPaulo } from './assetMath'
 import { variacaoPeriodo, SnapshotDoDia } from './benchmarkMath'
 import { claimMessage, releaseMessageClaim, releaseMessageClaimIfUndelivered } from './messageClaim'
@@ -210,7 +212,8 @@ async function pollsDeHoje(userId: string, hoje: string): Promise<PollDeHoje[]> 
 }
 
 async function anotarGasto(userId: string, args: string, hoje: string, refKey: string): Promise<string> {
-  const gasto = parseGasto(args)
+  const categorias = await carregarCategorias(userId)
+  const gasto = parseGasto(args, categorias)
   if (!gasto) return textoUsoGasto()
 
   // A trava command_reply é liberada quando a resposta comprovadamente não
@@ -227,7 +230,7 @@ async function anotarGasto(userId: string, args: string, hoje: string, refKey: s
     [userId, `${hoje.slice(0, 7)}-01`, hoje],
   )
   console.log(`[comandos] gasto de ${gasto.valor} anotado para ${userId}`)
-  return textoGastoAnotado(gasto, Number(total) || 0)
+  return textoGastoAnotado(gasto, Number(total) || 0, nomeCategoria(gasto.categoria, categorias))
 }
 
 async function marcarItem(userId: string, args: string, hoje: string): Promise<string> {

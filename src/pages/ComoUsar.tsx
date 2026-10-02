@@ -115,7 +115,7 @@ const ComoUsar: React.FC = () => {
           <p>
             <strong className="text-on-surface">/gasto:</strong> o valor pode vir antes ou depois — <Cmd>/gasto pão 12,50</Cmd> também vale.
             Aceita <Cmd>45,90</Cmd>, <Cmd>1.234,56</Cmd> e <Cmd>R$45</Cmd>. A categoria sai do nome (mercado → Alimentação, uber → Transporte);
-          para escolher, use <Cmd>#</Cmd>: <Cmd>/gasto 80 presente #lazer</Cmd>.
+          para escolher, use <Cmd>#</Cmd> com o nome de qualquer categoria, inclusive as que você criou: <Cmd>/gasto 50 ração #pet</Cmd>.
           </p>
           <p>
             <strong className="text-on-surface">/marcar:</strong> não precisa de acento nem do nome inteiro — <Cmd>/marcar medit</Cmd> acha “Meditação”.
@@ -131,7 +131,7 @@ const ComoUsar: React.FC = () => {
           itens={[
             <>Em <Link to="/contas/lista" className="text-primary font-medium">Contas</Link>, toque em <strong className="text-on-surface">Nova Conta</strong> e informe valor, recorrência (mensal, semanal, avulsa…) e, se quiser, a chave PIX ou o boleto.</>,
             <>Alguns dias antes do vencimento, chega um lembrete no WhatsApp com os dados de pagamento. Quantos dias antes e a hora do aviso ficam em <Link to="/configuracoes" className="text-primary font-medium">Configurações</Link>.</>,
-            <>Gastos do dia a dia (mercado, café) vão na aba <Link to="/contas/gastos" className="text-primary font-medium">Gastos</Link> ou pelo <Cmd>/gasto</Cmd>. Cada gasto tem uma categoria (Alimentação, Transporte, Lazer…), e o total do mês por categoria aparece acima da lista — toque numa para filtrar. Gastos não geram lembrete, mas contam no orçamento.</>,
+            <>Gastos do dia a dia (mercado, café) vão na aba <Link to="/contas/gastos" className="text-primary font-medium">Gastos</Link> ou pelo <Cmd>/gasto</Cmd>. Cada gasto tem uma categoria (Alimentação, Transporte, Lazer…), e o total do mês por categoria aparece acima da lista — toque numa para filtrar. Em <strong className="text-on-surface">Categorias</strong> dá para criar as suas (Pet, Filhos…), renomear, trocar o ícone e ocultar as que não usa. Gastos não geram lembrete, mas contam no orçamento.</>,
             <>Na aba <Link to="/contas/analise" className="text-primary font-medium">Análise</Link> você vê o total por categoria, a projeção dos próximos meses e quanto do orçamento mensal já foi usado.</>,
           ]}
         />
