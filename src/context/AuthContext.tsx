@@ -25,9 +25,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false)
       return
     }
-    setToken(stored)
-    client
-      .get('/auth/me', { headers: { Authorization: `Bearer ${stored}` } })
+    // Token de antes das sessões (JWT de 30 dias, três partes com ponto): troca
+    // por uma sessão de dispositivo antes de qualquer outra chamada, que já não
+    // aceita JWT.
+    const upgrade = stored.split('.').length === 3
+      ? client
+          .post<{ token: string }>('/auth/upgrade-session', null, { headers: { Authorization: `Bearer ${stored}` } })
+          .then((res) => {
+            localStorage.setItem(TOKEN_KEY, res.data.token)
+            return res.data.token
+          })
+      : Promise.resolve(stored)
+
+    upgrade
+      .then((sessionToken) => {
+        setToken(sessionToken)
+        return client.get('/auth/me', { headers: { Authorization: `Bearer ${sessionToken}` } })
+      })
       .then((res) => {
         setUser(res.data)
       })
@@ -46,6 +60,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [])
 
   const logout = useCallback(() => {
+    // Encerra no servidor também: apagar só do navegador deixava o token válido.
+    // Sem esperar a resposta — sair não pode travar por falha de rede.
+    // Header explícito: o interceptor roda depois do removeItem abaixo.
+    const current = localStorage.getItem(TOKEN_KEY)
+    if (current) {
+      client.post('/auth/logout', null, { headers: { Authorization: `Bearer ${current}` } }).catch(() => {})
+    }
     localStorage.removeItem(TOKEN_KEY)
     setToken(null)
     setUser(null)

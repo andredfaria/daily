@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express'
-import jwt from 'jsonwebtoken'
+import { validarSessao } from '../services/sessions'
 
 declare global {
   namespace Express {
     interface Request {
       userId?: string
+      sessionId?: string
     }
   }
 }
@@ -14,7 +15,7 @@ const SERVICE_ALLOWED_PATHS = [
   '/api/webhooks',
 ]
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   // Allow n8n service-to-service calls via API key — escopo restrito
   const apiKey = req.headers['x-api-key']
   if (process.env.N8N_API_KEY && apiKey === process.env.N8N_API_KEY) {
@@ -31,12 +32,19 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
     return res.status(401).json({ error: 'Token não fornecido' })
   }
 
+  // JWT antigo não passa daqui: só é aceito em POST /api/auth/upgrade-session,
+  // que o troca por uma sessão.
+  let sessao: { sessionId: string; userId: string } | null
   try {
-    const token = header.slice(7)
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string }
-    req.userId = payload.userId
-    next()
-  } catch {
+    sessao = await validarSessao(header.slice(7), req.headers['user-agent'])
+  } catch (err) {
+    console.error('[auth] erro ao validar sessão:', err)
+    return res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+  if (!sessao) {
     return res.status(401).json({ error: 'Token inválido ou expirado' })
   }
+  req.userId = sessao.userId
+  req.sessionId = sessao.sessionId
+  next()
 }

@@ -8,3 +8,17 @@ export const verifyOtp = (phone: string, code: string) =>
 
 export const getMe = () =>
   client.get<import('../types').User>('/auth/me')
+
+export interface Sessao {
+  id: string
+  user_agent: string | null
+  created_at: string
+  last_used_at: string
+  current: boolean
+}
+
+export const sessionsApi = {
+  list: () => client.get<Sessao[]>('/auth/sessions'),
+  revoke: (id: string) => client.delete(`/auth/sessions/${id}`),
+  revokeOthers: () => client.delete<{ removed: number }>('/auth/sessions'),
+}

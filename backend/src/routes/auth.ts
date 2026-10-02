@@ -5,6 +5,8 @@ import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { fetchWhatsAppName, resolveWhatsAppNumber, sendWhatsAppText, sendWhatsAppOtpButton, WhatsAppNumberNotFoundError, buildPhoneCandidates } from '../services/waha'
 import { authMiddleware } from '../middleware/auth'
+import { criarSessao } from '../services/sessions'
+import { ehTokenLegado } from '../services/sessionToken'
 
 const router = Router()
 
@@ -171,11 +173,7 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       }
     }
 
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET!,
-      { expiresIn: '30d' }
-    )
+    const token = await criarSessao(user.id, req.headers['user-agent'])
 
     const safeUser = {
       id: user.id,
@@ -206,6 +204,94 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
     }
 
     return res.json(rows[0])
+  } catch (err: any) {
+    console.error(err)
+    return res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// POST /api/auth/upgrade-session
+// Troca o JWT de 30 dias (anterior às sessões) por uma sessão, para quem já
+// estava logado não precisar pedir código de novo. Só aceita JWT válido e não
+// vencido, então a janela fecha sozinha 30 dias depois do deploy — aí esta rota
+// e o JWT_SECRET podem sair.
+router.post('/upgrade-session', async (req: Request, res: Response) => {
+  const header = req.headers.authorization
+  const legado = header?.startsWith('Bearer ') ? header.slice(7) : ''
+  if (!legado || !ehTokenLegado(legado) || !process.env.JWT_SECRET) {
+    return res.status(401).json({ error: 'Token inválido ou expirado' })
+  }
+
+  let userId: string
+  try {
+    userId = (jwt.verify(legado, process.env.JWT_SECRET) as { userId: string }).userId
+  } catch {
+    return res.status(401).json({ error: 'Token inválido ou expirado' })
+  }
+
+  try {
+    const [rows]: any = await pool.query(`SELECT id FROM users WHERE id = ? LIMIT 1`, [userId])
+    if (!rows.length) return res.status(401).json({ error: 'Usuário não encontrado' })
+    const token = await criarSessao(userId, req.headers['user-agent'])
+    return res.json({ token })
+  } catch (err: any) {
+    console.error(err)
+    return res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// POST /api/auth/logout — encerra a sessão deste dispositivo no servidor
+router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    await pool.query(`DELETE FROM sessions WHERE id = ?`, [req.sessionId])
+    return res.json({ success: true })
+  } catch (err: any) {
+    console.error(err)
+    return res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// GET /api/auth/sessions — dispositivos conectados
+router.get('/sessions', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const [rows]: any = await pool.query(
+      `SELECT id, user_agent, created_at, last_used_at
+         FROM sessions
+        WHERE user_id = ? AND expires_at > NOW()
+        ORDER BY last_used_at DESC`,
+      [req.userId]
+    )
+    return res.json(rows.map((r: any) => ({ ...r, current: r.id === req.sessionId })))
+  } catch (err: any) {
+    console.error(err)
+    return res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// DELETE /api/auth/sessions — encerra todos os outros dispositivos
+router.delete('/sessions', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const [result]: any = await pool.query(
+      `DELETE FROM sessions WHERE user_id = ? AND id <> ?`,
+      [req.userId, req.sessionId]
+    )
+    return res.json({ removed: result.affectedRows })
+  } catch (err: any) {
+    console.error(err)
+    return res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// DELETE /api/auth/sessions/:id — encerra um dispositivo
+router.delete('/sessions/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    // user_id no WHERE: não dá para derrubar sessão de outra pessoa adivinhando o id
+    const [result]: any = await pool.query(
+      `DELETE FROM sessions WHERE id = ? AND user_id = ?`,
+      [req.params.id, req.userId]
+    )
+    if (!result.affectedRows) return res.status(404).json({ error: 'Sessão não encontrada' })
+    return res.json({ success: true })
   } catch (err: any) {
     console.error(err)
     return res.status(500).json({ error: 'Erro interno do servidor' })

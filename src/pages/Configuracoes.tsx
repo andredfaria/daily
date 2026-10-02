@@ -9,6 +9,7 @@ import { formatNumericInput, parseNumericInput } from '../utils/numberInput'
 import { useAuth } from '../context/AuthContext'
 import { COMANDOS_WHATSAPP } from '../utils/comandosWhatsapp'
 import { WhatsAppProfileCard, WhatsAppProfile } from '../components/whatsapp/WhatsAppProfileCard'
+import DispositivosCard from '../components/sessoes/DispositivosCard'
 
 const NOTIFICATION_HOURS = [7, 8, 9, 10, 12, 18]
 // B3 negocia das 10h às 17h BRT; antes da abertura a brapi devolve o fechamento
@@ -722,6 +723,8 @@ const Configuracoes: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <DispositivosCard />
 
       {/* Sair — saiu do bottom nav mobile: ação destrutiva não divide barra com navegação */}
       <div className="section-card">

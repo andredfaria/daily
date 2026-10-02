@@ -391,6 +391,28 @@ CREATE TABLE IF NOT EXISTS scheduler_ticks (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `),
   },
+  {
+    // Sessão por dispositivo, no lugar do JWT de 30 dias: prazo de 90 dias sem
+    // uso renovado a cada acesso, e revogável (sair, encerrar outro aparelho).
+    // Guarda o hash do token, nunca o token.
+    name: '024_sessions',
+    statements: splitStatements(`
+CREATE TABLE IF NOT EXISTS sessions (
+  id           CHAR(36)     NOT NULL DEFAULT (UUID()),
+  user_id      CHAR(36)     NOT NULL,
+  token_hash   CHAR(64)     NOT NULL,
+  user_agent   VARCHAR(255) NULL,
+  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_used_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at   DATETIME     NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_sessions_token (token_hash),
+  KEY idx_sessions_user (user_id),
+  KEY idx_sessions_expires (expires_at),
+  CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `),
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

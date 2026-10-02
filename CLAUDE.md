@@ -32,7 +32,7 @@ The single production container bundles nginx (port 80) + Node.js backend (port 
 ### Environment
 Copy `.env.example` to `.env`. Required vars for local dev:
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` — MySQL connection
-- `JWT_SECRET` — signs 30-day session tokens
+- `JWT_SECRET` — só valida o JWT antigo em `POST /api/auth/upgrade-session` (troca por sessão). Login novo não usa JWT; pode sair junto com a rota depois que os JWTs emitidos antes de 024_sessions vencerem (30 dias).
 - `WAHA_URL`, `WAHA_API_KEY`, `WAHA_SESSION` — WhatsApp gateway
 - `WAHA_WEBHOOK_SECRET` / `WHATSAPP_HOOK_HMAC_KEY` — webhook HMAC verification
 - `PIX_ENCRYPTION_KEY` — AES-256-GCM key for `pix_key` at-rest encryption; **required in production**. In dev, if unset, `pix_key` is stored in plaintext with a warning.
@@ -63,10 +63,10 @@ Express app, TypeScript, MySQL2 connection pool.
 - `services/` — domain logic separated from routes: `waha.ts` (WAHA client), `notificationMaterializer.ts` (generates notification records), `occurrenceGenerator.ts`, `checklistDispatcher.ts`, `quotes.ts` (porta de entrada das cotações: cache de 10 min e roteamento por tipo), `brapi.ts` (cliente da brapi para ações e FIIs, com contingência de token), `coingecko.ts` (cliente de cotação de criptomoedas em BRL), `assetAlertService.ts` (alerta de preço-alvo e stop), `assetMath.ts` (cálculos puros de posição), `assetQuoteSync.ts` (coleta diária de cotação + snapshot), `assetSnapshotMath.ts` (decisões puras do snapshot)
 
 ### Database (MySQL 8.0.13+)
-Requires `DEFAULT (UUID())` expression support. Schema in `database/migrations/` (initial schema) + incremental migrations in `backend/src/migrate.ts`. Tables: `users`, `bills`, `payment_methods`, `bill_occurrences`, `notifications`, `otp_codes`, `checklists`, `checklist_items`, `checklist_daily_polls`, `assets`, `asset_snapshots`, `expenses`, `expense_categories`.
+Requires `DEFAULT (UUID())` expression support. Schema in `database/migrations/` (initial schema) + incremental migrations in `backend/src/migrate.ts`. Tables: `users`, `sessions`, `bills`, `payment_methods`, `bill_occurrences`, `notifications`, `otp_codes`, `checklists`, `checklist_items`, `checklist_daily_polls`, `assets`, `asset_snapshots`, `expenses`, `expense_categories`.
 
 ### Auth flow
-OTP via WhatsApp → JWT (30 days) stored in `localStorage` → `Authorization: Bearer` on every API call. `authMiddleware` (`backend/src/middleware/auth.ts`) sets `req.userId` for downstream handlers.
+OTP via WhatsApp → token opaco de sessão (256 bits) em `localStorage` → `Authorization: Bearer` on every API call. `authMiddleware` (`backend/src/middleware/auth.ts`) busca o hash SHA-256 do token em `sessions` e seta `req.userId` e `req.sessionId`. Prazo deslizante de 90 dias sem uso (`services/sessionToken.ts`); a renovação grava no máximo uma vez por hora por sessão. O banco nunca guarda o token, só o hash. Sair (`POST /api/auth/logout`) apaga a linha; Configurações › Dispositivos conectados lista e derruba as outras (`/api/auth/sessions`). JWT antigo não passa no middleware: o `AuthContext` o reconhece (três partes com ponto) e troca no boot via `upgrade-session`.
 
 ## Key conventions
 
