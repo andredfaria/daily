@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import client from '../api/client'
 import { notificationsApi } from '../api/notifications'
 import type { User } from '../types'
@@ -6,6 +7,7 @@ import { useToast } from '../context/ToastContext'
 import NumberField from '../components/ui/NumberField'
 import { formatNumericInput, parseNumericInput } from '../utils/numberInput'
 import { useAuth } from '../context/AuthContext'
+import { COMANDOS_WHATSAPP } from '../utils/comandosWhatsapp'
 import { WhatsAppProfileCard, WhatsAppProfile } from '../components/whatsapp/WhatsAppProfileCard'
 
 const NOTIFICATION_HOURS = [7, 8, 9, 10, 12, 18]
@@ -694,7 +696,7 @@ const Configuracoes: React.FC = () => {
             )}
           </div>
 
-          {/* Comandos por WhatsApp — espelha a ajuda de services/whatsappCommands.ts */}
+          {/* Comandos por WhatsApp — lista em utils/comandosWhatsapp.ts */}
           <div className="section-card">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-primary">terminal</span>
@@ -713,6 +715,10 @@ const Configuracoes: React.FC = () => {
                 </li>
               ))}
             </ul>
+            <Link to="/como-usar#whatsapp" className="inline-flex items-center gap-1 min-h-[44px] mt-2 text-sm font-medium text-primary">
+              Ver exemplos e guia completo
+              <span className="material-symbols-outlined text-base">arrow_forward</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -731,15 +737,6 @@ const Configuracoes: React.FC = () => {
     </div>
   )
 }
-
-const COMANDOS_WHATSAPP = [
-  { comando: '/contas', descricao: 'O que vence nos próximos 7 dias' },
-  { comando: '/carteira', descricao: 'Patrimônio e variação do dia' },
-  { comando: '/hoje', descricao: 'Itens do checklist ainda não marcados' },
-  { comando: '/marcar academia', descricao: 'Marca um item do checklist de hoje' },
-  { comando: '/gasto 45 mercado', descricao: 'Anota um gasto do dia (aparece em Contas › Gastos)' },
-  { comando: '/ajuda', descricao: 'Lista de comandos' },
-]
 
 // --- Helper Components ---
 interface ProfileFieldProps {

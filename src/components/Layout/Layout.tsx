@@ -41,8 +41,8 @@ const Layout: React.FC = () => {
     <div className="min-h-dvh bg-background flex">
       <Sidebar />
 
-      {/* Content area: no left margin on mobile, 220px on md+ */}
-      <div className="flex-1 md:ml-[220px] flex flex-col min-h-dvh">
+      {/* Content area: no left margin on mobile, 220px on md+. min-w-0: sem ele, faixa com rolagem horizontal (filtros, índice) alarga a página inteira no mobile */}
+      <div className="flex-1 min-w-0 md:ml-[220px] flex flex-col min-h-dvh">
         <Header />
 
         {/* Extra bottom padding on mobile to clear the bottom nav */}

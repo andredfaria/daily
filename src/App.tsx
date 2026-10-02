@@ -8,6 +8,7 @@ import ContasShell from './pages/contas/ContasShell'
 import ContasLista from './pages/contas/ContasLista'
 import ContasAnalise from './pages/contas/ContasAnalise'
 import ContasGastos from './pages/contas/ContasGastos'
+import ComoUsar from './pages/ComoUsar'
 import BillForm from './pages/BillForm'
 import Notificacoes from './pages/Notificacoes'
 import Configuracoes from './pages/Configuracoes'
@@ -70,6 +71,7 @@ const App: React.FC = () => {
                 </Route>
                 <Route path="/notificacoes" element={<Notificacoes />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
+                <Route path="/como-usar" element={<ComoUsar />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
