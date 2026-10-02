@@ -7,6 +7,7 @@ import Home from './pages/Home'
 import ContasShell from './pages/contas/ContasShell'
 import ContasLista from './pages/contas/ContasLista'
 import ContasAnalise from './pages/contas/ContasAnalise'
+import ContasGastos from './pages/contas/ContasGastos'
 import BillForm from './pages/BillForm'
 import Notificacoes from './pages/Notificacoes'
 import Configuracoes from './pages/Configuracoes'
@@ -52,6 +53,7 @@ const App: React.FC = () => {
                 <Route path="/contas" element={<ContasShell />}>
                   <Route index element={<Navigate to="lista" replace />} />
                   <Route path="lista" element={<ContasLista />} />
+                  <Route path="gastos" element={<ContasGastos />} />
                   <Route path="analise" element={<ContasAnalise />} />
                 </Route>
                 <Route path="/ativos" element={<AtivosShell />}>

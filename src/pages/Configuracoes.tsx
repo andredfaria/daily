@@ -736,6 +736,8 @@ const COMANDOS_WHATSAPP = [
   { comando: '/contas', descricao: 'O que vence nos próximos 7 dias' },
   { comando: '/carteira', descricao: 'Patrimônio e variação do dia' },
   { comando: '/hoje', descricao: 'Itens do checklist ainda não marcados' },
+  { comando: '/marcar academia', descricao: 'Marca um item do checklist de hoje' },
+  { comando: '/gasto 45 mercado', descricao: 'Anota um gasto do dia (aparece em Contas › Gastos)' },
   { comando: '/ajuda', descricao: 'Lista de comandos' },
 ]
 

@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit'
 import pool from '../db'
 import { wahaClient } from '../services/waha'
 import { handleIncomingMessage } from '../services/whatsappCommandHandler'
+import { lerListaJson, unirMarcados } from '../services/whatsappCommands'
 
 const router = Router()
 
@@ -136,7 +137,7 @@ async function handlePollVote(data: any): Promise<void> {
 
   // LIKE com sufixo para tolerar diferença de formato (LID vs c.us) no ID armazenado
   const [rows]: any = await pool.query(
-    'SELECT id, total_count, selected_options, last_vote_timestamp FROM checklist_daily_polls WHERE waha_poll_id LIKE ?',
+    'SELECT id, checklist_id, total_count, command_marked, last_vote_timestamp FROM checklist_daily_polls WHERE waha_poll_id LIKE ?',
     [`%${pollMessageId}`],
   )
   if (!rows.length) {
@@ -152,7 +153,18 @@ async function handlePollVote(data: any): Promise<void> {
     return
   }
 
-  const completedCount = selectedOptions.length
+  // O que foi marcado por /marcar não está na enquete; sem somar, o voto apagaria.
+  const viaComando = lerListaJson(poll.command_marked)
+  let marcados = selectedOptions
+  if (viaComando.length > 0) {
+    const [itens]: any = await pool.query(
+      'SELECT text FROM checklist_items WHERE checklist_id = ? ORDER BY sort_order ASC',
+      [poll.checklist_id],
+    )
+    marcados = unirMarcados(selectedOptions, viaComando, itens.map((i: any) => i.text))
+  }
+
+  const completedCount = marcados.length
   const totalCount = poll.total_count || 1
   const completionPct = Math.round((completedCount / totalCount) * 10000) / 100
 
@@ -162,11 +174,11 @@ async function handlePollVote(data: any): Promise<void> {
          last_vote_timestamp = ?, status = ?
      WHERE id = ?`,
     [
-      JSON.stringify(selectedOptions),
+      JSON.stringify(marcados),
       completedCount,
       completionPct,
       voteTimestamp,
-      completedCount === totalCount ? 'completed' : 'sent',
+      completedCount >= totalCount ? 'completed' : 'sent',
       poll.id,
     ],
   )

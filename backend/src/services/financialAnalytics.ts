@@ -17,6 +17,9 @@ export interface FechamentoMensal {
   porCategoria: Array<{ category: string; total: number }>
   orcamento: number | null
   qtdContas: number
+  /** Gastos avulsos (tabela expenses) do mês — ficam fora de total, que é só de contas. */
+  gastosAvulsos: number
+  qtdGastos: number
 }
 
 // Gastos por categoria num intervalo [from, to] (datas YYYY-MM-DD, inclusivas)
@@ -137,11 +140,18 @@ export async function fechamentoMensal(
   )
   const orcamento = user?.monthly_budget_limit != null ? Number(user.monthly_budget_limit) : null
 
+  const [[avulsos]]: any = await pool.query(
+    'SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS qtd FROM expenses WHERE user_id = ? AND spent_on BETWEEN ? AND ?',
+    [userId, toStr(first), toStr(last)]
+  )
+
   return {
     total,
     porCategoria: porCategoria.map((c) => ({ category: c.category, total: c.total })),
     orcamento,
     qtdContas,
+    gastosAvulsos: Math.round((Number(avulsos.total) || 0) * 100) / 100,
+    qtdGastos: Number(avulsos.qtd) || 0,
   }
 }
 

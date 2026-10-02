@@ -11,6 +11,8 @@ interface BudgetCardProps {
 
 export const BudgetCard: React.FC<BudgetCardProps> = ({ data, loading }) => {
   const navigate = useNavigate()
+  // Orçamento cobre contas e gastos avulsos; data.total é só de contas.
+  const gasto = data ? data.total + (data.gastosAvulsos ?? 0) : 0
 
   return (
     <div className="glass-card rounded-2xl border border-outline-variant/50 p-5">
@@ -21,7 +23,7 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({ data, loading }) => {
         <p className="text-sm text-on-surface-variant">Erro ao carregar orçamento.</p>
       ) : data.orcamento === null ? (
         <div>
-          <p className="text-2xl font-bold text-on-surface mb-1">{formatBRL(data.total)}</p>
+          <p className="text-2xl font-bold text-on-surface mb-1">{formatBRL(gasto)}</p>
           <p className="text-sm text-on-surface-variant mb-4">gastos neste mês</p>
           <button
             onClick={() => navigate('/configuracoes')}
@@ -32,10 +34,11 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({ data, loading }) => {
         </div>
       ) : (
         (() => {
-          const overBudget = data.total > data.orcamento
-          const pct = data.orcamento > 0
-            ? Math.round((data.total / data.orcamento) * 100)
-            : (data.total > 0 ? 100 : 0)
+          const orcamento = data.orcamento!
+          const overBudget = gasto > orcamento
+          const pct = orcamento > 0
+            ? Math.round((gasto / orcamento) * 100)
+            : (gasto > 0 ? 100 : 0)
           return (
             <div className="flex items-center gap-5">
               <RadialGauge pct={pct} color={overBudget ? '#ffb4ab' : '#c0c1ff'}>
@@ -44,14 +47,19 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({ data, loading }) => {
               </RadialGauge>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-1 flex-wrap">
-                  <span className="text-xl font-bold text-on-surface">{formatBRL(data.total)}</span>
-                  <span className="text-xs text-on-surface-variant">de {formatBRL(data.orcamento)}</span>
+                  <span className="text-xl font-bold text-on-surface">{formatBRL(gasto)}</span>
+                  <span className="text-xs text-on-surface-variant">de {formatBRL(orcamento)}</span>
                 </div>
                 <p className={`text-xs mt-1.5 ${overBudget ? 'text-error' : 'text-on-surface-variant'}`}>
                   {overBudget
-                    ? `${formatBRL(data.total - data.orcamento)} acima do limite`
-                    : `${formatBRL(data.orcamento - data.total)} restantes`}
+                    ? `${formatBRL(gasto - orcamento)} acima do limite`
+                    : `${formatBRL(orcamento - gasto)} restantes`}
                 </p>
+                {data.gastosAvulsos > 0 && (
+                  <p className="text-[11px] text-on-surface-variant/70 mt-1">
+                    {formatBRL(data.total)} em contas + {formatBRL(data.gastosAvulsos)} em gastos
+                  </p>
+                )}
               </div>
             </div>
           )

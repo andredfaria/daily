@@ -310,6 +310,35 @@ ALTER TABLE bills
     ENUM('monthly','weekly','once','biweekly','quarterly','semiannual','annual') NOT NULL
     `),
   },
+  {
+    // Gasto avulso do dia a dia (mercado, café), anotado pelo /gasto do WhatsApp
+    // ou pelo app. Fica fora de bills: não tem recorrência nem lembrete.
+    name: '019_expenses',
+    statements: splitStatements(`
+CREATE TABLE IF NOT EXISTS expenses (
+  id          CHAR(36)      NOT NULL DEFAULT (UUID()),
+  user_id     CHAR(36)      NOT NULL,
+  amount      DECIMAL(10,2) NOT NULL,
+  description VARCHAR(120)  NOT NULL,
+  spent_on    DATE          NOT NULL,
+  source      ENUM('whatsapp','app') NOT NULL DEFAULT 'app',
+  message_ref VARCHAR(40)   DEFAULT NULL,
+  created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_expenses_user_date (user_id, spent_on),
+  UNIQUE KEY uk_expenses_message (user_id, message_ref),
+  CONSTRAINT fk_expenses_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `),
+  },
+  {
+    // Itens marcados por /marcar. Ficam separados de selected_options porque o
+    // voto da enquete chega com a seleção inteira e sobrescreveria a marcação.
+    name: '020_checklist_polls_command_marked',
+    run: async () => {
+      await addColumnIfNotExists('checklist_daily_polls', 'command_marked', 'JSON DEFAULT NULL', 'selected_options')
+    },
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

@@ -7,9 +7,9 @@ import type { VariacaoPeriodo } from './benchmarkMath'
  * whatsappCommandHandler.ts / summaryService.ts.
  */
 
-export type Comando = 'contas' | 'carteira' | 'hoje' | 'ajuda' | 'desconhecido'
+export type Comando = 'contas' | 'carteira' | 'hoje' | 'gasto' | 'marcar' | 'ajuda' | 'desconhecido'
 
-const COMANDOS: Comando[] = ['contas', 'carteira', 'hoje', 'ajuda']
+const COMANDOS: Comando[] = ['contas', 'carteira', 'hoje', 'gasto', 'marcar', 'ajuda']
 
 const semAcento = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
 
@@ -25,6 +25,158 @@ export function parseComando(texto: unknown): Comando | null {
   if (!limpo.startsWith('/')) return null
   const palavra = semAcento(limpo.slice(1).split(/\s+/)[0] ?? '').toLowerCase()
   return (COMANDOS as string[]).includes(palavra) ? (palavra as Comando) : 'desconhecido'
+}
+
+/** O que vem depois do comando ("/gasto 45 mercado" → "45 mercado"), como foi digitado. */
+export function argumentosDoComando(texto: string): string {
+  return texto.trim().replace(/^\/\S*\s*/, '').trim()
+}
+
+// --- /gasto ---
+
+/** Maior valor que cabe no DECIMAL(10,2) de expenses.amount. */
+const VALOR_MAXIMO = 99_999_999.99
+
+/**
+ * "45", "45,90", "45.90", "1.234,56" e "R$45". Ponto seguido de 3 dígitos é
+ * milhar ("1.234" = 1234); seguido de 1 ou 2 é centavo ("45.9" = 45,90).
+ */
+export function parseValor(token: string): number | null {
+  const t = token.replace(/^r\$/i, '')
+  let normalizado: string
+  if (/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(t)) normalizado = t.replace(/\./g, '').replace(',', '.')
+  else if (/^\d+(,\d{1,2})?$/.test(t)) normalizado = t.replace(',', '.')
+  else if (/^\d+(\.\d{1,2})?$/.test(t)) normalizado = t
+  else return null
+
+  const valor = Math.round(Number(normalizado) * 100) / 100
+  return valor > 0 && valor <= VALOR_MAXIMO ? valor : null
+}
+
+export interface GastoDigitado {
+  valor: number
+  descricao: string
+}
+
+/**
+ * Valor no começo ou no fim: "/gasto 45 mercado" e "/gasto mercado 45" valem
+ * igual. Sem descrição o gasto entra assim mesmo — melhor anotado sem nome do
+ * que perdido.
+ */
+export function parseGasto(args: string): GastoDigitado | null {
+  const tokens = args.split(/\s+/).filter((t) => t && t.toLowerCase() !== 'r$')
+  if (tokens.length === 0) return null
+
+  let valor = parseValor(tokens[0])
+  let resto = tokens.slice(1)
+  if (valor === null && tokens.length > 1) {
+    valor = parseValor(tokens[tokens.length - 1])
+    resto = tokens.slice(0, -1)
+  }
+  if (valor === null) return null
+
+  const descricao = resto.join(' ').slice(0, 120).trim()
+  return { valor, descricao: descricao || 'Sem descrição' }
+}
+
+export function textoUsoGasto(): string {
+  return 'Para anotar um gasto, mande o valor e o que foi:\n/gasto 45 mercado\n/gasto 12,50 café'
+}
+
+export function textoGastoAnotado(g: GastoDigitado, totalDoMes: number): string {
+  return `💸 Anotado: *${g.descricao}* — ${formatBRL(g.valor)}\n\nGastos do mês: ${formatBRL(totalDoMes)}`
+}
+
+// --- /marcar ---
+
+export interface PollParaMarcar {
+  pollId: string
+  nome: string
+  itens: string[]
+  marcados: string[]
+}
+
+export type ItemAchado =
+  | { tipo: 'achou'; pollId: string; nome: string; item: string; jaMarcado: boolean }
+  | { tipo: 'varios'; opcoes: Array<{ nome: string; item: string }> }
+  | { tipo: 'nenhum' }
+
+const normalizar = (s: string): string => semAcento(s).toLowerCase().replace(/\s+/g, ' ').trim()
+
+/**
+ * Casa o que foi digitado com um item dos checklists de hoje, sem ligar para
+ * acento e maiúscula. Nome exato ganha de trecho: "/marcar ler" acha "Ler"
+ * mesmo havendo "Ler 10 páginas". Empate vira 'varios' para a pessoa escolher,
+ * em vez de marcar o item errado.
+ */
+export function acharItem(polls: PollParaMarcar[], termo: string): ItemAchado {
+  const alvo = normalizar(termo)
+  if (!alvo) return { tipo: 'nenhum' }
+
+  const todos = polls.flatMap((p) => p.itens.map((item) => ({ p, item, chave: normalizar(item) })))
+  const exatos = todos.filter((c) => c.chave === alvo)
+  const candidatos = exatos.length > 0 ? exatos : todos.filter((c) => c.chave.includes(alvo))
+
+  if (candidatos.length === 0) return { tipo: 'nenhum' }
+  if (candidatos.length > 1) {
+    return { tipo: 'varios', opcoes: candidatos.map((c) => ({ nome: c.p.nome, item: c.item })) }
+  }
+  const [{ p, item }] = candidatos
+  return { tipo: 'achou', pollId: p.pollId, nome: p.nome, item, jaMarcado: p.marcados.includes(item) }
+}
+
+/**
+ * Marcados de verdade: o voto da enquete mais o que veio por /marcar, na ordem
+ * dos itens. A enquete do WhatsApp não sabe do /marcar — sem a união, votar
+ * nela depois apagaria o que foi marcado por mensagem.
+ */
+export function unirMarcados(doPoll: string[], viaComando: string[], itens: string[]): string[] {
+  const marcados = new Set([...doPoll, ...viaComando])
+  const naOrdem = itens.filter((i) => marcados.has(i))
+  // Item que saiu do checklist depois do envio continua contando como na enquete.
+  const foraDaLista = doPoll.filter((i) => !itens.includes(i))
+  return [...naOrdem, ...foraDaLista]
+}
+
+/** Coluna JSON de lista: o mysql2 costuma entregar já parseado, mas não em toda versão. */
+export function lerListaJson(bruto: unknown): string[] {
+  if (Array.isArray(bruto)) return bruto.map(String)
+  if (typeof bruto === 'string') {
+    try {
+      const v = JSON.parse(bruto)
+      return Array.isArray(v) ? v.map(String) : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+export function textoUsoMarcar(): string {
+  return 'Para marcar um item do checklist de hoje:\n/marcar academia\n\nMande /hoje para ver o que falta.'
+}
+
+export function textoMarcado(item: string, nome: string, feitos: number, total: number): string {
+  const completo = total > 0 && feitos >= total
+  return `✅ *${item}* marcado em _${nome}_ (${feitos}/${total})` + (completo ? '\n\n🎉 Checklist completo!' : '')
+}
+
+export function textoJaMarcado(item: string, nome: string): string {
+  return `*${item}* já estava marcado em _${nome}_.`
+}
+
+export function textoItemAmbiguo(termo: string, opcoes: Array<{ nome: string; item: string }>): string {
+  return (
+    `Achei mais de um item com "${termo}":\n` +
+    opcoes.map((o) => `• ${o.item} (_${o.nome}_)`).join('\n') +
+    '\n\nMande o nome completo, ex.: /marcar ' + opcoes[0].item
+  )
+}
+
+export function textoItemNaoEncontrado(termo: string, polls: PollParaMarcar[]): string {
+  const pendentes = polls.flatMap((p) => p.itens.filter((i) => !p.marcados.includes(i)))
+  if (pendentes.length === 0) return `Não achei "${termo}", e o checklist de hoje já está todo marcado. ✅`
+  return `Não achei "${termo}" no checklist de hoje. Ainda faltam:\n` + pendentes.map((i) => `◻️ ${i}`).join('\n')
 }
 
 /** Texto da mensagem, que muda de lugar conforme a engine do WAHA. */
@@ -116,6 +268,8 @@ export function textoAjuda(desconhecido = false): string {
     '/contas — o que vence nos próximos 7 dias\n' +
     '/carteira — patrimônio e variação do dia\n' +
     '/hoje — itens do checklist ainda não marcados\n' +
+    '/marcar academia — marca um item do checklist de hoje\n' +
+    '/gasto 45 mercado — anota um gasto do dia\n' +
     '/ajuda — esta lista'
   )
 }

@@ -121,13 +121,16 @@ export async function sendMonthlySummary(userId: string): Promise<void> {
   const mes = prev.getMonth() + 1
 
   const fechamento = await fechamentoMensal(userId, ano, mes)
-  if (fechamento.qtdContas === 0) return // nada a reportar
+  if (fechamento.qtdContas === 0 && fechamento.qtdGastos === 0) return // nada a reportar
 
   const nomesMes = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
   const firstName = userRows[0].name ? `, ${userRows[0].name.split(' ')[0]}` : ''
 
   let msg = `📅 *Fechamento de ${nomesMes[mes - 1]}${firstName}*\n\n`
-  msg += `*Total:* R$ ${formatBRL(fechamento.total)} em ${fechamento.qtdContas} conta(s)\n`
+  msg += `*Contas:* R$ ${formatBRL(fechamento.total)} em ${fechamento.qtdContas} conta(s)\n`
+  if (fechamento.qtdGastos > 0) {
+    msg += `*Gastos avulsos:* R$ ${formatBRL(fechamento.gastosAvulsos)} em ${fechamento.qtdGastos} lançamento(s)\n`
+  }
 
   if (fechamento.porCategoria.length) {
     msg += `\n*Por categoria:*\n`
@@ -138,7 +141,7 @@ export async function sendMonthlySummary(userId: string): Promise<void> {
   }
 
   if (fechamento.orcamento != null) {
-    const diff = fechamento.total - fechamento.orcamento
+    const diff = fechamento.total + fechamento.gastosAvulsos - fechamento.orcamento
     if (diff > 0) {
       msg += `\n⚠️ R$ ${formatBRL(diff)} acima do orçamento de R$ ${formatBRL(fechamento.orcamento)}.`
     } else {

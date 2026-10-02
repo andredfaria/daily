@@ -4,21 +4,34 @@ import { sendTextToChat, resolveLid } from './waha'
 import { fetchQuote } from './quotes'
 import { formatDateSaoPaulo } from './assetMath'
 import { variacaoPeriodo, SnapshotDoDia } from './benchmarkMath'
-import { claimMessage, releaseMessageClaimIfUndelivered } from './messageClaim'
+import { claimMessage, releaseMessageClaim, releaseMessageClaimIfUndelivered } from './messageClaim'
 import {
   Comando,
   ContaAVencer,
   PollDeHoje,
+  PollParaMarcar,
+  acharItem,
+  argumentosDoComando,
   candidatosDoRemetente,
   ehGrupo,
   idDaMensagem,
+  lerListaJson,
   parseComando,
+  parseGasto,
   somarDias,
   textoAjuda,
   textoCarteira,
   textoContas,
   textoDaMensagem,
+  textoGastoAnotado,
   textoHoje,
+  textoItemAmbiguo,
+  textoItemNaoEncontrado,
+  textoJaMarcado,
+  textoMarcado,
+  textoUsoGasto,
+  textoUsoMarcar,
+  unirMarcados,
 } from './whatsappCommands'
 
 /**
@@ -30,8 +43,9 @@ export async function handleIncomingMessage(data: any): Promise<void> {
   // fromMe são as próprias mensagens do bot — responder a elas seria um laço.
   if (data?.fromMe || ehGrupo(data)) return
 
-  const comando = parseComando(textoDaMensagem(data))
-  if (!comando) return
+  const textoRecebido = textoDaMensagem(data)
+  const comando = parseComando(textoRecebido)
+  if (!comando || textoRecebido === null) return
 
   const mensagemId = idDaMensagem(data)
   const chatId = typeof data?.from === 'string' ? data.from : null
@@ -46,12 +60,20 @@ export async function handleIncomingMessage(data: any): Promise<void> {
     return
   }
 
-  const texto = await montarResposta(comando, userId)
-
   // Id da mensagem pode passar dos 60 caracteres de ref_key; o hash cabe e
-  // continua único por mensagem.
+  // continua único por mensagem. A trava vem antes da resposta porque /gasto e
+  // /marcar gravam: reentrega do webhook não pode anotar o gasto duas vezes.
   const refKey = crypto.createHash('sha256').update(mensagemId).digest('hex').slice(0, 40)
   if (!await claimMessage(userId, 'command_reply', refKey)) return
+
+  let texto: string
+  try {
+    texto = await montarResposta(comando, userId, argumentosDoComando(textoRecebido), refKey)
+  } catch (err) {
+    // Nada foi gravado nem enviado: a reentrega pode tentar de novo.
+    await releaseMessageClaim(userId, 'command_reply', refKey)
+    throw err
+  }
 
   try {
     await sendTextToChat(chatId, texto)
@@ -87,7 +109,7 @@ async function acharUsuario(data: any): Promise<string | null> {
   return null
 }
 
-async function montarResposta(comando: Comando, userId: string): Promise<string> {
+async function montarResposta(comando: Comando, userId: string, args: string, refKey: string): Promise<string> {
   const hoje = formatDateSaoPaulo(new Date())
   switch (comando) {
     case 'contas':
@@ -96,6 +118,10 @@ async function montarResposta(comando: Comando, userId: string): Promise<string>
       return textoCarteira(await carteiraAgora(userId, hoje), hoje)
     case 'hoje':
       return textoHoje(await pollsDeHoje(userId, hoje))
+    case 'gasto':
+      return anotarGasto(userId, args, hoje, refKey)
+    case 'marcar':
+      return marcarItem(userId, args, hoje)
     case 'ajuda':
       return textoAjuda()
     case 'desconhecido':
@@ -158,20 +184,6 @@ async function carteiraAgora(userId: string, hoje: string) {
   return { patrimonio, variacao, semCotacao }
 }
 
-function lerMarcados(bruto: unknown): string[] {
-  // Coluna JSON: o mysql2 costuma entregar já parseado, mas não em toda versão.
-  if (Array.isArray(bruto)) return bruto.map(String)
-  if (typeof bruto === 'string') {
-    try {
-      const v = JSON.parse(bruto)
-      return Array.isArray(v) ? v.map(String) : []
-    } catch {
-      return []
-    }
-  }
-  return []
-}
-
 async function pollsDeHoje(userId: string, hoje: string): Promise<PollDeHoje[]> {
   const [polls]: any = await pool.query(
     `SELECT p.checklist_id, c.name, p.selected_options
@@ -193,6 +205,83 @@ async function pollsDeHoje(userId: string, hoje: string): Promise<PollDeHoje[]> 
   return polls.map((p: any) => ({
     nome: p.name || 'Checklist',
     itens: itens.filter((i: any) => i.checklist_id === p.checklist_id).map((i: any) => i.text),
-    marcados: lerMarcados(p.selected_options),
+    marcados: lerListaJson(p.selected_options),
   }))
+}
+
+async function anotarGasto(userId: string, args: string, hoje: string, refKey: string): Promise<string> {
+  const gasto = parseGasto(args)
+  if (!gasto) return textoUsoGasto()
+
+  // A trava command_reply é liberada quando a resposta comprovadamente não
+  // saiu, e aí o WAHA reentrega a mensagem. message_ref faz a reentrega
+  // responder de novo sem anotar o gasto pela segunda vez.
+  await pool.query(
+    `INSERT INTO expenses (user_id, amount, description, spent_on, source, message_ref)
+     VALUES (?, ?, ?, ?, 'whatsapp', ?)
+     ON DUPLICATE KEY UPDATE id = id`,
+    [userId, gasto.valor, gasto.descricao, hoje, refKey],
+  )
+  const [[{ total }]]: any = await pool.query(
+    'SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE user_id = ? AND spent_on BETWEEN ? AND ?',
+    [userId, `${hoje.slice(0, 7)}-01`, hoje],
+  )
+  console.log(`[comandos] gasto de ${gasto.valor} anotado para ${userId}`)
+  return textoGastoAnotado(gasto, Number(total) || 0)
+}
+
+async function marcarItem(userId: string, args: string, hoje: string): Promise<string> {
+  if (!args) return textoUsoMarcar()
+
+  const [rows]: any = await pool.query(
+    `SELECT p.id, p.checklist_id, c.name, p.selected_options, p.command_marked, p.total_count
+       FROM checklist_daily_polls p JOIN checklists c ON c.id = p.checklist_id
+      WHERE p.user_id = ? AND p.poll_date = ?
+      ORDER BY c.name`,
+    [userId, hoje],
+  )
+  if (rows.length === 0) return '✅ Nenhum checklist enviado hoje ainda.'
+
+  const ids = rows.map((r: any) => r.checklist_id)
+  const [itens]: any = await pool.query(
+    `SELECT checklist_id, text FROM checklist_items
+      WHERE checklist_id IN (${ids.map(() => '?').join(', ')})
+      ORDER BY sort_order ASC`,
+    ids,
+  )
+
+  const polls: PollParaMarcar[] = rows.map((r: any) => ({
+    pollId: r.id,
+    nome: r.name || 'Checklist',
+    itens: itens.filter((i: any) => i.checklist_id === r.checklist_id).map((i: any) => i.text),
+    marcados: lerListaJson(r.selected_options),
+  }))
+
+  const achado = acharItem(polls, args)
+  if (achado.tipo === 'nenhum') return textoItemNaoEncontrado(args, polls)
+  if (achado.tipo === 'varios') return textoItemAmbiguo(args, achado.opcoes)
+  if (achado.jaMarcado) return textoJaMarcado(achado.item, achado.nome)
+
+  const row = rows.find((r: any) => r.id === achado.pollId)
+  const poll = polls.find((p) => p.pollId === achado.pollId)!
+  const viaComando = [...lerListaJson(row.command_marked), achado.item]
+  const marcados = unirMarcados(poll.marcados, viaComando, poll.itens)
+  const total = row.total_count || poll.itens.length || 1
+  const pct = Math.round((marcados.length / total) * 10000) / 100
+
+  await pool.query(
+    `UPDATE checklist_daily_polls
+        SET selected_options = ?, command_marked = ?, completed_count = ?, completion_pct = ?, status = ?
+      WHERE id = ?`,
+    [
+      JSON.stringify(marcados),
+      JSON.stringify(viaComando),
+      marcados.length,
+      Math.min(pct, 100),
+      marcados.length >= total ? 'completed' : 'sent',
+      achado.pollId,
+    ],
+  )
+  console.log(`[comandos] item marcado por mensagem para ${userId}`)
+  return textoMarcado(achado.item, achado.nome, marcados.length, total)
 }

@@ -230,6 +230,24 @@ export interface BudgetResponse {
   orcamento: number | null
   qtdContas: number
   porCategoria: Array<{ category: string; total: number }>
+  /** Gastos avulsos do mês — somam no orçamento, mas ficam fora de total (só contas). */
+  gastosAvulsos: number
+  qtdGastos: number
+}
+
+export interface Expense {
+  id: string
+  amount: number
+  description: string
+  spent_on: string
+  source: 'whatsapp' | 'app'
+  created_at: string
+}
+
+export interface ExpensesResponse {
+  month: string
+  total: number
+  gastos: Expense[]
 }
 
 export interface OcorrenciaTop {

@@ -17,6 +17,7 @@ import webhooksRouter from './routes/webhooks'
 import checklistsRouter from './routes/checklists'
 import analyticsRouter from './routes/analytics'
 import assetsRouter from './routes/assets'
+import expensesRouter from './routes/expenses'
 import { authMiddleware } from './middleware/auth'
 import { initScheduler } from './scheduler'
 import { runMigrations } from './migrate'
@@ -84,6 +85,7 @@ app.use('/api/waha', wahaRouter)
 app.use('/api/users', usersRouter)
 app.use('/api/analytics', analyticsRouter)
 app.use('/api/assets', assetsRouter)
+app.use('/api/expenses', expensesRouter)
 
 app.use((req: Request, res: Response) => {
   console.warn(`[404] rota não encontrada: ${req.method} ${req.path}`)

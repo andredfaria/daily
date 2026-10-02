@@ -21,11 +21,16 @@ export async function checkBudgetAlert(userId: string): Promise<void> {
     [userId, firstOfMonth, lastOfMonth]
   )
 
-  const total = Number(stats.total) || 0
+  const [[avulsos]]: any = await pool.query(
+    'SELECT SUM(amount) AS total FROM expenses WHERE user_id = ? AND spent_on BETWEEN ? AND ?',
+    [userId, firstOfMonth, lastOfMonth]
+  )
+
+  const total = (Number(stats.total) || 0) + (Number(avulsos.total) || 0)
   if (total > budget) {
     const msg =
       `⚠️ *Alerta de Orçamento — Rotina*\n\n` +
-      `Suas contas deste mês somam *R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*, ` +
+      `Suas contas e gastos deste mês somam *R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*, ` +
       `acima do limite configurado de *R$ ${budget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*.`
     // Chave diária: preserva a cadência atual (um aviso por dia enquanto o
     // orçamento estiver estourado) e barra só a duplicata entre instâncias.

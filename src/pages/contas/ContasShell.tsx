@@ -7,6 +7,7 @@ const ContasShell: React.FC = () => (
     <TabNav
       tabs={[
         { to: 'lista', label: 'Contas', icon: 'receipt_long' },
+        { to: 'gastos', label: 'Gastos', icon: 'payments' },
         { to: 'analise', label: 'Análise', icon: 'monitoring' },
       ]}
     />
