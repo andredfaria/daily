@@ -1,5 +1,5 @@
 -- =============================================================================
--- BillSync — Add notification_time column to users table
+-- Rotina — Add notification_time column to users table
 -- Date: 2026-04-07
 -- =============================================================================
 

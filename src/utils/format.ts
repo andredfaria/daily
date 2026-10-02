@@ -135,5 +135,5 @@ export const buildMessagePreview = (notif: NotificationEnriched): string => {
     paymentSection = `\n\n💳 *Pagamento:*\nBoleto:\n${notif.boleto_code}`
   }
 
-  return `📅 *Lembrete de Vencimento — BillSync*\n\nConta: *${notif.bill_name}*\nValor: R$ ${amount}\nVencimento: *${relative} (${dueFmt})*${paymentSection}`
+  return `📅 *Lembrete de Vencimento — Rotina*\n\nConta: *${notif.bill_name}*\nValor: R$ ${amount}\nVencimento: *${relative} (${dueFmt})*${paymentSection}`
 }

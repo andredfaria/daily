@@ -1,5 +1,5 @@
 {
-  "name": "billsync-backend",
+  "name": "rotina-backend",
   "version": "0.1.0",
   "scripts": {
     "build": "tsc",

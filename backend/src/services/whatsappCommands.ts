@@ -112,7 +112,7 @@ const brlComSinal = (v: number): string => comSinal(v, formatBRL(Math.abs(v)))
 export function textoAjuda(desconhecido = false): string {
   return (
     (desconhecido ? 'Não conheço esse comando. ' : '') +
-    '🤖 *Comandos do BillSync*\n\n' +
+    '🤖 *Comandos do Rotina*\n\n' +
     '/contas — o que vence nos próximos 7 dias\n' +
     '/carteira — patrimônio e variação do dia\n' +
     '/hoje — itens do checklist ainda não marcados\n' +

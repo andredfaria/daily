@@ -1,4 +1,4 @@
-# TODO / Registro de Desenvolvimento — BillSync
+# TODO / Registro de Desenvolvimento — Rotina
 
 > Consolida o que foi entregue a partir das specs/plans que existiam em
 > `docs/superpowers/` (agora removido, conteúdo consumido) e o que permanece pendente.

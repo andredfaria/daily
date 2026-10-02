@@ -128,7 +128,7 @@ export async function sendWhatsAppOtpButton(
   const { data } = await wahaClient().post('/api/sendButtons', {
     session,
     chatId,
-    body: `Seu código de acesso BillSync:`,
+    body: `Seu código de acesso Rotina:`,
     footer: 'Válido por 5 minutos. Não compartilhe.',
     buttons: [
       {

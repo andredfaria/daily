@@ -701,7 +701,7 @@ const Configuracoes: React.FC = () => {
               <h3 className="text-base font-semibold text-on-surface">Comandos no WhatsApp</h3>
             </div>
             <p className="text-xs text-on-surface-variant mb-4 leading-relaxed">
-              Mande uma destas mensagens para o número do BillSync e receba a resposta na hora.
+              Mande uma destas mensagens para o número do Rotina e receba a resposta na hora.
             </p>
             <ul className="space-y-2">
               {COMANDOS_WHATSAPP.map((c) => (

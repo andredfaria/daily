@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import client from '../api/client'
+import client, { TOKEN_KEY } from '../api/client'
 import type { User } from '../types'
 
 interface AuthContextValue {
@@ -13,8 +13,6 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
-
-const TOKEN_KEY = 'billsync_token'
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)

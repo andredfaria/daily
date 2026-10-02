@@ -21,7 +21,7 @@ const Header: React.FC = () => {
       ? 'Home'
       : location.pathname.includes('/editar')
         ? 'Editar Conta'
-        : pageTitles.find((p) => location.pathname.startsWith(p.prefix))?.title ?? 'BillSync'
+        : pageTitles.find((p) => location.pathname.startsWith(p.prefix))?.title ?? 'Rotina'
 
   return (
     <header className="sticky top-0 z-30 bg-surface-container-lowest/80 backdrop-blur-xl border-b border-outline-variant/30 px-4 md:px-6 h-14 md:h-16 flex items-center">

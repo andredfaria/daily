@@ -27,6 +27,6 @@ export function buildInactivityMessage(
   return (
     `Seu checklist *${checklistName}* ficou ${threshold} dias sem resposta, ` +
     `então pausamos o envio dele. Seus lembretes de contas continuam normalmente. ` +
-    `Para voltar a receber, reative em Checklists no BillSync.`
+    `Para voltar a receber, reative em Checklists no Rotina.`
   )
 }

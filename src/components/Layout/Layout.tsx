@@ -51,7 +51,7 @@ const Layout: React.FC = () => {
         </main>
 
         <footer className="hidden md:block text-center text-[11px] text-on-surface-variant/50 py-3 border-t border-outline-variant/20 select-none">
-          BillSync v1.0.0 · Gestão do Dia a Dia
+          Rotina v1.0.0 · Gestão do Dia a Dia
         </footer>
       </div>
 

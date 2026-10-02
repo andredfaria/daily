@@ -168,7 +168,7 @@ router.get('/export', async (req: Request, res: Response) => {
 
     // CRLF é o fim de linha que o RFC 4180 pede e o Excel trata sem surpresa.
     const csv = [header, ...csvRows].join('\r\n')
-    const filename = `billsync-historico-${new Date().toISOString().slice(0, 10)}.csv`
+    const filename = `rotina-historico-${new Date().toISOString().slice(0, 10)}.csv`
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)

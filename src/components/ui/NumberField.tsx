@@ -38,7 +38,7 @@ export interface NumberFieldProps {
 }
 
 /**
- * Campo numérico do BillSync.
+ * Campo numérico do Rotina.
  *
  * Por que não `type="number"`:
  * - a roda do mouse altera o valor sem querer e as setinhas ocupam área de toque;

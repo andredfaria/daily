@@ -100,7 +100,7 @@ router.post('/test-message', async (req: Request, res: Response) => {
 
     // 4. Resolver número e enviar (valida existência com/sem 9 automaticamente)
     const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-    const body = `✅ *Teste de Integração — BillSync*\n\nOlá, ${userName}! Esta é uma mensagem de teste enviada em ${now}.\n\nSe você está recebendo isso, o envio de notificações está funcionando corretamente. 🎉`
+    const body = `✅ *Teste de Integração — Rotina*\n\nOlá, ${userName}! Esta é uma mensagem de teste enviada em ${now}.\n\nSe você está recebendo isso, o envio de notificações está funcionando corretamente. 🎉`
 
     try {
       const { id: messageId } = await sendWhatsAppText(rawNumber, body)

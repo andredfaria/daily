@@ -108,7 +108,7 @@ describe('buildAlertMessage', () => {
   }
 
   it('inclui o cabeçalho do alerta', () => {
-    expect(buildAlertMessage([alvo])).toContain('📈 *Alerta de Ativos — BillSync*')
+    expect(buildAlertMessage([alvo])).toContain('📈 *Alerta de Ativos — Rotina*')
   })
 
   it('descreve o ticker e a cotação que atingiu o alvo', () => {

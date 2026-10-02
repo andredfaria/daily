@@ -24,7 +24,7 @@ export async function checkBudgetAlert(userId: string): Promise<void> {
   const total = Number(stats.total) || 0
   if (total > budget) {
     const msg =
-      `⚠️ *Alerta de Orçamento — BillSync*\n\n` +
+      `⚠️ *Alerta de Orçamento — Rotina*\n\n` +
       `Suas contas deste mês somam *R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*, ` +
       `acima do limite configurado de *R$ ${budget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*.`
     // Chave diária: preserva a cadência atual (um aviso por dia enquanto o

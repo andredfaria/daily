@@ -45,7 +45,7 @@ export async function sendWeeklySummary(userId: string): Promise<void> {
   const proximas = await contasDaSemana(userId, hoje)
 
   const firstName = userRows[0].name ? `, ${userRows[0].name.split(' ')[0]}` : ''
-  let msg = `📊 *Resumo BillSync${firstName}*\n\n`
+  let msg = `📊 *Resumo Rotina${firstName}*\n\n`
   msg += `*Total deste mês:* R$ ${formatBRL(Number(stats.total) || 0)}\n`
 
   if (proximas.length) {

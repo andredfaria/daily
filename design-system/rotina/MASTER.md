@@ -1,12 +1,12 @@
-# Design System Master File — BillSync
+# Design System Master File — Rotina
 
-> **Como usar:** Antes de construir uma página específica, verifique se existe `design-system/billsync/pages/[nome-da-pagina].md`.
+> **Como usar:** Antes de construir uma página específica, verifique se existe `design-system/rotina/pages/[nome-da-pagina].md`.
 > Se o arquivo existir, suas regras **sobrescrevem** este Master.
 > Se não existir, siga rigorosamente as regras abaixo.
 
 ---
 
-**Projeto:** BillSync  
+**Projeto:** Rotina  
 **Categoria:** Gerenciador de Finanças Pessoais  
 **Tema:** Dark Mode OLED — Material Design 3 adaptado  
 **Stack:** React + Vite + TypeScript + Tailwind CSS  

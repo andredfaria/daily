@@ -23,11 +23,11 @@ const Sidebar: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <span className="material-symbols-outlined text-on-primary-fixed text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>
-              sync_alt
+              event_repeat
             </span>
           </div>
           <div>
-            <h1 className="text-sm font-bold text-on-surface leading-none">BillSync</h1>
+            <h1 className="text-sm font-bold text-on-surface leading-none">Rotina</h1>
             <p className="text-[10px] text-on-surface-variant mt-0.5">Gestão do Dia a Dia</p>
           </div>
         </div>

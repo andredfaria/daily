@@ -66,7 +66,7 @@ function buildMessage(billName: string, amount: number, dueDate: string, pm: any
   const paymentSection = buildPaymentSection(pm)
 
   return (
-    `📅 *Lembrete de Vencimento — BillSync*\n\n` +
+    `📅 *Lembrete de Vencimento — Rotina*\n\n` +
     `Conta: *${billName}*\n` +
     `Valor: R$ ${formatAmount(amount)}\n` +
     `Vencimento: *${relative} (${dueFmt})*` +

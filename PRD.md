@@ -1,8 +1,8 @@
-# BillSync — Product Requirements Document
+# Rotina — Product Requirements Document
 
 | Campo | Valor |
 |---|---|
-| **Produto** | BillSync |
+| **Produto** | Rotina |
 | **Versão** | 3.0 (unificado) |
 | **Data** | Maio 2026 |
 | **Status** | Implementado — referência viva |
@@ -32,7 +32,7 @@
 
 ## 1. Visão Geral
 
-O **BillSync** é um sistema web pessoal com dois módulos integrados:
+O **Rotina** é um sistema web pessoal com dois módulos integrados:
 
 1. **Gestão de contas a pagar** — cadastro, acompanhamento e notificação automática de vencimentos via WhatsApp, com confirmação de pagamento por resposta na conversa.
 2. **Checklists diários** — envio automático de enquetes de tarefas/hábitos via WhatsApp e dashboard de acompanhamento de conclusão.
@@ -567,7 +567,7 @@ O sistema tenta o número exato e a variante (com/sem o 9 após o DDD) para comp
 
 **Requisito de engine:** NOWEB ou GOWS obrigatório para enquetes. WEBJS não descriptografa votos corretamente.
 
-### 11.2 Webhook WAHA → BillSync
+### 11.2 Webhook WAHA → Rotina
 
 O WAHA deve ser configurado para enviar eventos ao endpoint `POST /api/webhooks/waha-poll`:
 
@@ -755,4 +755,4 @@ Para reenviar (sobrescreve):
 
 ---
 
-*Documento gerado em Maio 2026 · BillSync PRD v3.0 — reflete o estado implementado do sistema*
+*Documento gerado em Maio 2026 · Rotina PRD v3.0 — reflete o estado implementado do sistema*

@@ -1,7 +1,7 @@
-# GEMINI.md - BillSync Project Context
+# GEMINI.md - Rotina Project Context
 
 ## Project Overview
-**BillSync** is a personal bill management and notification system designed to eliminate missed payment deadlines. It features proactive WhatsApp alerts with payment data (PIX keys or Boleto codes) and allows users to confirm payments directly through WhatsApp or a web dashboard.
+**Rotina** is a personal bill management and notification system designed to eliminate missed payment deadlines. It features proactive WhatsApp alerts with payment data (PIX keys or Boleto codes) and allows users to confirm payments directly through WhatsApp or a web dashboard.
 
 ### Core Architecture
 - **Frontend**: React 18, Vite (Port 3000), TypeScript, TailwindCSS. Proxies `/api` to `http://localhost:4000`.

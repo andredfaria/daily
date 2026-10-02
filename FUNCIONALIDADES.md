@@ -1,7 +1,7 @@
-# BillSync — Documento de Funcionalidades
+# Rotina — Documento de Funcionalidades
 
 > Versão: 1.0 · Março 2026
-> Este documento descreve todas as funcionalidades do sistema BillSync, seu comportamento esperado no backend, fluxo de execução e onde as informações são manipuladas. Não aborda estrutura de banco de dados.
+> Este documento descreve todas as funcionalidades do sistema Rotina, seu comportamento esperado no backend, fluxo de execução e onde as informações são manipuladas. Não aborda estrutura de banco de dados.
 
 ---
 
@@ -244,7 +244,7 @@ O sistema envia alertas automáticos pelo WhatsApp do usuário antes e no dia do
 
 ### Template da mensagem (antecedência)
 ```
-⏰ Lembrete de Conta — BillSync
+⏰ Lembrete de Conta — Rotina
 
 📌 Conta: [nome]
 💰 Valor: R$ [valor]
@@ -257,7 +257,7 @@ Boleto → [código]
 
 ### Template da mensagem (no dia)
 ```
-🚨 Vence HOJE — BillSync
+🚨 Vence HOJE — Rotina
 
 📌 Conta: [nome]
 💰 Valor: R$ [valor]
@@ -416,7 +416,7 @@ Permite ao usuário controlar quais tipos de alertas automáticos deseja receber
 
 ### WAHA (WhatsApp HTTP API)
 
-O WAHA é o gateway de comunicação com o WhatsApp. O backend do BillSync não se comunica diretamente com o WhatsApp — toda a orquestração de envio e recebimento passa pelo n8n.
+O WAHA é o gateway de comunicação com o WhatsApp. O backend do Rotina não se comunica diretamente com o WhatsApp — toda a orquestração de envio e recebimento passa pelo n8n.
 
 | Operação | Responsável | Endpoint envolvido |
 |---|---|---|
@@ -426,7 +426,7 @@ O WAHA é o gateway de comunicação com o WhatsApp. O backend do BillSync não 
 
 ### n8n (Automação)
 
-O n8n atua como camada de orquestração entre o backend BillSync e o WAHA. Nenhuma lógica de regra de negócio vive no n8n — ele apenas consulta a API, formata mensagens e delega ações de volta ao backend.
+O n8n atua como camada de orquestração entre o backend Rotina e o WAHA. Nenhuma lógica de regra de negócio vive no n8n — ele apenas consulta a API, formata mensagens e delega ações de volta ao backend.
 
 | Workflow | Trigger | Ação |
 |---|---|---|
@@ -437,4 +437,4 @@ O n8n atua como camada de orquestração entre o backend BillSync e o WAHA. Nenh
 
 ---
 
-*Documento gerado em 25/03/2026 · BillSync v1.0*
+*Documento gerado em 25/03/2026 · Rotina v1.0*

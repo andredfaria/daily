@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**BillSync** — personal finance manager that tracks bills and sends WhatsApp reminders via [WAHA](https://waha.devlike.pro/) (WhatsApp HTTP API). Users authenticate via OTP sent to WhatsApp; the app also dispatches daily checklist polls.
+**Rotina** — personal finance manager that tracks bills and sends WhatsApp reminders via [WAHA](https://waha.devlike.pro/) (WhatsApp HTTP API). Users authenticate via OTP sent to WhatsApp; the app also dispatches daily checklist polls.
 
 ## Commands
 
@@ -46,7 +46,7 @@ Copy `.env.example` to `.env`. Required vars for local dev:
 ### Frontend (`src/`)
 React SPA with React Router v6. All pages are protected by `ProtectedRoute`; `AuthProvider` (Context) holds the session and validates the stored JWT on load.
 
-- `src/api/client.ts` — shared axios instance; attaches `billsync_token` from `localStorage` to every request; auto-redirects to `/login` on 401
+- `src/api/client.ts` — shared axios instance; attaches `rotina_token` from `localStorage` (migra a chave antiga `billsync_token` na carga) to every request; auto-redirects to `/login` on 401
 - `src/api/*.ts` — one file per domain (bills, occurrences, notifications, checklists)
 - `src/types/index.ts` — canonical TypeScript types shared across frontend (no duplication with backend)
 - `src/pages/` — Home, Contas (`contas/`: lista + análise), Ativos (`ativos/`: carteira + análise), Checklists (`checklists/`: lista + análise), BillForm (create/edit), Notificacoes, Configuracoes, Login. Páginas com análise usam shell + rotas aninhadas: `/contas/lista` e `/contas/analise` são rotas reais, e a aba ativa vem da URL via `TabNav` (`src/components/ui/TabNav.tsx`).

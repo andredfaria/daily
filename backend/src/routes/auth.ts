@@ -69,7 +69,7 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       // Fallback: sendButtons indisponível (tier Core ou deprecated) — envia 2 mensagens de texto
       console.warn('[auth] sendButtons indisponível — usando fallback de texto')
       try {
-        await sendWhatsAppText(digits, `Seu código de acesso BillSync (válido por 5 min):`)
+        await sendWhatsAppText(digits, `Seu código de acesso Rotina (válido por 5 min):`)
         await sendWhatsAppText(digits, code)
       } catch (txtErr) {
         if (txtErr instanceof WhatsAppNumberNotFoundError) {

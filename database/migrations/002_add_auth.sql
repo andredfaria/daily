@@ -1,5 +1,5 @@
 -- =============================================================================
--- BillSync — Auth Migration
+-- Rotina — Auth Migration
 -- Date: 2026-04-15
 -- Creates otp_codes table for phone-based OTP authentication
 -- =============================================================================

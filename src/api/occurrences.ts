@@ -1,4 +1,4 @@
-import client from './client'
+import client, { TOKEN_KEY } from './client'
 import type { BillOccurrence } from '../types'
 
 export interface ListOccurrencesParams {
@@ -38,7 +38,7 @@ export const occurrencesApi = {
     if (params?.to) query.set('to', params.to)
     if (params?.bill_id) query.set('bill_id', params.bill_id)
 
-    const token = localStorage.getItem('billsync_token')
+    const token = localStorage.getItem(TOKEN_KEY)
     const res = await fetch(`/api/occurrences/export?${query}`, {
       headers: { Authorization: `Bearer ${token ?? ''}` },
     })
@@ -47,7 +47,7 @@ export const occurrencesApi = {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `billsync-historico-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `rotina-historico-${new Date().toISOString().slice(0, 10)}.csv`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)

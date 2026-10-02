@@ -84,7 +84,7 @@ function buildHitBlock(hit: AlertHit): string {
 
 export function buildAlertMessage(hits: AlertHit[]): string {
   return [
-    '📈 *Alerta de Ativos — BillSync*',
+    '📈 *Alerta de Ativos — Rotina*',
     '',
     hits.map(buildHitBlock).join('\n\n'),
     '',

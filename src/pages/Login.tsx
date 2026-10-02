@@ -124,7 +124,7 @@ export const Login: React.FC = () => {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-surface-container-high mb-4">
             <span className="material-symbols-outlined text-primary text-3xl">account_balance_wallet</span>
           </div>
-          <h1 className="text-2xl font-semibold text-on-surface">BillSync</h1>
+          <h1 className="text-2xl font-semibold text-on-surface">Rotina</h1>
           <p className="text-sm text-on-surface-variant mt-1">Gestão de contas pessoais</p>
         </div>
 

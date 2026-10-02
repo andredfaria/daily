@@ -1,5 +1,16 @@
 import axios from 'axios'
 
+export const TOKEN_KEY = 'rotina_token'
+
+// O app se chamava BillSync: move a sessão salva na chave antiga para
+// ninguém precisar logar de novo depois da troca de nome.
+const LEGACY_TOKEN_KEY = 'billsync_token'
+const legacyToken = localStorage.getItem(LEGACY_TOKEN_KEY)
+if (legacyToken) {
+  if (!localStorage.getItem(TOKEN_KEY)) localStorage.setItem(TOKEN_KEY, legacyToken)
+  localStorage.removeItem(LEGACY_TOKEN_KEY)
+}
+
 const client = axios.create({
   baseURL: '/api',
   headers: {
@@ -11,7 +22,7 @@ const client = axios.create({
 
 client.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('billsync_token')
+    const token = localStorage.getItem(TOKEN_KEY)
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -24,7 +35,7 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && window.location.pathname !== '/login') {
-      localStorage.removeItem('billsync_token')
+      localStorage.removeItem(TOKEN_KEY)
       window.location.href = '/login'
     }
     if (error.response) {

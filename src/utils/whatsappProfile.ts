@@ -6,7 +6,7 @@ function limpar(valor: string | null | undefined): string | null {
 }
 
 // Precedência do nome mostrado: o que o próprio usuário definiu no WhatsApp
-// (pushName) vence o apelido que a conta do BillSync tem salvo na agenda
+// (pushName) vence o apelido que a conta do Rotina tem salvo na agenda
 // (savedName) — é assim que ele se apresenta ao mundo.
 export function nomeExibicao(
   pushName: string | null,
