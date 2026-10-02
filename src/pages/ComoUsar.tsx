@@ -181,7 +181,7 @@ const ComoUsar: React.FC = () => {
           <p>Se tudo estiver certo e mesmo assim não vier resposta, mande <Cmd>/ajuda</Cmd>: se nem ele responder, o WhatsApp do Rotina está fora do ar no momento.</p>
         </Duvida>
         <Duvida pergunta="Anotei um gasto errado">
-          <p>Apague na aba <Link to="/contas/gastos" className="text-primary font-medium">Contas › Gastos</Link> e anote de novo.</p>
+          <p>Na aba <Link to="/contas/gastos" className="text-primary font-medium">Contas › Gastos</Link>, toque no lápis ao lado do gasto para corrigir o nome, o valor ou o dia — ou na lixeira para apagar.</p>
         </Duvida>
         <Duvida pergunta="Marquei um item pelo /marcar e votei na enquete depois">
           <p>Os dois se somam: o que foi marcado por mensagem continua marcado mesmo que não esteja selecionado na enquete.</p>

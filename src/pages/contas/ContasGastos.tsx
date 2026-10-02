@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { expensesApi } from '../../api/expenses'
 import type { Expense } from '../../types'
 import { formatBRL, formatDate } from '../../utils/format'
-import { parseNumericInput } from '../../utils/numberInput'
+import { formatNumericInput, parseNumericInput } from '../../utils/numberInput'
 import NumberField from '../../components/ui/NumberField'
 import Modal from '../../components/ui/Modal'
 import { SkeletonCard } from '../../components/ui/Skeleton'
@@ -30,6 +30,75 @@ function porDia(gastos: Expense[]): Array<{ dia: string; itens: Expense[] }> {
   return grupos
 }
 
+interface EdicaoProps {
+  gasto: Expense
+  onSalvar: (dados: { amount: number; description: string; spent_on: string }) => Promise<boolean>
+  onCancelar: () => void
+}
+
+/** A linha vira formulário no lugar; Esc cancela. */
+const EdicaoGasto: React.FC<EdicaoProps> = ({ gasto, onSalvar, onCancelar }) => {
+  const [valor, setValor] = useState(formatNumericInput(gasto.amount, 2, { padDecimals: true }))
+  const [descricao, setDescricao] = useState(gasto.description)
+  const [dia, setDia] = useState(gasto.spent_on)
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const salvar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const amount = parseNumericInput(valor)
+    if (amount === null || amount <= 0) return setErro('Informe o valor.')
+    if (!descricao.trim()) return setErro('Informe o que foi o gasto.')
+    setSalvando(true)
+    const ok = await onSalvar({ amount, description: descricao.trim(), spent_on: dia })
+    if (!ok) setSalvando(false)
+  }
+
+  return (
+    <li className="p-4 bg-surface-container/40">
+      <form
+        onSubmit={salvar}
+        onKeyDown={(e) => e.key === 'Escape' && onCancelar()}
+        className="space-y-3"
+        aria-label={`Editar gasto ${gasto.description}`}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr_150px] gap-3">
+          <NumberField label="Valor" mode="currency" min={0} prefix="R$" value={valor} onChange={setValor} />
+          <div>
+            <label className="label" htmlFor={`desc-${gasto.id}`}>O que foi</label>
+            <input
+              id={`desc-${gasto.id}`}
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              maxLength={120}
+              autoFocus
+              className="input-field"
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor={`dia-${gasto.id}`}>Dia</label>
+            <input
+              id={`dia-${gasto.id}`}
+              type="date"
+              value={dia}
+              max={hojeLocal()}
+              onChange={(e) => setDia(e.target.value)}
+              className="input-field"
+            />
+          </div>
+        </div>
+        {erro && <p className="text-xs text-error">{erro}</p>}
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={onCancelar} className="btn-ghost min-h-[44px]">Cancelar</button>
+          <button type="submit" disabled={salvando} className="btn-primary min-h-[44px]">
+            {salvando ? 'Salvando…' : 'Salvar'}
+          </button>
+        </div>
+      </form>
+    </li>
+  )
+}
+
 const ContasGastos: React.FC = () => {
   const mesAtual = hojeLocal().slice(0, 7)
   const [mes, setMes] = useState(mesAtual)
@@ -42,6 +111,7 @@ const ContasGastos: React.FC = () => {
   const [dia, setDia] = useState(hojeLocal())
   const [salvando, setSalvando] = useState(false)
 
+  const [editando, setEditando] = useState<string | null>(null)
   const [apagar, setApagar] = useState<Expense | null>(null)
   const [apagando, setApagando] = useState(false)
   const { success, error: showError } = useToast()
@@ -83,6 +153,20 @@ const ContasGastos: React.FC = () => {
     }
   }
 
+  const salvarEdicao = async (id: string, dados: { amount: number; description: string; spent_on: string }) => {
+    try {
+      await expensesApi.update(id, dados)
+      success('Gasto atualizado!')
+      setEditando(null)
+      // Dia trocado pode mudar a ordem, o agrupamento ou até o mês: recarrega.
+      carregar()
+      return true
+    } catch {
+      showError('Erro ao salvar gasto.')
+      return false
+    }
+  }
+
   const confirmarApagar = async () => {
     if (!apagar) return
     setApagando(true)
@@ -99,7 +183,7 @@ const ContasGastos: React.FC = () => {
     }
   }
 
-  const nomeMes = formatDate(`${mes}-01`, "MMMM 'de' yyyy")
+  const nomeMes = formatDate(`${mes}-01`, "MMMM 'de' yyyy").replace(/^./, (c) => c.toUpperCase())
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -160,7 +244,7 @@ const ContasGastos: React.FC = () => {
           >
             <span className="material-symbols-outlined">chevron_left</span>
           </button>
-          <span className="text-sm font-semibold text-on-surface capitalize min-w-[140px] text-center">{nomeMes}</span>
+          <span className="text-sm font-semibold text-on-surface min-w-[140px] text-center">{nomeMes}</span>
           <button
             onClick={() => setMes(somarMeses(mes, 1))}
             disabled={mes >= mesAtual}
@@ -196,7 +280,14 @@ const ContasGastos: React.FC = () => {
                 {formatDate(d, "EEEE, dd/MM")}
               </h3>
               <ul className="glass-card rounded-2xl border border-outline-variant/50 divide-y divide-outline-variant/30">
-                {itens.map((g) => (
+                {itens.map((g) => editando === g.id ? (
+                  <EdicaoGasto
+                    key={g.id}
+                    gasto={g}
+                    onSalvar={(dados) => salvarEdicao(g.id, dados)}
+                    onCancelar={() => setEditando(null)}
+                  />
+                ) : (
                   <li key={g.id} className="flex items-center gap-3 pl-4 pr-1.5 py-1.5">
                     <span
                       className="material-symbols-outlined text-base text-on-surface-variant"
@@ -206,6 +297,13 @@ const ContasGastos: React.FC = () => {
                     </span>
                     <span className="flex-1 min-w-0 text-sm text-on-surface truncate">{g.description}</span>
                     <span className="text-sm font-semibold text-on-surface">{formatBRL(g.amount)}</span>
+                    <button
+                      onClick={() => setEditando(g.id)}
+                      className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-surface-container-high text-on-surface-variant hover:text-primary cursor-pointer"
+                      aria-label={`Editar gasto ${g.description}`}
+                    >
+                      <span className="material-symbols-outlined text-base">edit</span>
+                    </button>
                     <button
                       onClick={() => setApagar(g)}
                       className="w-11 h-11 flex items-center justify-center rounded-lg hover:bg-surface-container-high text-on-surface-variant hover:text-error cursor-pointer"

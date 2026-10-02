@@ -34,27 +34,72 @@ router.get('/', async (req: Request, res: Response) => {
   }
 })
 
+type CamposGasto = { amount?: number; description?: string; spent_on?: string }
+
+/**
+ * Valida os campos enviados. Na criação os três são exigidos (spent_on cai em
+ * hoje); na edição só os presentes no corpo são validados e alterados.
+ */
+function validarGasto(body: any, parcial: boolean): { campos: CamposGasto } | { erro: string } {
+  const campos: CamposGasto = {}
+
+  if (body.amount !== undefined || !parcial) {
+    const amount = typeof body.amount === 'number' ? body.amount : parseValor(String(body.amount ?? ''))
+    if (amount === null || !Number.isFinite(amount) || amount <= 0 || amount > 99_999_999.99) {
+      return { erro: 'Valor inválido' }
+    }
+    campos.amount = Math.round(amount * 100) / 100
+  }
+
+  if (body.description !== undefined || !parcial) {
+    const description = String(body.description ?? '').trim().slice(0, 120)
+    if (!description) return { erro: 'Descrição é obrigatória' }
+    campos.description = description
+  }
+
+  if (body.spent_on !== undefined || !parcial) {
+    const spentOn = body.spent_on ?? formatDateSaoPaulo(new Date())
+    if (typeof spentOn !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(spentOn) || isNaN(Date.parse(spentOn))) {
+      return { erro: 'spent_on deve estar no formato YYYY-MM-DD' }
+    }
+    campos.spent_on = spentOn
+  }
+
+  return { campos }
+}
+
 // POST /api/expenses — { amount, description, spent_on? }
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const amount = typeof req.body.amount === 'number' ? req.body.amount : parseValor(String(req.body.amount ?? ''))
-    if (amount === null || !Number.isFinite(amount) || amount <= 0 || amount > 99_999_999.99) {
-      return res.status(400).json({ error: 'Valor inválido' })
-    }
-    const description = String(req.body.description ?? '').trim().slice(0, 120)
-    if (!description) return res.status(400).json({ error: 'Descrição é obrigatória' })
+    const v = validarGasto(req.body, false)
+    if ('erro' in v) return res.status(400).json({ error: v.erro })
+    const { amount, description, spent_on } = v.campos
 
-    const spentOn = req.body.spent_on ?? formatDateSaoPaulo(new Date())
-    if (typeof spentOn !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(spentOn) || isNaN(Date.parse(spentOn))) {
-      return res.status(400).json({ error: 'spent_on deve estar no formato YYYY-MM-DD' })
-    }
-
-    const valor = Math.round(amount * 100) / 100
     await pool.query(
       `INSERT INTO expenses (user_id, amount, description, spent_on, source) VALUES (?, ?, ?, ?, 'app')`,
-      [req.userId, valor, description, spentOn],
+      [req.userId, amount, description, spent_on],
     )
     res.status(201).json({ ok: true })
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// PATCH /api/expenses/:id — qualquer subconjunto de { amount, description, spent_on }
+router.patch('/:id', async (req: Request, res: Response) => {
+  try {
+    const v = validarGasto(req.body, true)
+    if ('erro' in v) return res.status(400).json({ error: v.erro })
+    const entradas = Object.entries(v.campos)
+    if (entradas.length === 0) return res.status(400).json({ error: 'Nada para alterar' })
+
+    const [result]: any = await pool.query(
+      `UPDATE expenses SET ${entradas.map(([k]) => `${k} = ?`).join(', ')} WHERE id = ? AND user_id = ?`,
+      [...entradas.map(([, val]) => val), req.params.id, req.userId],
+    )
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Gasto não encontrado' })
+    res.json({ ok: true })
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })

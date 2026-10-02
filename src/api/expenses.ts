@@ -11,6 +11,10 @@ export const expensesApi = {
     await client.post('/expenses', data)
   },
 
+  update: async (id: string, data: { amount: number; description: string; spent_on: string }): Promise<void> => {
+    await client.patch(`/expenses/${id}`, data)
+  },
+
   delete: async (id: string): Promise<void> => {
     await client.delete(`/expenses/${id}`)
   },
