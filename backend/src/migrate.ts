@@ -378,6 +378,19 @@ CREATE TABLE IF NOT EXISTS expense_categories (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `),
   },
+  {
+    // Um registro por tick horário executado. Se o container estava fora no
+    // minuto 0, o boot vê que a hora não rodou e roda — sem isso o tick sumia.
+    name: '023_scheduler_ticks',
+    statements: splitStatements(`
+CREATE TABLE IF NOT EXISTS scheduler_ticks (
+  tick_key VARCHAR(13) NOT NULL,
+  ran_at   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (tick_key),
+  KEY idx_tick_ran_at (ran_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `),
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

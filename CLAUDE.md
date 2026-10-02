@@ -71,6 +71,7 @@ OTP via WhatsApp → JWT (30 days) stored in `localStorage` → `Authorization: 
 ## Key conventions
 
 - All code, comments, and log messages are in **Portuguese** (pt-BR).
+- Tick horário (`scheduler.ts`) reserva a hora em `scheduler_ticks` (chave `YYYY-MM-DD HH` de São Paulo, `INSERT IGNORE`) antes de rodar. No boot, se a hora corrente não tem linha, o tick roda na hora — deploy no minuto 0 perdia o tick inteiro. Só a hora corrente é recuperada; horas anteriores com o container fora continuam perdidas. Repetir é seguro porque todo envio tem claim.
 - `notification_time` on `users` is an integer hour (0–23) in America/Sao_Paulo; scheduler compares it to current São Paulo hour.
 - Bill recurrence: `monthly` uses `recurrence_day_of_month`, `weekly` uses `recurrence_day_of_week` (0=Sunday), `once` uses `due_date`.
 - WAHA webhook hits `/api/webhooks`; a resposta do usuário alimenta os checklists. Não há estado de pagamento em `bill_occurrences` — `status`, `paid_at` e `confirmation_source` foram removidos pela migration `010_remove_payment_fields`.
