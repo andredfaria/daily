@@ -438,8 +438,9 @@ const Gastos: React.FC = () => {
         <div className="space-y-5">
           {porDia(visiveis).map(({ dia: d, itens }) => (
             <section key={d}>
-              <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">
-                {formatDate(d, "EEEE, dd/MM")}
+              <h3 className="flex items-baseline justify-between gap-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2 pr-1.5">
+                <span>{formatDate(d, "EEEE, dd/MM")}</span>
+                <span className="normal-case tabular-nums">{formatBRL(itens.reduce((s, g) => s + g.amount, 0))}</span>
               </h3>
               <ul className="glass-card rounded-2xl border border-outline-variant/50 divide-y divide-outline-variant/30">
                 {itens.map((g) => editando === g.id ? (
