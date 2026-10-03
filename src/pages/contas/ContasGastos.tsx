@@ -9,6 +9,8 @@ import { SkeletonCard } from '../../components/ui/Skeleton'
 import { useToast } from '../../context/ToastContext'
 import { infoCategoria, type CategoriaGasto } from '../../utils/categoriasGasto'
 import GerenciarCategorias from '../../components/contas/GerenciarCategorias'
+import DiaADiaGastos from '../../components/contas/DiaADiaGastos'
+import { resumoDiario } from '../../utils/gastosDiarios'
 
 const hojeLocal = (): string => {
   const d = new Date()
@@ -152,6 +154,7 @@ const ContasGastos: React.FC = () => {
   const [categoria, setCategoria] = useState('')
   const [dia, setDia] = useState(hojeLocal())
   const [filtro, setFiltro] = useState<string | null>(null)
+  const [diaFiltro, setDiaFiltro] = useState<string | null>(null)
   const [categorias, setCategorias] = useState<CategoriaGasto[]>([])
   const [gerenciando, setGerenciando] = useState(false)
   const [salvando, setSalvando] = useState(false)
@@ -175,6 +178,8 @@ const ContasGastos: React.FC = () => {
   }, [mes, showError])
 
   useEffect(() => { carregar() }, [carregar])
+  // Dia escolhido no gráfico é do mês que estava aberto.
+  useEffect(() => { setDiaFiltro(null) }, [mes])
 
   useEffect(() => {
     expensesApi.categorias().then(setCategorias).catch(() => showError('Erro ao carregar categorias.'))
@@ -242,7 +247,11 @@ const ContasGastos: React.FC = () => {
   const totais = totaisPorCategoria(gastos, categorias)
   // Filtro de categoria que sumiu (mês trocado, gasto apagado) deixa de valer.
   const filtroAtivo = filtro && totais.some((t) => t.categoria === filtro) ? filtro : null
-  const visiveis = filtroAtivo ? gastos.filter((g) => infoCategoria(g.category, categorias).key === filtroAtivo) : gastos
+  const daCategoria = filtroAtivo ? gastos.filter((g) => infoCategoria(g.category, categorias).key === filtroAtivo) : gastos
+  // Gráfico segue a categoria; o dia filtra só a lista, senão o gráfico viraria uma barra.
+  const resumo = resumoDiario(daCategoria, mes, hojeLocal())
+  const diaAtivo = diaFiltro && daCategoria.some((g) => g.spent_on === diaFiltro) ? diaFiltro : null
+  const visiveis = diaAtivo ? daCategoria.filter((g) => g.spent_on === diaAtivo) : daCategoria
 
   const nomeMes = formatDate(`${mes}-01`, "MMMM 'de' yyyy").replace(/^./, (c) => c.toUpperCase())
 
@@ -353,6 +362,26 @@ const ContasGastos: React.FC = () => {
             )
           })}
         </div>
+      )}
+
+      {!loading && gastos.length > 0 && (
+        <DiaADiaGastos
+          resumo={resumo}
+          categoria={filtroAtivo ? infoCategoria(filtroAtivo, categorias).nome : null}
+          diaSelecionado={diaAtivo}
+          onSelecionarDia={setDiaFiltro}
+        />
+      )}
+
+      {diaAtivo && (
+        <button
+          onClick={() => setDiaFiltro(null)}
+          className="flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl text-xs font-semibold bg-primary/15 text-primary hover:bg-primary/25 transition-colors cursor-pointer"
+        >
+          <span className="capitalize">Só {formatDate(diaAtivo, "EEEE, dd/MM")}</span>
+          <span className="material-symbols-outlined text-base" aria-hidden="true">close</span>
+          <span className="sr-only">— mostrar o mês inteiro</span>
+        </button>
       )}
 
       {/* Lista */}
