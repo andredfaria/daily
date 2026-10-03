@@ -1,5 +1,5 @@
 import client, { TOKEN_KEY } from './client'
-import type { BillOccurrence } from '../types'
+import type { BillOccurrence, OcorrenciaAtual } from '../types'
 
 export interface ListOccurrencesParams {
   bill_id?: string
@@ -24,6 +24,12 @@ export const occurrencesApi = {
 
   get: async (id: string): Promise<BillOccurrence> => {
     const res = await client.get<BillOccurrence>(`/occurrences/${id}`)
+    return res.data
+  },
+
+  /** Valor real do mês de uma conta variável; null volta para a estimativa. */
+  setAmount: async (id: string, amount: number | null): Promise<OcorrenciaAtual> => {
+    const res = await client.patch<OcorrenciaAtual>(`/occurrences/${id}`, { amount })
     return res.data
   },
 

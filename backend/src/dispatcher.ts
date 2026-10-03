@@ -59,7 +59,8 @@ function buildPaymentSection(pm: any): string {
   return ''
 }
 
-function buildMessage(billName: string, amount: number, dueDate: string, pm: any): string {
+// estimado: conta variável cujo valor real do mês ainda não foi informado.
+function buildMessage(billName: string, amount: number, dueDate: string, pm: any, estimado = false): string {
   const [y, m, d] = dueDate.split('-')
   const dueFmt = `${d}/${m}/${y}`
   const relative = buildRelativeDate(dueDate)
@@ -68,7 +69,9 @@ function buildMessage(billName: string, amount: number, dueDate: string, pm: any
   return (
     `📅 *Lembrete de Vencimento — Rotina*\n\n` +
     `Conta: *${billName}*\n` +
-    `Valor: R$ ${formatAmount(amount)}\n` +
+    (estimado
+      ? `Valor estimado: R$ ${formatAmount(amount)}\n`
+      : `Valor: R$ ${formatAmount(amount)}\n`) +
     `Vencimento: *${relative} (${dueFmt})*` +
     paymentSection
   )
@@ -91,8 +94,8 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
 
   const [notifRows]: any = await pool.query(
     `SELECT n.id, n.bill_occurrence_id, n.type,
-            o.due_date, o.amount,
-            b.name AS bill_name, b.is_active AS bill_is_active,
+            o.due_date, o.amount, o.amount_is_actual,
+            b.name AS bill_name, b.is_active AS bill_is_active, b.is_fixed AS bill_is_fixed,
             u.whatsapp_number, u.whatsapp_alerts_enabled,
             pm.type AS pm_type, pm.pix_key_type, pm.pix_key, pm.pix_beneficiary, pm.boleto_code
      FROM notifications n
@@ -153,7 +156,8 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
     ? notif.due_date.toISOString().slice(0, 10)
     : String(notif.due_date).slice(0, 10)
 
-  const messageBody = buildMessage(notif.bill_name, notif.amount, dueDateStr, pm)
+  const estimado = !notif.bill_is_fixed && !notif.amount_is_actual
+  const messageBody = buildMessage(notif.bill_name, notif.amount, dueDateStr, pm, estimado)
 
   try {
     const { id: wahaMessageId } = await sendWhatsAppText(notif.whatsapp_number, messageBody)

@@ -157,7 +157,8 @@ async function runTick(hour: number): Promise<void> {
   if (hour === 9) {
     try {
       const [budgetUsers]: any = await pool.query(
-        `SELECT id FROM users WHERE monthly_budget_limit IS NOT NULL AND is_active = 1`
+        `SELECT id FROM users
+          WHERE (monthly_budget_limit IS NOT NULL OR monthly_expense_budget_limit IS NOT NULL) AND is_active = 1`
       )
       for (const { id } of budgetUsers) {
         try { await checkBudgetAlert(id) } catch (e: any) { console.error('[scheduler] budget erro:', e.message) }

@@ -1,4 +1,4 @@
-// Série dia a dia dos gastos avulsos de um mês, para o gráfico de Contas › Gastos.
+// Série dia a dia dos gastos avulsos de um mês, para o gráfico da página de Gastos.
 
 export interface DiaGasto {
   /** YYYY-MM-DD */

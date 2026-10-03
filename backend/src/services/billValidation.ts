@@ -33,6 +33,7 @@ export interface EstadoConta {
   due_date?: unknown
   days_before_alert?: unknown
   is_active?: unknown
+  is_fixed?: unknown
   [outros: string]: unknown
 }
 
@@ -83,6 +84,10 @@ export function validarConta(estado: EstadoConta): string | null {
       estado.is_active !== 0 && estado.is_active !== 1) {
     return 'is_active deve ser booleano'
   }
+  if (estado.is_fixed !== undefined && typeof estado.is_fixed !== 'boolean' &&
+      estado.is_fixed !== 0 && estado.is_fixed !== 1) {
+    return 'is_fixed deve ser booleano'
+  }
 
   const exigido = CAMPO_EXIGIDO[recurrence_type as RecurrenceType]
   if (exigido === 'day_of_month' && ausente(estado.recurrence_day_of_month)) {
@@ -96,4 +101,47 @@ export function validarConta(estado: EstadoConta): string | null {
   }
 
   return null
+}
+
+// Teto do DECIMAL(10,2) de bill_occurrences.amount.
+const VALOR_MAXIMO = 99_999_999.99
+
+/**
+ * Valor real informado para uma ocorrência de conta variável. null volta a
+ * ocorrência para a estimativa da conta. Devolve o valor arredondado em
+ * centavos, ou a mensagem de erro.
+ */
+export function validarValorReal(valor: unknown): { valor: number | null } | { erro: string } {
+  if (valor === null) return { valor: null }
+  const n = typeof valor === 'number' ? valor : typeof valor === 'string' && valor.trim() !== '' ? Number(valor) : NaN
+  if (!Number.isFinite(n) || n < 0 || n > VALOR_MAXIMO) {
+    return { erro: 'amount deve ser um número entre 0 e 99.999.999,99, ou null para voltar à estimativa' }
+  }
+  return { valor: Math.round(n * 100) / 100 }
+}
+
+function normalizarCampo(valor: unknown): string {
+  if (valor === undefined || valor === null || valor === '') return ''
+  if (typeof valor === 'boolean') return valor ? '1' : '0'
+  if (valor instanceof Date) {
+    // DATE do mysql2 chega como meia-noite local; a data local é a gravada.
+    const m = String(valor.getMonth() + 1).padStart(2, '0')
+    const d = String(valor.getDate()).padStart(2, '0')
+    return `${valor.getFullYear()}-${m}-${d}`
+  }
+  if (typeof valor === 'number') return String(valor)
+  const s = String(valor)
+  // "150.00" (DECIMAL do banco) e 150 (corpo JSON) são o mesmo valor.
+  if (/^-?\d+(\.\d+)?$/.test(s)) return String(Number(s))
+  // Data ISO com horário ("2026-10-05T00:00:00.000Z") compara só o dia.
+  return /^\d{4}-\d{2}-\d{2}T/.test(s) ? s.slice(0, 10) : s
+}
+
+/**
+ * Quais dos campos vieram no corpo com valor diferente do gravado. O formulário
+ * de edição manda a conta inteira a cada salvamento, então "veio no corpo" não
+ * quer dizer "mudou" — e tratar assim regerava as ocorrências a cada edição.
+ */
+export function camposAlterados(atual: Record<string, unknown>, corpo: Record<string, unknown>, campos: string[]): string[] {
+  return campos.filter((c) => corpo[c] !== undefined && normalizarCampo(corpo[c]) !== normalizarCampo(atual[c]))
 }

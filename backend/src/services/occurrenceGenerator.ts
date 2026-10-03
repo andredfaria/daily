@@ -143,3 +143,18 @@ export async function regenerateOccurrencesForBill(
   )
   await generateOccurrencesForBill(billId, bill)
 }
+
+/**
+ * Leva o valor da conta para as ocorrências futuras sem regerá-las — regerar
+ * apagaria os lembretes já agendados. Em conta variável, ocorrência com valor
+ * real informado fica como está; em conta fixa não existe valor real, então
+ * tudo volta para o valor da conta (é o que acontece ao trocar de variável para fixa).
+ */
+export async function aplicarValorDaConta(billId: string, amount: number, isFixed: boolean): Promise<void> {
+  const today = toDateString(new Date())
+  await pool.query(
+    `UPDATE bill_occurrences SET amount = ?, amount_is_actual = 0
+      WHERE bill_id = ? AND due_date >= ? AND (amount_is_actual = 0 OR ?)`,
+    [amount, billId, today, isFixed ? 1 : 0]
+  )
+}

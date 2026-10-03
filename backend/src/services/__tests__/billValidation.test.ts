@@ -1,4 +1,4 @@
-import { validarConta, RECURRENCE_TYPES } from '../billValidation'
+import { validarConta, validarValorReal, camposAlterados, RECURRENCE_TYPES } from '../billValidation'
 
 // Uma conta mensal válida — cada teste muda só o campo que está em julgamento.
 const mensal = {
@@ -170,5 +170,66 @@ describe('validarConta', () => {
     it('recusa esvaziar o nome por um patch parcial', () => {
       expect(validarConta({ ...doBanco, name: '' })).toBe('Campo obrigatório: name')
     })
+  })
+})
+
+describe('validarConta — is_fixed', () => {
+  it('aceita booleano e o 1/0 que o MySQL devolve', () => {
+    expect(validarConta({ ...mensal, is_fixed: false })).toBeNull()
+    expect(validarConta({ ...mensal, is_fixed: 0 })).toBeNull()
+    expect(validarConta({ ...mensal, is_fixed: 1 })).toBeNull()
+  })
+
+  it('recusa texto', () => {
+    expect(validarConta({ ...mensal, is_fixed: 'sim' })).toBe('is_fixed deve ser booleano')
+  })
+})
+
+describe('validarValorReal', () => {
+  it('null volta para a estimativa', () => {
+    expect(validarValorReal(null)).toEqual({ valor: null })
+  })
+
+  it('arredonda em centavos e aceita string numérica', () => {
+    expect(validarValorReal(231.456)).toEqual({ valor: 231.46 })
+    expect(validarValorReal('180.5')).toEqual({ valor: 180.5 })
+    expect(validarValorReal(0)).toEqual({ valor: 0 })
+  })
+
+  it('recusa negativo, vazio, texto e o que estoura a coluna', () => {
+    for (const v of [-1, '', 'abc', undefined, 1e9, Infinity]) {
+      expect(validarValorReal(v)).toHaveProperty('erro')
+    }
+  })
+})
+
+describe('camposAlterados', () => {
+  const gravada = {
+    amount: '150.00',
+    is_fixed: 1,
+    recurrence_type: 'monthly',
+    recurrence_day_of_month: 10,
+    recurrence_day_of_week: null,
+    due_date: null,
+  }
+
+  it('formulário reenviando a conta igual não muda nada', () => {
+    const corpo = { amount: 150, is_fixed: true, recurrence_type: 'monthly', recurrence_day_of_month: 10 }
+    expect(camposAlterados(gravada, corpo, Object.keys(gravada))).toEqual([])
+  })
+
+  it('campo ausente do corpo não conta como mudança', () => {
+    expect(camposAlterados(gravada, {}, ['amount', 'due_date'])).toEqual([])
+  })
+
+  it('aponta o que mudou de fato', () => {
+    const corpo = { amount: 180, is_fixed: false, recurrence_day_of_month: 10 }
+    expect(camposAlterados(gravada, corpo, Object.keys(gravada))).toEqual(['amount', 'is_fixed'])
+  })
+
+  it('compara data do banco (Date) com a string do corpo', () => {
+    const avulsa = { due_date: new Date(2026, 9, 5) }
+    expect(camposAlterados(avulsa, { due_date: '2026-10-05' }, ['due_date'])).toEqual([])
+    expect(camposAlterados(avulsa, { due_date: '2026-10-06' }, ['due_date'])).toEqual(['due_date'])
   })
 })

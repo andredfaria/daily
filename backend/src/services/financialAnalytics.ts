@@ -15,7 +15,10 @@ export interface MesProjecao {
 export interface FechamentoMensal {
   total: number
   porCategoria: Array<{ category: string; total: number }>
+  /** Limite mensal das contas (users.monthly_budget_limit). */
   orcamento: number | null
+  /** Limite mensal dos gastos avulsos, separado do das contas. */
+  orcamentoGastos: number | null
   qtdContas: number
   /** Gastos avulsos (tabela expenses) do mês — ficam fora de total, que é só de contas. */
   gastosAvulsos: number
@@ -135,10 +138,11 @@ export async function fechamentoMensal(
   const qtdContas = porCategoria.reduce((acc, c) => acc + c.count, 0)
 
   const [[user]]: any = await pool.query(
-    'SELECT monthly_budget_limit FROM users WHERE id = ?',
+    'SELECT monthly_budget_limit, monthly_expense_budget_limit FROM users WHERE id = ?',
     [userId]
   )
   const orcamento = user?.monthly_budget_limit != null ? Number(user.monthly_budget_limit) : null
+  const orcamentoGastos = user?.monthly_expense_budget_limit != null ? Number(user.monthly_expense_budget_limit) : null
 
   const [[avulsos]]: any = await pool.query(
     'SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS qtd FROM expenses WHERE user_id = ? AND spent_on BETWEEN ? AND ?',
@@ -149,6 +153,7 @@ export async function fechamentoMensal(
     total,
     porCategoria: porCategoria.map((c) => ({ category: c.category, total: c.total })),
     orcamento,
+    orcamentoGastos,
     qtdContas,
     gastosAvulsos: Math.round((Number(avulsos.total) || 0) * 100) / 100,
     qtdGastos: Number(avulsos.qtd) || 0,

@@ -8,6 +8,7 @@ export type ClaimKind =
   | 'weekly_summary'
   | 'monthly_summary'
   | 'budget_alert'
+  | 'expense_budget_alert'
   | 'asset_alert'
   | 'checklist_poll'
   | 'checklist_inactivity'

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { expensesApi, type DadosGasto } from '../../api/expenses'
 import type { Expense } from '../../types'
 import { formatBRL, formatDate } from '../../utils/format'
@@ -7,6 +8,7 @@ import NumberField from '../../components/ui/NumberField'
 import Modal from '../../components/ui/Modal'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 import { useToast } from '../../context/ToastContext'
+import { useAuth } from '../../context/AuthContext'
 import { infoCategoria, type CategoriaGasto } from '../../utils/categoriasGasto'
 import GerenciarCategorias from '../../components/contas/GerenciarCategorias'
 import DiaADiaGastos from '../../components/contas/DiaADiaGastos'
@@ -21,6 +23,38 @@ const somarMeses = (mes: string, n: number): string => {
   const [a, m] = mes.split('-').map(Number)
   const d = new Date(a, m - 1 + n, 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** Total do mês contra o limite de gastos — separado do limite das contas. */
+const LimiteGastos: React.FC<{ total: number; limite: number | null }> = ({ total, limite }) => {
+  if (limite === null) {
+    return (
+      <Link to="/configuracoes" className="inline-block text-xs text-primary hover:text-primary/80 font-medium">
+        Definir limite mensal de gastos →
+      </Link>
+    )
+  }
+  const estourou = total > limite
+  const pct = limite > 0 ? Math.min(100, Math.round((total / limite) * 100)) : 100
+  return (
+    <div className="space-y-1.5">
+      <div
+        className="h-2 rounded-full bg-surface-container overflow-hidden"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Limite de gastos usado"
+      >
+        <div className={`h-full rounded-full ${estourou ? 'bg-error' : 'bg-primary'}`} style={{ width: `${pct}%` }} />
+      </div>
+      <p className={`text-xs ${estourou ? 'text-error' : 'text-on-surface-variant'}`}>
+        {estourou
+          ? `${formatBRL(total - limite)} acima do limite de ${formatBRL(limite)}`
+          : `${formatBRL(limite - total)} restantes do limite de ${formatBRL(limite)}`}
+      </p>
+    </div>
+  )
 }
 
 /** Agrupa por dia mantendo a ordem da API (mais recente primeiro). */
@@ -142,7 +176,7 @@ const EdicaoGasto: React.FC<EdicaoProps> = ({ gasto, categorias, onSalvar, onCan
   )
 }
 
-const ContasGastos: React.FC = () => {
+const Gastos: React.FC = () => {
   const mesAtual = hojeLocal().slice(0, 7)
   const [mes, setMes] = useState(mesAtual)
   const [gastos, setGastos] = useState<Expense[]>([])
@@ -163,6 +197,8 @@ const ContasGastos: React.FC = () => {
   const [apagar, setApagar] = useState<Expense | null>(null)
   const [apagando, setApagando] = useState(false)
   const { success, error: showError } = useToast()
+  const { user } = useAuth()
+  const limiteGastos = user?.monthly_expense_budget_limit != null ? Number(user.monthly_expense_budget_limit) : null
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -329,6 +365,7 @@ const ContasGastos: React.FC = () => {
           TOTAL {formatBRL(total)}
         </span>
       </div>
+      {!loading && <LimiteGastos total={total} limite={limiteGastos} />}
 
       {/* Por categoria — tocar filtra a lista. O gerenciador vem primeiro: no fim
           da faixa rolável ele ficava escondido no celular. */}
@@ -472,4 +509,4 @@ const ContasGastos: React.FC = () => {
   )
 }
 
-export default ContasGastos
+export default Gastos

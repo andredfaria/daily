@@ -296,6 +296,8 @@ export interface ContaAVencer {
   nome: string
   vencimento: string
   valor: number
+  /** Conta variável sem o valor real do mês informado: valor é a estimativa. */
+  estimado?: boolean
 }
 
 function rotuloDia(data: string, hoje: string): string {
@@ -308,7 +310,7 @@ function rotuloDia(data: string, hoje: string): string {
 export function linhasContas(contas: ContaAVencer[], hoje: string): string[] {
   return [...contas]
     .sort((a, b) => a.vencimento.localeCompare(b.vencimento))
-    .map((c) => `• ${c.nome} — ${formatBRL(c.valor)} (${rotuloDia(c.vencimento, hoje)})`)
+    .map((c) => `• ${c.nome} — ${formatBRL(c.valor)}${c.estimado ? ' estimado' : ''} (${rotuloDia(c.vencimento, hoje)})`)
 }
 
 export function textoContas(contas: ContaAVencer[], hoje: string): string {

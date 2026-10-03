@@ -2,13 +2,15 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
-const navItems = [
+// short: rótulo da barra inferior do celular, onde sete itens dividem a largura.
+const navItems: { path: string; label: string; icon: string; exact?: boolean; short?: string }[] = [
   { path: '/', label: 'Home', icon: 'home', exact: true },
   { path: '/contas', label: 'Contas', icon: 'receipt_long' },
+  { path: '/gastos', label: 'Gastos', icon: 'payments' },
   { path: '/ativos', label: 'Ativos', icon: 'trending_up' },
   { path: '/checklists', label: 'Checklists', icon: 'checklist' },
-  { path: '/notificacoes', label: 'Notificações', icon: 'notifications' },
-  { path: '/configuracoes', label: 'Configurações', icon: 'settings' },
+  { path: '/notificacoes', label: 'Notificações', icon: 'notifications', short: 'Avisos' },
+  { path: '/configuracoes', label: 'Configurações', icon: 'settings', short: 'Ajustes' },
 ]
 
 export { navItems }

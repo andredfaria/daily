@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
-import { generateOccurrencesForBill, regenerateOccurrencesForBill } from '../services/occurrenceGenerator'
+import { generateOccurrencesForBill, regenerateOccurrencesForBill, aplicarValorDaConta } from '../services/occurrenceGenerator'
 import { encryptPix, decryptPix } from '../services/pixCrypto'
-import { validarConta } from '../services/billValidation'
+import { validarConta, camposAlterados } from '../services/billValidation'
 
 const router = Router()
 
@@ -34,7 +34,29 @@ router.get('/', async (req: Request, res: Response) => {
       byBill[m.bill_id].push(decryptMethod(m))
     }
 
-    res.json(rows.map((b: any) => ({ ...b, payment_methods: byBill[b.id] ?? [] })))
+    // Conta variável mostra o vencimento do mês corrente (ou o próximo), onde se
+    // informa o valor real. Parte do dia 1º para o vencimento que já passou
+    // continuar editável até o mês virar.
+    const variaveis = rows.filter((b: any) => !b.is_fixed).map((b: any) => b.id)
+    const atualPorConta: Record<string, any> = {}
+    if (variaveis.length) {
+      const [ocorrencias]: any = await pool.query(
+        `SELECT id, bill_id, DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date, amount, amount_is_actual
+           FROM bill_occurrences
+          WHERE bill_id IN (?) AND due_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+          ORDER BY due_date ASC`,
+        [variaveis]
+      )
+      for (const o of ocorrencias) {
+        if (!atualPorConta[o.bill_id]) atualPorConta[o.bill_id] = o
+      }
+    }
+
+    res.json(rows.map((b: any) => ({
+      ...b,
+      payment_methods: byBill[b.id] ?? [],
+      ocorrencia_atual: atualPorConta[b.id] ?? null,
+    })))
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })
@@ -67,11 +89,11 @@ router.post('/', async (req: Request, res: Response) => {
       recurrence_day_of_month, recurrence_day_of_week,
       // O default acompanha o da coluna (NOT NULL DEFAULT 3): sem ele, um corpo
       // sem days_before_alert chegava como undefined no bind do mysql2 e quebrava.
-      due_date, days_before_alert = 3, is_active = true, category,
+      due_date, days_before_alert = 3, is_active = true, is_fixed = true, category,
     } = req.body
 
     // B4 — validação de campos obrigatórios (mesma regra do PATCH)
-    const erro = validarConta({ ...req.body, days_before_alert })
+    const erro = validarConta({ ...req.body, days_before_alert, is_fixed })
     if (erro) return res.status(400).json({ error: erro })
 
     const id = uuidv4()
@@ -79,13 +101,13 @@ router.post('/', async (req: Request, res: Response) => {
 
     await pool.query(
       `INSERT INTO bills
-        (id, user_id, name, category, description, amount, recurrence_type,
+        (id, user_id, name, category, description, amount, is_fixed, recurrence_type,
          recurrence_day_of_month, recurrence_day_of_week, due_date,
          days_before_alert, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, req.userId,
-        name, category ?? null, description ?? null, amount, recurrence_type,
+        name, category ?? null, description ?? null, amount, is_fixed ? 1 : 0, recurrence_type,
         recurrence_day_of_month ?? null, recurrence_day_of_week ?? null,
         due_date ?? null, days_before_alert, is_active ? 1 : 0, now, now,
       ]
@@ -119,7 +141,7 @@ router.post('/', async (req: Request, res: Response) => {
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const allowed = [
-      'name', 'category', 'description', 'amount', 'recurrence_type',
+      'name', 'category', 'description', 'amount', 'is_fixed', 'recurrence_type',
       'recurrence_day_of_month', 'recurrence_day_of_week',
       'due_date', 'days_before_alert', 'is_active',
     ]
@@ -159,8 +181,16 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const [rows]: any = await pool.query('SELECT * FROM bills WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
     const updatedBill = rows[0]
 
-    const recurrenceChanged = ['recurrence_type', 'recurrence_day_of_month', 'recurrence_day_of_week', 'due_date', 'amount']
-      .some(k => req.body[k] !== undefined)
+    // Só mudança de data regera as ocorrências futuras (e perde o valor real já
+    // informado nelas). Mudança de valor ou de fixa/variável só reescreve o
+    // valor, preservando lembretes e o valor real da conta variável.
+    const recurrenceChanged = camposAlterados(atuais[0], req.body,
+      ['recurrence_type', 'recurrence_day_of_month', 'recurrence_day_of_week', 'due_date']).length > 0
+    const valorChanged = camposAlterados(atuais[0], req.body, ['amount', 'is_fixed']).length > 0
+    if (!recurrenceChanged && valorChanged) {
+      aplicarValorDaConta(req.params.id, updatedBill.amount, !!updatedBill.is_fixed)
+        .catch((err: any) => console.error('[bills] erro ao aplicar valor nas ocorrências:', err.message))
+    }
     if (recurrenceChanged) {
       regenerateOccurrencesForBill(req.params.id, {
         recurrence_type: updatedBill.recurrence_type,

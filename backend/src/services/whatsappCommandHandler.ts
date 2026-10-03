@@ -133,13 +133,19 @@ async function montarResposta(comando: Comando, userId: string, args: string, re
 
 export async function contasDaSemana(userId: string, hoje: string): Promise<ContaAVencer[]> {
   const [rows]: any = await pool.query(
-    `SELECT b.name, DATE_FORMAT(o.due_date, '%Y-%m-%d') AS due_date, o.amount
+    `SELECT b.name, DATE_FORMAT(o.due_date, '%Y-%m-%d') AS due_date, o.amount,
+            (b.is_fixed = 0 AND o.amount_is_actual = 0) AS estimado
        FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id
       WHERE b.user_id = ? AND b.is_active = 1 AND o.due_date BETWEEN ? AND ?
       ORDER BY o.due_date ASC`,
     [userId, hoje, somarDias(hoje, 7)],
   )
-  return rows.map((r: any) => ({ nome: r.name, vencimento: r.due_date, valor: Number(r.amount) || 0 }))
+  return rows.map((r: any) => ({
+    nome: r.name,
+    vencimento: r.due_date,
+    valor: Number(r.amount) || 0,
+    estimado: Number(r.estimado) === 1,
+  }))
 }
 
 async function carteiraAgora(userId: string, hoje: string) {

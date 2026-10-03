@@ -7,6 +7,7 @@ import { Link, useLocation } from 'react-router-dom'
 const pageTitles: { prefix: string; title: string }[] = [
   { prefix: '/contas/nova', title: 'Nova Conta' },
   { prefix: '/contas', title: 'Minhas Contas' },
+  { prefix: '/gastos', title: 'Meus Gastos' },
   { prefix: '/ativos', title: 'Meus Ativos' },
   { prefix: '/checklists', title: 'Checklists' },
   { prefix: '/notificacoes', title: 'Notificações' },

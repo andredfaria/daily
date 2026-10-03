@@ -25,7 +25,7 @@ router.patch('/me', async (req: Request, res: Response) => {
       'name', 'whatsapp_number', 'timezone', 'is_active',
       'notification_time', 'whatsapp_alerts_enabled',
       'weekly_summary_enabled', 'default_days_before_alert',
-      'summary_enabled', 'summary_day_of_week', 'monthly_budget_limit',
+      'summary_enabled', 'summary_day_of_week', 'monthly_budget_limit', 'monthly_expense_budget_limit',
       'monthly_summary_enabled',
       'asset_alerts_enabled', 'asset_alert_hour',
       'onboarding_completed',
@@ -85,7 +85,7 @@ router.patch('/me', async (req: Request, res: Response) => {
         continue
       }
 
-      if (key === 'monthly_budget_limit') {
+      if (key === 'monthly_budget_limit' || key === 'monthly_expense_budget_limit') {
         const val = req.body[key]
         if (val === null || val === '') {
           fields.push(`${key} = ?`)
@@ -94,7 +94,7 @@ router.patch('/me', async (req: Request, res: Response) => {
         }
         const num = Number(val)
         if (isNaN(num) || num < 0) {
-          return res.status(400).json({ error: 'monthly_budget_limit deve ser um número maior ou igual a zero' })
+          return res.status(400).json({ error: `${key} deve ser um número maior ou igual a zero` })
         }
         fields.push(`${key} = ?`)
         values.push(num)

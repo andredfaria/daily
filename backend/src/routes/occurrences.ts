@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import axios from 'axios'
 import pool from '../db'
+import { validarValorReal } from '../services/billValidation'
 
 const router = Router()
 
@@ -194,5 +195,39 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 })
 
+// PATCH /api/occurrences/:id — valor real do mês de uma conta variável.
+// { amount: número } grava o valor real; { amount: null } volta para a estimativa.
+router.patch('/:id', async (req: Request, res: Response) => {
+  try {
+    const r = validarValorReal(req.body?.amount)
+    if ('erro' in r) return res.status(400).json({ error: r.erro })
+
+    const [rows]: any = await pool.query(
+      `SELECT o.id, b.amount AS bill_amount, b.is_fixed
+         FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id
+        WHERE o.id = ? AND b.user_id = ?`,
+      [req.params.id, req.userId]
+    )
+    if (!rows.length) return res.status(404).json({ error: 'Not found' })
+    if (rows[0].is_fixed) {
+      return res.status(400).json({ error: 'Conta fixa não tem valor por mês: altere o valor da própria conta' })
+    }
+
+    const amount = r.valor ?? rows[0].bill_amount
+    await pool.query(
+      'UPDATE bill_occurrences SET amount = ?, amount_is_actual = ?, updated_at = ? WHERE id = ?',
+      [amount, r.valor !== null ? 1 : 0, new Date(), req.params.id]
+    )
+    const [atualizada]: any = await pool.query(
+      `SELECT id, bill_id, DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date, amount, amount_is_actual
+         FROM bill_occurrences WHERE id = ?`,
+      [req.params.id]
+    )
+    res.json(atualizada[0])
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
 
 export default router

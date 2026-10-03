@@ -130,9 +130,10 @@ const ComoUsar: React.FC = () => {
         <Passos
           itens={[
             <>Em <Link to="/contas/lista" className="text-primary font-medium">Contas</Link>, toque em <strong className="text-on-surface">Nova Conta</strong> e informe valor, recorrência (mensal, semanal, avulsa…) e, se quiser, a chave PIX ou o boleto.</>,
+            <>Marque a conta como <strong className="text-on-surface">Fixa</strong> quando o valor é sempre o mesmo (aluguel, internet) ou <strong className="text-on-surface">Variável</strong> quando muda todo mês (luz, água). Na variável, o valor cadastrado é uma estimativa: quando a fatura chegar, informe o valor real do mês no card da conta, e a análise passa a usar o valor real.</>,
             <>Alguns dias antes do vencimento, chega um lembrete no WhatsApp com os dados de pagamento. Quantos dias antes e a hora do aviso ficam em <Link to="/configuracoes" className="text-primary font-medium">Configurações</Link>.</>,
-            <>Gastos do dia a dia (mercado, café) vão na aba <Link to="/contas/gastos" className="text-primary font-medium">Gastos</Link> ou pelo <Cmd>/gasto</Cmd>. Cada gasto tem uma categoria (Alimentação, Transporte, Lazer…), e o total do mês por categoria aparece acima da lista — toque numa para filtrar. Em <strong className="text-on-surface">Categorias</strong> dá para criar as suas (Pet, Filhos…), renomear, trocar o ícone e ocultar as que não usa. Gastos não geram lembrete, mas contam no orçamento.</>,
-            <>Na aba <Link to="/contas/analise" className="text-primary font-medium">Análise</Link> você vê o total por categoria, a projeção dos próximos meses e quanto do orçamento mensal já foi usado.</>,
+            <>Gastos do dia a dia (mercado, café) ficam à parte das contas, em <Link to="/gastos" className="text-primary font-medium">Gastos</Link>, e podem ser anotados também pelo <Cmd>/gasto</Cmd>. Cada gasto tem uma categoria (Alimentação, Transporte, Lazer…), e o total do mês por categoria aparece acima da lista — toque numa para filtrar. Em <strong className="text-on-surface">Categorias</strong> dá para criar as suas (Pet, Filhos…), renomear, trocar o ícone e ocultar as que não usa. Gastos não geram lembrete e têm limite mensal próprio, separado do das contas.</>,
+            <>Na aba <Link to="/contas/analise" className="text-primary font-medium">Análise</Link> você vê o total por categoria, a projeção dos próximos meses e quanto do limite mensal de contas já foi usado.</>,
           ]}
         />
       </section>
@@ -182,7 +183,7 @@ const ComoUsar: React.FC = () => {
           <p>Se tudo estiver certo e mesmo assim não vier resposta, mande <Cmd>/ajuda</Cmd>: se nem ele responder, o WhatsApp do Rotina está fora do ar no momento.</p>
         </Duvida>
         <Duvida pergunta="Anotei um gasto errado">
-          <p>Na aba <Link to="/contas/gastos" className="text-primary font-medium">Contas › Gastos</Link>, toque no lápis ao lado do gasto para corrigir o nome, o valor, a categoria ou o dia — ou na lixeira para apagar.</p>
+          <p>Em <Link to="/gastos" className="text-primary font-medium">Gastos</Link>, toque no lápis ao lado do gasto para corrigir o nome, o valor, a categoria ou o dia — ou na lixeira para apagar.</p>
         </Duvida>
         <Duvida pergunta="Marquei um item pelo /marcar e votei na enquete depois">
           <p>Os dois se somam: o que foi marcado por mensagem continua marcado mesmo que não esteja selecionado na enquete.</p>

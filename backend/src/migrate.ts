@@ -413,6 +413,17 @@ CREATE TABLE IF NOT EXISTS sessions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `),
   },
+  {
+    // Conta fixa x variável: na variável (luz, água) bills.amount é estimativa e
+    // o valor real de cada mês vai na ocorrência, marcada com amount_is_actual.
+    // Gastos ganham limite próprio: monthly_budget_limit passa a ser só de contas.
+    name: '025_bills_fixed_expense_budget',
+    run: async () => {
+      await addColumnIfNotExists('bills', 'is_fixed', 'BOOLEAN NOT NULL DEFAULT TRUE', 'amount')
+      await addColumnIfNotExists('bill_occurrences', 'amount_is_actual', 'BOOLEAN NOT NULL DEFAULT FALSE', 'amount')
+      await addColumnIfNotExists('users', 'monthly_expense_budget_limit', 'DECIMAL(10,2) DEFAULT NULL', 'monthly_budget_limit')
+    },
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

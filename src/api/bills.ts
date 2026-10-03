@@ -5,6 +5,7 @@ export interface CreateBillPayload {
   name: string
   description?: string
   amount: number
+  is_fixed?: boolean
   recurrence_type: string
   recurrence_day_of_month?: number
   recurrence_day_of_week?: number

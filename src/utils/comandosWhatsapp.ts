@@ -33,7 +33,7 @@ export const COMANDOS_WHATSAPP: ComandoWhatsapp[] = [
   },
   {
     comando: '/gasto',
-    descricao: 'Anota um gasto do dia (aparece em Contas › Gastos)',
+    descricao: 'Anota um gasto do dia (aparece em Gastos)',
     exemplo: '/gasto 45 mercado',
     resposta: '💸 Anotado: mercado — R$ 45,00\nCategoria: Alimentação\n\nGastos do mês: R$ 312,40',
   },

@@ -5,7 +5,7 @@ import Header from './Header'
 
 const BottomNav: React.FC = () => {
   // Sem botão Sair: ação destrutiva não divide barra com navegação, e a largura
-  // liberada deixa os seis rótulos legíveis no mobile. Sair vive em Configurações.
+  // liberada deixa os sete rótulos legíveis no mobile. Sair vive em Configurações.
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest border-t border-outline-variant/50 flex items-stretch">
       {navItems.map((item) => (
@@ -27,7 +27,7 @@ const BottomNav: React.FC = () => {
               >
                 {item.icon}
               </span>
-              <span className="leading-none">{item.label.split(' ')[0]}</span>
+              <span className="leading-none">{item.short ?? item.label}</span>
             </>
           )}
         </NavLink>

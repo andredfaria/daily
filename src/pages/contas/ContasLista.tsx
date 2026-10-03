@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { billsApi } from '../../api/bills'
-import type { Bill, BillCategory, RecurrenceType } from '../../types'
+import { occurrencesApi } from '../../api/occurrences'
+import type { Bill, BillCategory, OcorrenciaAtual, RecurrenceType } from '../../types'
 import {
   formatBRL,
   formatDate,
@@ -11,6 +12,8 @@ import {
   getRecurrenceLabel,
   getRecurrenceShortLabel,
 } from '../../utils/format'
+import { formatNumericInput, parseNumericInput } from '../../utils/numberInput'
+import NumberField from '../../components/ui/NumberField'
 import Modal from '../../components/ui/Modal'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 import { useToast } from '../../context/ToastContext'
@@ -20,16 +23,115 @@ type RecurrenceFilter = 'all' | RecurrenceType
 type ActiveFilter = 'all' | 'active' | 'inactive'
 type CategoryFilter = 'all' | BillCategory
 
+/** Valor que a conta pesa no mês: na variável, o do vencimento corrente (real ou estimado). */
+const valorDoMes = (bill: Bill): number =>
+  Number(!bill.is_fixed && bill.ocorrencia_atual ? bill.ocorrencia_atual.amount : bill.amount)
+
+// --- Valor do mês (conta variável) ---
+interface ValorDoMesProps {
+  bill: Bill
+  ocorrencia: OcorrenciaAtual
+  onAtualizada: (billId: string, ocorrencia: OcorrenciaAtual) => void
+}
+
+/** Mostra o valor do vencimento corrente e deixa informar o real no próprio card. */
+const ValorDoMes: React.FC<ValorDoMesProps> = ({ bill, ocorrencia, onAtualizada }) => {
+  const [editando, setEditando] = useState(false)
+  const [valor, setValor] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const { success, error: showError } = useToast()
+  const real = !!Number(ocorrencia.amount_is_actual)
+
+  const abrir = () => {
+    setValor(real ? formatNumericInput(Number(ocorrencia.amount), 2, { padDecimals: true }) : '')
+    setEditando(true)
+  }
+
+  const salvar = async (amount: number | null) => {
+    setSalvando(true)
+    try {
+      onAtualizada(bill.id, await occurrencesApi.setAmount(ocorrencia.id, amount))
+      success(amount === null ? 'Voltou para o valor estimado.' : 'Valor do mês salvo!')
+      setEditando(false)
+    } catch {
+      showError('Erro ao salvar o valor do mês.')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const enviar = (e: React.FormEvent) => {
+    e.preventDefault()
+    const amount = parseNumericInput(valor)
+    if (amount === null || amount < 0) return showError('Informe o valor do mês.')
+    salvar(amount)
+  }
+
+  if (editando) {
+    return (
+      <form onSubmit={enviar} className="mt-4 space-y-2" onKeyDown={(e) => e.key === 'Escape' && setEditando(false)}>
+        <NumberField
+          label={`Valor real de ${formatDate(ocorrencia.due_date, 'MMMM')}`}
+          mode="currency"
+          min={0}
+          prefix="R$"
+          placeholder={formatNumericInput(Number(bill.amount), 2, { padDecimals: true })}
+          value={valor}
+          onChange={setValor}
+          autoFocus
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="submit" disabled={salvando} className="btn-primary flex-1 justify-center">
+            {salvando ? 'Salvando…' : 'Salvar'}
+          </button>
+          <button type="button" onClick={() => setEditando(false)} className="btn-ghost flex-1 justify-center">
+            Cancelar
+          </button>
+          {real && (
+            <button
+              type="button"
+              disabled={salvando}
+              onClick={() => salvar(null)}
+              className="w-full min-h-[44px] text-xs text-on-surface-variant hover:text-primary cursor-pointer"
+            >
+              Voltar para a estimativa ({formatBRL(bill.amount)})
+            </button>
+          )}
+        </div>
+      </form>
+    )
+  }
+
+  return (
+    <div className="flex items-end justify-between gap-3 mt-4">
+      <div className="min-w-0">
+        <div className="text-xl font-bold text-primary">{formatBRL(ocorrencia.amount)}</div>
+        <p className="text-xs text-on-surface-variant mt-0.5">
+          {real ? 'Valor real' : 'Estimado'} · vence {formatDate(ocorrencia.due_date, 'dd/MM')}
+        </p>
+      </div>
+      <button
+        onClick={abrir}
+        className="flex-shrink-0 flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+      >
+        <span className="material-symbols-outlined text-base">{real ? 'edit' : 'edit_note'}</span>
+        {real ? 'Corrigir' : 'Informar valor'}
+      </button>
+    </div>
+  )
+}
+
 // --- Bill Card ---
 interface BillCardProps {
   bill: Bill
   onEdit: (id: string) => void
   onToggle: (id: string, active: boolean) => void
   onDelete: (bill: Bill) => void
+  onOcorrenciaAtualizada: (billId: string, ocorrencia: OcorrenciaAtual) => void
   toggling?: string | null
 }
 
-const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, toggling }) => {
+const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, onOcorrenciaAtualizada, toggling }) => {
   const icon = getBillIcon(bill.name)
   const recurrenceLabel = getRecurrenceShortLabel(bill.recurrence_type)
   const recurrenceColor = getRecurrenceBadgeColor(bill.recurrence_type)
@@ -110,6 +212,17 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, t
           {recurrenceLabel}
         </span>
 
+        <span
+          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+            bill.is_fixed
+              ? 'border-outline-variant/40 text-on-surface-variant'
+              : 'border-secondary/40 text-secondary'
+          }`}
+          title={bill.is_fixed ? 'Mesmo valor todo mês' : 'Valor muda todo mês'}
+        >
+          {bill.is_fixed ? 'Fixa' : 'Variável'}
+        </span>
+
         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
           bill.is_active
             ? 'bg-tertiary/15 text-tertiary'
@@ -143,10 +256,19 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, t
         <p className="text-xs text-on-surface-variant/70 mt-2 line-clamp-1">{bill.description}</p>
       )}
 
+      {/* Valor do mês da conta variável */}
+      {!bill.is_fixed && bill.ocorrencia_atual && (
+        <ValorDoMes bill={bill} ocorrencia={bill.ocorrencia_atual} onAtualizada={onOcorrenciaAtualizada} />
+      )}
+
       {/* Amount + due date */}
       <div className="flex items-end justify-between mt-4">
         <div>
-          <div className="text-xl font-bold text-primary">{formatBRL(bill.amount)}</div>
+          {!bill.is_fixed && bill.ocorrencia_atual ? (
+            <p className="text-xs text-on-surface-variant">Estimativa: {formatBRL(bill.amount)}</p>
+          ) : (
+            <div className="text-xl font-bold text-primary">{formatBRL(bill.amount)}</div>
+          )}
           {bill.due_date && (
             <p className="text-xs text-on-surface-variant mt-0.5">
               Vence em {formatDate(bill.due_date)}
@@ -229,7 +351,11 @@ const ContasLista: React.FC = () => {
     return recMatch && activeMatch && categoryMatch
   })
 
-  const totalAmount = filtered.reduce((s, b) => s + Number(b.amount), 0)
+  const totalAmount = filtered.reduce((s, b) => s + valorDoMes(b), 0)
+
+  const ocorrenciaAtualizada = (billId: string, ocorrencia: OcorrenciaAtual) => {
+    setBills((prev) => prev.map((b) => (b.id === billId ? { ...b, ocorrencia_atual: ocorrencia } : b)))
+  }
 
   const recurrenceFilters: { value: RecurrenceFilter; label: string }[] = [
     { value: 'all', label: 'Todas' },
@@ -368,6 +494,7 @@ const ContasLista: React.FC = () => {
               onEdit={(id) => navigate(`/contas/${id}/editar`)}
               onToggle={handleToggle}
               onDelete={setDeleteTarget}
+              onOcorrenciaAtualizada={ocorrenciaAtualizada}
               toggling={toggling}
             />
           ))}

@@ -99,6 +99,11 @@ describe('textoContas', () => {
     expect(t).toContain('*Total:* R$ 299,90')
   })
 
+  it('marca o valor estimado de conta variável', () => {
+    const t = textoContas([{ nome: 'Luz', vencimento: '2026-09-25', valor: 120, estimado: true }], '2026-09-24')
+    expect(t.split('\n')[2]).toBe('• Luz — R$ 120,00 estimado (amanhã)')
+  })
+
   it('sem contas', () => {
     expect(textoContas([], '2026-09-24')).toContain('Nenhuma conta')
   })

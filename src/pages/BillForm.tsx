@@ -170,6 +170,7 @@ const BillForm: React.FC = () => {
   const [category, setCategory] = useState<BillCategory | ''>('')
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
+  const [isFixed, setIsFixed] = useState(true)
   const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('monthly')
   const [dayOfMonth, setDayOfMonth] = useState('1')
   const [dayOfWeek, setDayOfWeek] = useState<number>(1)
@@ -193,6 +194,7 @@ const BillForm: React.FC = () => {
       setCategory(bill.category ?? '')
       setDescription(bill.description ?? '')
       setAmount(formatNumericInput(Number(bill.amount), 2, { padDecimals: true }))
+      setIsFixed(!!bill.is_fixed)
       setRecurrenceType(bill.recurrence_type)
       setDayOfMonth(String(bill.recurrence_day_of_month ?? 1))
       setDayOfWeek(bill.recurrence_day_of_week ?? 1)
@@ -276,6 +278,7 @@ const BillForm: React.FC = () => {
         category: category || undefined,
         description: description.trim() || undefined,
         amount: parseNumericInput(amount) ?? 0,
+        is_fixed: isFixed,
         recurrence_type: recurrenceType,
         recurrence_day_of_month: needsDayOfMonth ? (parseNumericInput(dayOfMonth) ?? 1) : undefined,
         recurrence_day_of_week: needsDayOfWeek ? dayOfWeek : undefined,
@@ -427,9 +430,39 @@ const BillForm: React.FC = () => {
                 />
               </div>
 
+              {/* Fixa x variável */}
+              <div>
+                <label className="label" id="tipo-valor">Valor da conta</label>
+                <div className="flex items-center gap-1.5 bg-surface-container rounded-xl p-1" role="radiogroup" aria-labelledby="tipo-valor">
+                  {([
+                    { fixa: true, label: 'Fixa', dica: 'mesmo valor todo mês' },
+                    { fixa: false, label: 'Variável', dica: 'muda todo mês' },
+                  ]).map((o) => (
+                    <button
+                      key={o.label}
+                      type="button"
+                      role="radio"
+                      aria-checked={isFixed === o.fixa}
+                      onClick={() => setIsFixed(o.fixa)}
+                      className={`
+                        flex-1 min-h-[44px] px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer
+                        ${isFixed === o.fixa
+                          ? 'bg-primary text-on-primary-fixed shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                        }
+                      `}
+                    >
+                      {o.label}
+                      <span className="block text-[10px] font-normal opacity-80">{o.dica}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Valor */}
               <NumberField
-                label="Valor"
+                label={isFixed ? 'Valor' : 'Valor estimado'}
+                hint={isFixed ? undefined : 'Média de um mês. O valor real de cada mês você informa no card da conta.'}
                 required
                 mode="currency"
                 min={0}

@@ -133,20 +133,25 @@ export async function sendMonthlySummary(userId: string): Promise<void> {
   }
 
   if (fechamento.porCategoria.length) {
-    msg += `\n*Por categoria:*\n`
+    msg += `\n*Contas por categoria:*\n`
     for (const c of fechamento.porCategoria) {
       const nome = NOMES_CATEGORIA[c.category] ?? c.category
       msg += `• ${nome}: R$ ${formatBRL(c.total)}\n`
     }
   }
 
-  if (fechamento.orcamento != null) {
-    const diff = fechamento.total + fechamento.gastosAvulsos - fechamento.orcamento
-    if (diff > 0) {
-      msg += `\n⚠️ R$ ${formatBRL(diff)} acima do orçamento de R$ ${formatBRL(fechamento.orcamento)}.`
-    } else {
-      msg += `\n✅ Dentro do orçamento (R$ ${formatBRL(fechamento.orcamento)}).`
-    }
+  // Contas e gastos têm limites separados; cada um é julgado contra o seu.
+  const linhaOrcamento = (rotulo: string, total: number, limite: number): string => {
+    const diff = total - limite
+    return diff > 0
+      ? `⚠️ ${rotulo}: R$ ${formatBRL(diff)} acima do limite de R$ ${formatBRL(limite)}.\n`
+      : `✅ ${rotulo}: dentro do limite de R$ ${formatBRL(limite)}.\n`
+  }
+  if (fechamento.orcamento != null || fechamento.orcamentoGastos != null) {
+    msg += `\n`
+    if (fechamento.orcamento != null) msg += linhaOrcamento('Contas', fechamento.total, fechamento.orcamento)
+    if (fechamento.orcamentoGastos != null) msg += linhaOrcamento('Gastos', fechamento.gastosAvulsos, fechamento.orcamentoGastos)
+    msg = msg.trimEnd()
   }
 
   const refKey = claimKeyMesAnterior()

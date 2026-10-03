@@ -23,6 +23,8 @@ export interface Bill {
   category?: BillCategory
   description?: string
   amount: number
+  /** Fixa: valor igual todo mês. Variável: amount é estimativa e o valor real vai na ocorrência. */
+  is_fixed: boolean
   recurrence_type: RecurrenceType
   recurrence_day_of_month?: number
   recurrence_day_of_week?: number
@@ -32,6 +34,16 @@ export interface Bill {
   created_at: string
   updated_at: string
   payment_methods?: PaymentMethod[]
+  /** Só conta variável: vencimento do mês corrente (ou o próximo), onde vai o valor real. */
+  ocorrencia_atual?: OcorrenciaAtual | null
+}
+
+export interface OcorrenciaAtual {
+  id: string
+  bill_id: string
+  due_date: string
+  amount: number
+  amount_is_actual: boolean | number
 }
 
 export interface BillOccurrence {
@@ -41,6 +53,7 @@ export interface BillOccurrence {
   bill_name?: string
   due_date: string
   amount: number
+  amount_is_actual?: boolean | number
   whatsapp_msg?: string
   created_at: string
   updated_at: string
@@ -98,6 +111,7 @@ export interface User {
   summary_day_of_week: number
   monthly_summary_enabled: boolean
   monthly_budget_limit: number | null
+  monthly_expense_budget_limit: number | null
   onboarding_completed: boolean
   created_at: string
   updated_at: string
@@ -227,10 +241,13 @@ export interface ProjectionResponse {
 
 export interface BudgetResponse {
   total: number
+  /** Limite mensal das contas. */
   orcamento: number | null
+  /** Limite mensal dos gastos avulsos, separado do das contas. */
+  orcamentoGastos: number | null
   qtdContas: number
   porCategoria: Array<{ category: string; total: number }>
-  /** Gastos avulsos do mês — somam no orçamento, mas ficam fora de total (só contas). */
+  /** Gastos avulsos do mês — fora de total, que é só de contas. */
   gastosAvulsos: number
   qtdGastos: number
 }
