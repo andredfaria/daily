@@ -13,6 +13,7 @@ import { WhatsAppProfileCard, WhatsAppProfile } from '../components/whatsapp/Wha
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { parseISO, isToday, isTomorrow } from 'date-fns'
+import { totalCarteira } from '../utils/carteira'
 
 function mesAtualSaoPaulo(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -156,6 +157,12 @@ const Home: React.FC = () => {
   }
 
   const hoje = checklist?.today
+  const resumoCarteira = totalCarteira(ativos)
+  const ativosComPosicao = ativos.filter((ativo) => ativo.quantity > 0)
+  const resultadoCarteira = ativosComPosicao.reduce((total, ativo) => total + (ativo.profit_loss ?? 0), 0)
+  const ativosEmDestaque = [...ativos]
+    .sort((a, b) => (b.current_value ?? -1) - (a.current_value ?? -1))
+    .slice(0, 4)
   if (checklist?.checklist && hoje && hoje.completion_pct < 100) {
     pendencias.push({
       icone: 'checklist',
@@ -176,6 +183,96 @@ const Home: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      <section className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between" aria-label="Resumo do dia">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Visão geral</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-on-surface">Seu dia, em foco</h1>
+          <p className="mt-1 text-sm text-on-surface-variant">Acompanhe sua carteira, seus gastos e o que precisa de atenção.</p>
+        </div>
+        <button onClick={() => navigate('/ativos/carteira')} className="mt-2 inline-flex min-h-[44px] items-center gap-1 self-start text-sm font-medium text-primary hover:text-primary/80 sm:mt-0 sm:self-auto">
+          Minha carteira <span className="material-symbols-outlined text-lg">arrow_forward</span>
+        </button>
+      </section>
+
+      <section className="grid gap-3 lg:grid-cols-[1.35fr_1fr_1fr]" aria-label="Indicadores principais">
+        <button onClick={() => navigate('/ativos/carteira')} className="glass-card rounded-2xl border border-primary/30 bg-primary/5 p-5 text-left transition-colors hover:border-primary/60">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-on-surface-variant">Patrimônio investido</p>
+            <span className="material-symbols-outlined text-primary">account_balance</span>
+          </div>
+          {loading ? <div className="mt-3 h-8 w-36 animate-pulse rounded bg-surface-container-high" /> : (
+            <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight text-on-surface">{formatBRL(resumoCarteira.total)}</p>
+          )}
+          <p className="mt-2 text-xs text-on-surface-variant">
+            {loading ? 'Atualizando carteira…' : `${ativosComPosicao.length} ${ativosComPosicao.length === 1 ? 'posição' : 'posições'}${resumoCarteira.semCotacao ? ` · ${resumoCarteira.semCotacao} sem cotação` : ''}`}
+          </p>
+        </button>
+
+        <button onClick={() => navigate('/ativos/analise')} className="glass-card rounded-2xl border border-outline-variant/50 p-5 text-left transition-colors hover:border-outline-variant">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-on-surface-variant">Resultado da carteira</p>
+            <span className="material-symbols-outlined text-on-surface-variant">monitoring</span>
+          </div>
+          {loading ? <div className="mt-3 h-8 w-32 animate-pulse rounded bg-surface-container-high" /> : (
+            <p className={`mt-2 text-2xl font-bold tabular-nums ${resultadoCarteira >= 0 ? 'text-tertiary' : 'text-error'}`}>
+              {resultadoCarteira > 0 ? '+' : ''}{formatBRL(resultadoCarteira)}
+            </p>
+          )}
+          <p className="mt-2 text-xs text-on-surface-variant">Variação sobre o preço médio</p>
+        </button>
+
+        <button onClick={() => navigate('/gastos')} className="glass-card rounded-2xl border border-outline-variant/50 p-5 text-left transition-colors hover:border-outline-variant">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-on-surface-variant">Gastos neste mês</p>
+            <span className="material-symbols-outlined text-on-surface-variant">payments</span>
+          </div>
+          {loading || gastosErro ? <p className="mt-3 text-sm text-on-surface-variant">{loading ? 'Carregando…' : 'Indisponível no momento'}</p> : (
+            <p className="mt-2 text-2xl font-bold tabular-nums text-on-surface">{formatBRL(gastos?.total ?? 0)}</p>
+          )}
+          <p className="mt-2 text-xs text-on-surface-variant">
+            {user?.monthly_expense_budget_limit != null ? `Limite ${formatBRL(Number(user.monthly_expense_budget_limit))}` : 'Acompanhe suas despesas do mês'}
+          </p>
+        </button>
+      </section>
+
+      <section className="glass-card rounded-2xl border border-outline-variant/50 p-5" aria-labelledby="ativos-destaque-titulo">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 id="ativos-destaque-titulo" className="text-base font-semibold text-on-surface">Sua carteira</h2>
+            <p className="mt-0.5 text-xs text-on-surface-variant">Ativos com maior posição na carteira</p>
+          </div>
+          <button onClick={() => navigate('/ativos/carteira')} className="min-h-[44px] shrink-0 text-xs font-medium text-primary hover:text-primary/80">Ver carteira →</button>
+        </div>
+        {loading ? (
+          <div className="space-y-3"><SkeletonRow /><SkeletonRow /></div>
+        ) : ativos.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-outline-variant/60 px-4 py-6 text-center">
+            <p className="text-sm text-on-surface-variant">Sua carteira ainda está vazia.</p>
+            <button onClick={() => navigate('/ativos/carteira')} className="btn-primary mx-auto mt-3 min-h-[44px]">Adicionar primeiro ativo</button>
+          </div>
+        ) : (
+          <div className="divide-y divide-outline-variant/30">
+            {ativosEmDestaque.map((ativo) => {
+              const resultado = ativo.profit_loss
+              return (
+                <button key={ativo.id} onClick={() => navigate('/ativos/carteira')} className="flex min-h-[68px] w-full items-center gap-3 py-3 text-left hover:bg-surface-container/40">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">{ativo.ticker.slice(0, 2)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-on-surface">{ativo.ticker}</span>
+                    <span className="block truncate text-xs text-on-surface-variant">{ativo.short_name}</span>
+                  </span>
+                  <span className="text-right">
+                    <span className="block text-sm font-semibold tabular-nums text-on-surface">{ativo.current_value !== null ? formatBRL(ativo.current_value) : ativo.quantity > 0 ? 'Sem cotação' : 'Em acompanhamento'}</span>
+                    {ativo.quantity > 0 && resultado !== null && <span className={`block text-xs tabular-nums ${resultado >= 0 ? 'text-tertiary' : 'text-error'}`}>{resultado > 0 ? '+' : ''}{formatBRL(resultado)}</span>}
+                  </span>
+                  <span className="material-symbols-outlined text-lg text-on-surface-variant">chevron_right</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
       <WhatsAppProfileCard
         profile={profile}
         whatsappNumber={user?.whatsapp_number ?? null}
