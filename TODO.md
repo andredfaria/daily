@@ -2,7 +2,14 @@
 
 > Consolida o que foi entregue a partir das specs/plans que existiam em
 > `docs/superpowers/` (agora removido, conteúdo consumido) e o que permanece pendente.
-> Última atualização: 2026-05-30.
+> Última atualização: 2026-10-04.
+
+## ✅ Concluído nesta rodada (2026-10-04)
+
+### Resumo semanal no WhatsApp
+- [x] Checklists mostram a frequência individual de cada item marcado (ex.: `Academia: 5/7 dias`), em vez de dias completos e percentual geral.
+- [x] Resumo inclui o total e a quantidade de gastos avulsos dos sete dias fechados antes do envio.
+- [x] Story: `docs/stories/2026-10-04-resumo-semanal.md`.
 
 ---
 

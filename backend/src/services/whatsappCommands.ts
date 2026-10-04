@@ -376,27 +376,34 @@ export function blocoCarteiraSemana(v: VariacaoPeriodo | null): string | null {
 export interface PollDaSemana {
   checklistId: string
   nome: string
-  completos: number
-  total: number
+  marcados: string[]
+  itens: string[]
 }
 
-/** "• Treino: 5/7 dias completos (82%)", um por checklist. */
+/** Frequência semanal de cada item, contando apenas os dias em que houve envio. */
 export function blocoChecklistsSemana(polls: PollDaSemana[]): string | null {
-  const porChecklist = new Map<string, { nome: string; dias: number; completos: number; somaPct: number }>()
+  const porChecklist = new Map<string, { nome: string; dias: number; itens: Map<string, number> }>()
   for (const p of polls) {
-    const atual = porChecklist.get(p.checklistId) ?? { nome: p.nome, dias: 0, completos: 0, somaPct: 0 }
+    const atual = porChecklist.get(p.checklistId) ?? { nome: p.nome, dias: 0, itens: new Map<string, number>() }
     atual.dias++
-    if (p.total > 0 && p.completos >= p.total) atual.completos++
-    atual.somaPct += p.total > 0 ? Math.min(p.completos / p.total, 1) : 0
+    for (const item of p.itens) if (!atual.itens.has(item)) atual.itens.set(item, 0)
+    for (const item of new Set(p.marcados)) atual.itens.set(item, (atual.itens.get(item) ?? 0) + 1)
     porChecklist.set(p.checklistId, atual)
   }
   if (porChecklist.size === 0) return null
 
   const linhas = [...porChecklist.values()]
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-    .map((c) => {
-      const media = Math.round((c.somaPct / c.dias) * 100)
-      return `• ${c.nome}: ${c.completos}/${c.dias} ${c.dias === 1 ? 'dia completo' : 'dias completos'} (${media}%)`
-    })
+    .flatMap((c) => [
+      `*${c.nome}:*`,
+      ...[...c.itens.entries()]
+        .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+        .map(([item, dias]) => `• ${item}: ${dias}/${c.dias} ${c.dias === 1 ? 'dia' : 'dias'}`),
+    ])
   return '*Checklists:*\n' + linhas.join('\n')
+}
+
+export function blocoGastosSemana(total: number, quantidade: number): string | null {
+  if (quantidade <= 0) return null
+  return `*Gastos na semana:* ${formatBRL(total)} em ${quantidade} ${quantidade === 1 ? 'lançamento' : 'lançamentos'}`
 }

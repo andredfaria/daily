@@ -11,6 +11,7 @@ import {
   textoAjuda,
   blocoCarteiraSemana,
   blocoChecklistsSemana,
+  blocoGastosSemana,
 } from '../whatsappCommands'
 
 describe('parseComando', () => {
@@ -177,16 +178,21 @@ describe('blocos do resumo semanal', () => {
     ).toBe('*Carteira:* R$ 2.000,00\nNa semana: +R$ 40,00 (+2,00%)')
   })
 
-  it('checklists agrupados com dias completos e média', () => {
+  it('checklists agrupados com frequência individual por item', () => {
     const b = blocoChecklistsSemana([
-      { checklistId: 't', nome: 'Treino', completos: 3, total: 3 },
-      { checklistId: 't', nome: 'Treino', completos: 1, total: 3 },
-      { checklistId: 'a', nome: 'Água', completos: 2, total: 2 },
+      { checklistId: 't', nome: 'Treino', marcados: ['Academia', 'Alongamento'], itens: ['Academia', 'Alongamento'] },
+      { checklistId: 't', nome: 'Treino', marcados: ['Academia'], itens: ['Academia', 'Alongamento'] },
+      { checklistId: 'a', nome: 'Água', marcados: ['Beber água'], itens: ['Beber água'] },
     ])
-    expect(b).toBe('*Checklists:*\n• Água: 1/1 dia completo (100%)\n• Treino: 1/2 dias completos (67%)')
+    expect(b).toBe('*Checklists:*\n*Água:*\n• Beber água: 1/1 dia\n*Treino:*\n• Academia: 2/2 dias\n• Alongamento: 1/2 dias')
   })
 
   it('sem polls na semana, bloco some', () => {
     expect(blocoChecklistsSemana([])).toBeNull()
+  })
+
+  it('formata total de gastos e omite semana sem lançamentos', () => {
+    expect(blocoGastosSemana(87.5, 3)).toBe('*Gastos na semana:* R$ 87,50 em 3 lançamentos')
+    expect(blocoGastosSemana(0, 0)).toBeNull()
   })
 })

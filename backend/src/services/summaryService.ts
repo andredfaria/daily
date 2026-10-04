@@ -5,7 +5,7 @@ import { claimMessage, releaseMessageClaimIfUndelivered, claimKeyDia, claimKeyMe
 import { formatDateSaoPaulo } from './assetMath'
 import { variacaoPeriodo } from './benchmarkMath'
 import { contasDaSemana } from './whatsappCommandHandler'
-import { blocoCarteiraSemana, blocoChecklistsSemana, linhasContas, somarDias } from './whatsappCommands'
+import { blocoCarteiraSemana, blocoChecklistsSemana, blocoGastosSemana, linhasContas, somarDias } from './whatsappCommands'
 
 function formatBRL(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -22,7 +22,7 @@ const NOMES_CATEGORIA: Record<string, string> = {
   outro: 'Outro',
 }
 
-// --- Resumo semanal: contas da semana, carteira e checklists ---
+// --- Resumo semanal: contas da semana, carteira, checklists e gastos avulsos ---
 // As datas saem de São Paulo: o container roda em UTC, e o resumo das 8h BRT
 // usando new Date() pegava o mês e a semana certos só por sorte do horário.
 export async function sendWeeklySummary(userId: string): Promise<void> {
@@ -55,7 +55,11 @@ export async function sendWeeklySummary(userId: string): Promise<void> {
   }
 
   // Blocos sem dado somem: quem não tem ativo não recebe uma "Carteira" vazia.
-  const blocos = [await blocoCarteira(userId, hoje), await blocoChecklists(userId, hoje)].filter(Boolean)
+  const blocos = [
+    await blocoCarteira(userId, hoje),
+    await blocoChecklists(userId, hoje),
+    await blocoGastos(userId, hoje),
+  ].filter(Boolean)
   if (blocos.length) msg += `\n${blocos.join('\n\n')}`
 
   const refKey = claimKeyDia()
@@ -93,18 +97,49 @@ async function blocoCarteira(userId: string, hoje: string): Promise<string | nul
 
 // Os 7 dias fechados antes de hoje: o poll de hoje ainda nem foi respondido às 8h.
 async function blocoChecklists(userId: string, hoje: string): Promise<string | null> {
-  const [rows]: any = await pool.query(
-    `SELECT p.checklist_id, c.name, p.completed_count, p.total_count
+  const [[pollRows], [itemRows]]: any = await Promise.all([
+    pool.query(
+      `SELECT p.checklist_id, c.name, p.selected_options
        FROM checklist_daily_polls p JOIN checklists c ON c.id = p.checklist_id
-      WHERE p.user_id = ? AND p.poll_date BETWEEN ? AND ?`,
-    [userId, somarDias(hoje, -7), somarDias(hoje, -1)]
-  )
-  return blocoChecklistsSemana(rows.map((r: any) => ({
+      WHERE p.user_id = ? AND p.poll_date BETWEEN ? AND ? AND p.status IN ('sent', 'completed')`,
+      [userId, somarDias(hoje, -7), somarDias(hoje, -1)]
+    ),
+    pool.query(
+      `SELECT i.checklist_id, i.text
+         FROM checklist_items i JOIN checklists c ON c.id = i.checklist_id
+        WHERE c.user_id = ?`,
+      [userId]
+    ),
+  ])
+  const itensPorChecklist = new Map<string, string[]>()
+  for (const item of itemRows) {
+    const itens = itensPorChecklist.get(item.checklist_id) ?? []
+    itens.push(item.text)
+    itensPorChecklist.set(item.checklist_id, itens)
+  }
+  const lerOpcoes = (valor: unknown): string[] => {
+    if (Array.isArray(valor)) return valor.filter((v): v is string => typeof v === 'string')
+    if (typeof valor !== 'string' || !valor) return []
+    try {
+      const parsed = JSON.parse(valor)
+      return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
+    } catch { return [] }
+  }
+  return blocoChecklistsSemana(pollRows.map((r: any) => ({
     checklistId: r.checklist_id,
     nome: r.name || 'Checklist',
-    completos: Number(r.completed_count) || 0,
-    total: Number(r.total_count) || 0,
+    marcados: lerOpcoes(r.selected_options),
+    itens: itensPorChecklist.get(r.checklist_id) ?? [],
   })))
+}
+
+async function blocoGastos(userId: string, hoje: string): Promise<string | null> {
+  const [[row]]: any = await pool.query(
+    `SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS quantidade
+       FROM expenses WHERE user_id = ? AND spent_on BETWEEN ? AND ?`,
+    [userId, somarDias(hoje, -7), somarDias(hoje, -1)]
+  )
+  return blocoGastosSemana(Number(row.total) || 0, Number(row.quantidade) || 0)
 }
 
 // --- Sumário mensal (novo): fechamento do mês anterior ---
