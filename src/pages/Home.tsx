@@ -4,13 +4,24 @@ import { occurrencesApi } from '../api/occurrences'
 import { checklistsApi } from '../api/checklists'
 import { assetsApi } from '../api/assets'
 import { notificationsApi } from '../api/notifications'
+import { expensesApi } from '../api/expenses'
 import wahaApi from '../api/waha'
-import type { BillOccurrence, ChecklistDashboardData, AssetWithQuote } from '../types'
+import type { BillOccurrence, ChecklistDashboardData, AssetWithQuote, ExpensesResponse } from '../types'
 import { formatBRL, formatDate, formatRelativeDate, getBillIcon } from '../utils/format'
 import { SkeletonRow } from '../components/ui/Skeleton'
 import { WhatsAppProfileCard, WhatsAppProfile } from '../components/whatsapp/WhatsAppProfileCard'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { parseISO, isToday, isTomorrow } from 'date-fns'
+
+function mesAtualSaoPaulo(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit',
+  }).formatToParts(new Date())
+  const ano = parts.find((p) => p.type === 'year')?.value ?? '2000'
+  const mes = parts.find((p) => p.type === 'month')?.value ?? '01'
+  return `${ano}-${mes}`
+}
 
 interface Pendencia {
   icone: string
@@ -48,12 +59,17 @@ const Home: React.FC = () => {
 
   const [occurrences, setOccurrences] = useState<BillOccurrence[]>([])
   const [checklist, setChecklist] = useState<ChecklistDashboardData | null>(null)
+  const [gastos, setGastos] = useState<ExpensesResponse | null>(null)
+  const [gastosErro, setGastosErro] = useState(false)
   const [ativos, setAtivos] = useState<AssetWithQuote[]>([])
   const [profile, setProfile] = useState<WhatsAppProfile | null>(null)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [connected, setConnected] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingProfile, setLoadingProfile] = useState(true)
+  const [marcandoItem, setMarcandoItem] = useState<string | null>(null)
+  const [enviandoChecklist, setEnviandoChecklist] = useState(false)
+  const { success, error: showError } = useToast()
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -61,17 +77,24 @@ const Home: React.FC = () => {
     setProfileError(null)
 
     // allSettled em tudo: o WAHA fora do ar não pode esconder os vencimentos.
-    const [occR, checkR, ativosR, profileR, conexaoR] = await Promise.allSettled([
+    const [occR, checkR, ativosR, profileR, conexaoR, gastosR] = await Promise.allSettled([
       occurrencesApi.upcoming(30),
       checklistsApi.dashboard(),
       assetsApi.list(),
       notificationsApi.getWhatsAppProfile(),
       wahaApi.getStatus(),
+      expensesApi.list(mesAtualSaoPaulo()),
     ])
 
     if (occR.status === 'fulfilled') setOccurrences(occR.value)
     if (checkR.status === 'fulfilled') setChecklist(checkR.value)
     if (ativosR.status === 'fulfilled') setAtivos(ativosR.value)
+    if (gastosR.status === 'fulfilled') {
+      setGastos(gastosR.value)
+      setGastosErro(false)
+    } else {
+      setGastosErro(true)
+    }
 
     if (profileR.status === 'fulfilled') {
       setProfile(profileR.value)
@@ -87,6 +110,35 @@ const Home: React.FC = () => {
   }, [])
 
   useEffect(() => { carregar() }, [carregar])
+
+  const marcarItem = async (texto: string) => {
+    if (!checklist?.checklist || !checklist.today || marcandoItem) return
+    setMarcandoItem(texto)
+    try {
+      const updated = await checklistsApi.markToday(checklist.checklist.id, texto)
+      setChecklist((prev) => prev?.today ? { ...prev, today: { ...prev.today, ...updated } } : prev)
+      success('Item marcado.')
+    } catch {
+      showError('Não foi possível marcar o item.')
+    } finally {
+      setMarcandoItem(null)
+    }
+  }
+
+  const enviarChecklist = async () => {
+    if (!checklist?.checklist || enviandoChecklist) return
+    setEnviandoChecklist(true)
+    try {
+      await checklistsApi.sendNow(false, checklist.checklist.id)
+      const updated = await checklistsApi.dashboard(checklist.checklist.id)
+      setChecklist(updated)
+      success('Checklist enviado para o WhatsApp.')
+    } catch {
+      showError('Não foi possível enviar o checklist.')
+    } finally {
+      setEnviandoChecklist(false)
+    }
+  }
 
   // Não há estado de pagamento em bill_occurrences (a migration 010 removeu
   // status/paid_at), então a pendência de conta é apenas a data de vencimento.
@@ -132,6 +184,117 @@ const Home: React.FC = () => {
         connected={connected}
         compact
       />
+
+      <section className="glass-card rounded-2xl border border-outline-variant/50 p-5" aria-labelledby="gastos-mes-titulo">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <p id="gastos-mes-titulo" className="text-sm font-semibold text-on-surface">Gastos neste mês</p>
+            {loading ? (
+              <div className="mt-3 h-7 w-32 rounded bg-surface-container-high animate-pulse" />
+            ) : gastosErro ? (
+              <p className="mt-2 text-sm text-on-surface-variant">Não foi possível carregar os gastos.</p>
+            ) : (
+              <>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-on-surface">{formatBRL(gastos?.total ?? 0)}</p>
+                {user?.monthly_expense_budget_limit != null ? (() => {
+                  const limite = Number(user.monthly_expense_budget_limit)
+                  const total = gastos?.total ?? 0
+                  const passou = total > limite
+                  const percentual = limite > 0 ? Math.round((total / limite) * 100) : 100
+                  return (
+                    <div className="mt-3 space-y-1.5">
+                      <div
+                        className="h-2 rounded-full bg-surface-container overflow-hidden"
+                        role="progressbar"
+                        aria-label="Limite mensal de gastos usado"
+                        aria-valuenow={Math.min(percentual, 100)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                      >
+                        <div className={`h-full rounded-full ${passou ? 'bg-error' : 'bg-primary'}`} style={{ width: `${Math.min(percentual, 100)}%` }} />
+                      </div>
+                      <p className={`text-xs ${passou ? 'text-error' : 'text-on-surface-variant'}`}>
+                        {passou
+                          ? `${formatBRL(total - limite)} acima do limite de ${formatBRL(limite)}`
+                          : `${formatBRL(limite - total)} restantes de ${formatBRL(limite)}`}
+                      </p>
+                    </div>
+                  )
+                })() : (
+                  <button onClick={() => navigate('/configuracoes')} className="mt-2 text-xs font-medium text-primary hover:text-primary/80">
+                    Definir limite mensal →
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+          <button onClick={() => navigate('/gastos')} className="min-h-[44px] shrink-0 text-xs font-medium text-primary hover:text-primary/80">
+            Ver gastos →
+          </button>
+        </div>
+      </section>
+
+      <section className="glass-card rounded-2xl border border-outline-variant/50 p-5" aria-labelledby="checklist-hoje-titulo">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 id="checklist-hoje-titulo" className="text-base font-semibold text-on-surface">Checklist de hoje</h3>
+            {checklist?.checklist && <p className="text-xs text-on-surface-variant">{checklist.checklist.name}</p>}
+          </div>
+          <button onClick={() => navigate('/checklists/lista')} className="min-h-[44px] text-xs font-medium text-primary hover:text-primary/80">
+            Ver checklist →
+          </button>
+        </div>
+        {loading ? (
+          <div className="space-y-3"><SkeletonRow /><SkeletonRow /></div>
+        ) : !checklist?.checklist ? (
+          <div className="text-center py-3">
+            <p className="text-sm text-on-surface-variant mb-3">Ainda não há checklist cadastrado.</p>
+            <button onClick={() => navigate('/checklists/lista')} className="btn-primary mx-auto min-h-[44px]">Criar checklist</button>
+          </div>
+        ) : !checklist.today ? (
+          <div className="text-center py-2">
+            <p className="text-sm text-on-surface-variant mb-3">O checklist ainda não foi enviado hoje.</p>
+            <button onClick={enviarChecklist} disabled={enviandoChecklist} className="btn-primary mx-auto min-h-[44px] disabled:opacity-50">
+              {enviandoChecklist ? 'Enviando…' : 'Enviar checklist para o WhatsApp'}
+            </button>
+          </div>
+        ) : (
+          <>
+            {checklist.today.status === 'pending' && (
+              <p className="mb-3 text-xs text-on-surface-variant">Aguardando o envio da enquete para liberar as marcações.</p>
+            )}
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-2 flex-1 rounded-full bg-surface-container overflow-hidden" role="progressbar" aria-label="Progresso do checklist de hoje" aria-valuenow={checklist.today.completion_pct} aria-valuemin={0} aria-valuemax={100}>
+                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(checklist.today.completion_pct, 100)}%` }} />
+              </div>
+              <span className="text-sm font-semibold tabular-nums text-on-surface">{checklist.today.completed_count}/{checklist.today.total_count}</span>
+            </div>
+            <div className="divide-y divide-outline-variant/30">
+              {checklist.checklist.items.map((item) => {
+                const marcado = checklist.today!.selected_options.includes(item.text)
+                const ocupado = marcandoItem === item.text
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => marcarItem(item.text)}
+                    disabled={marcado || !!marcandoItem || checklist.today!.status === 'pending'}
+                    aria-pressed={marcado}
+                    className="w-full min-h-[48px] flex items-center gap-3 py-2 text-left disabled:cursor-default"
+                  >
+                    <span className={`material-symbols-outlined text-xl ${marcado ? 'text-tertiary' : 'text-on-surface-variant/60'}`} style={marcado ? { fontVariationSettings: "'FILL' 1" } : undefined} aria-hidden="true">
+                      {marcado ? 'check_circle' : 'radio_button_unchecked'}
+                    </span>
+                    <span className={`flex-1 text-sm ${marcado ? 'text-on-surface' : 'text-on-surface-variant'}`}>{item.text}</span>
+                    {!marcado && <span className="text-xs text-primary">{ocupado ? 'Marcando…' : 'Marcar'}</span>}
+                    {marcado && <span className="sr-only">Marcado hoje</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </section>
 
       {!loading && pendencias.length > 0 && (
         <div>

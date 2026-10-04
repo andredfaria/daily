@@ -4,6 +4,7 @@ import pool from '../db'
 import { sendDailyPoll, getTodaySaoPaulo } from '../services/checklistDispatcher'
 import { computeItemStats, computeItemStreaks } from '../services/checklistStats'
 import { computeConsistency, constanciaZerada, PollResumo } from '../services/checklistConsistency'
+import { lerListaJson, unirMarcados } from '../services/whatsappCommands'
 
 const router = Router()
 
@@ -427,6 +428,61 @@ router.get('/dashboard', async (req: Request, res: Response) => {
     res.json({ checklist: { ...checklist, items }, today: todayPoll, history, itemStats: itemStatsWithStreak, constancia })
   } catch (err: any) {
     console.error('[checklists] GET /dashboard', err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// -------- POST /api/checklists/:id/today/mark - marca item pela Home --------
+router.post('/:id/today/mark', async (req: Request, res: Response) => {
+  try {
+    const itemText = typeof req.body?.itemText === 'string' ? req.body.itemText.trim() : ''
+    if (!itemText) return res.status(400).json({ error: 'itemText é obrigatório' })
+
+    const today = getTodaySaoPaulo()
+    const [pollRows]: any = await pool.query(
+      `SELECT id, selected_options, command_marked, total_count, status
+         FROM checklist_daily_polls
+        WHERE checklist_id = ? AND user_id = ? AND poll_date = ?`,
+      [req.params.id, req.userId, today],
+    )
+    if (!pollRows.length) return res.status(404).json({ error: 'Checklist de hoje ainda não foi enviado.' })
+    const poll = pollRows[0]
+    if (!['sent', 'completed'].includes(poll.status)) {
+      return res.status(409).json({ error: 'Checklist ainda não está disponível para marcação.' })
+    }
+
+    const items = await getItems(req.params.id)
+    const itemTexts = items.map((item: any) => item.text)
+    if (!itemTexts.includes(itemText)) return res.status(404).json({ error: 'Item não encontrado neste checklist.' })
+
+    const selected = lerListaJson(poll.selected_options)
+    const commandMarked = lerListaJson(poll.command_marked)
+    if (!selected.includes(itemText)) {
+      const viaComando = [...new Set([...commandMarked, itemText])]
+      const marked = unirMarcados(selected, viaComando, itemTexts)
+      const total = Number(poll.total_count) || itemTexts.length || 1
+      const completionPct = Math.min(Math.round((marked.length / total) * 10000) / 100, 100)
+      const status = marked.length >= total ? 'completed' : 'sent'
+      await pool.query(
+        `UPDATE checklist_daily_polls
+            SET selected_options = ?, command_marked = ?, completed_count = ?, completion_pct = ?, status = ?
+          WHERE id = ? AND user_id = ?`,
+        [JSON.stringify(marked), JSON.stringify(viaComando), marked.length, completionPct, status, poll.id, req.userId],
+      )
+      return res.json({ selected_options: marked, completed_count: marked.length, total_count: total, completion_pct: completionPct, status })
+    }
+
+    const total = Number(poll.total_count) || itemTexts.length || 1
+    const marked = unirMarcados(selected, commandMarked, itemTexts)
+    return res.json({
+      selected_options: marked,
+      completed_count: marked.length,
+      total_count: total,
+      completion_pct: Math.min(Math.round((marked.length / total) * 10000) / 100, 100),
+      status: marked.length >= total ? 'completed' : 'sent',
+    })
+  } catch (err: any) {
+    console.error('[checklists] POST /:id/today/mark', err)
     res.status(500).json({ error: 'Erro interno do servidor' })
   }
 })

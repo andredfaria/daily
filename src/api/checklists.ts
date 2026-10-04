@@ -67,6 +67,17 @@ export const checklistsApi = {
     await client.post('/checklists/send-now', { force, checklistId })
   },
 
+  markToday: async (checklistId: string, itemText: string): Promise<{
+    selected_options: string[]
+    completed_count: number
+    total_count: number
+    completion_pct: number
+    status: 'sent' | 'completed'
+  }> => {
+    const res = await client.post(`/checklists/${checklistId}/today/mark`, { itemText })
+    return res.data
+  },
+
   polls: async (params: {
     upcoming?: boolean
     history?: boolean
