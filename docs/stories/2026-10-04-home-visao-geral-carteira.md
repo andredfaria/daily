@@ -11,12 +11,15 @@ Dar prioridade às informações mais importantes na Home, incluindo patrimônio
 - [x] Destacar o resultado da carteira sem ocultar posições sem cotação.
 - [x] Mostrar gastos do mês como indicador de acesso rápido.
 - [x] Incluir estados de carregamento e carteira vazia.
+- [x] Reorganizar o painel em grade compacta com conexão WhatsApp, maiores altas e baixas, gastos recentes, checklist e próximos vencimentos.
+- [x] Limitar os destaques a três posições por variação, três gastos recentes e três vencimentos visíveis, mantendo a quantidade de vencimentos do período.
 - [x] Validar build e testes automatizados disponíveis.
 - [ ] Inspecionar visualmente no navegador.
 
 ## Arquivos
 
 - `src/pages/Home.tsx` — indicadores principais e resumo da carteira na Home.
+- `src/pages/Home.tsx` — grade compacta com altas/baixas da carteira, gastos recentes, perfil conectado e vencimentos.
 - `docs/stories/2026-10-04-home-visao-geral-carteira.md` — esta story.
 
 ## Regras de dados

@@ -160,9 +160,7 @@ const Home: React.FC = () => {
   const resumoCarteira = totalCarteira(ativos)
   const ativosComPosicao = ativos.filter((ativo) => ativo.quantity > 0)
   const resultadoCarteira = ativosComPosicao.reduce((total, ativo) => total + (ativo.profit_loss ?? 0), 0)
-  const ativosEmDestaque = [...ativos]
-    .sort((a, b) => (b.current_value ?? -1) - (a.current_value ?? -1))
-    .slice(0, 4)
+  const gastosRecentes = [...(gastos?.gastos ?? [])].sort((a, b) => b.spent_on.localeCompare(a.spent_on)).slice(0, 3)
   if (checklist?.checklist && hoje && hoje.completion_pct < 100) {
     pendencias.push({
       icone: 'checklist',
@@ -182,7 +180,7 @@ const Home: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="mx-auto max-w-[1600px] space-y-4 animate-fadeIn">
       <section className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between" aria-label="Resumo do dia">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Visão geral</p>
@@ -194,8 +192,8 @@ const Home: React.FC = () => {
         </button>
       </section>
 
-      <section className="grid gap-3 lg:grid-cols-[1.35fr_1fr_1fr]" aria-label="Indicadores principais">
-        <button onClick={() => navigate('/ativos/carteira')} className="glass-card rounded-2xl border border-primary/30 bg-primary/5 p-5 text-left transition-colors hover:border-primary/60">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores principais">
+        <button onClick={() => navigate('/ativos/carteira')} className="glass-card rounded-2xl border border-primary/30 bg-primary/5 p-4 text-left transition-colors hover:border-primary/60">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-medium text-on-surface-variant">Patrimônio investido</p>
             <span className="material-symbols-outlined text-primary">account_balance</span>
@@ -208,7 +206,7 @@ const Home: React.FC = () => {
           </p>
         </button>
 
-        <button onClick={() => navigate('/ativos/analise')} className="glass-card rounded-2xl border border-outline-variant/50 p-5 text-left transition-colors hover:border-outline-variant">
+        <button onClick={() => navigate('/ativos/analise')} className="glass-card rounded-2xl border border-outline-variant/50 p-4 text-left transition-colors hover:border-outline-variant">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-medium text-on-surface-variant">Resultado da carteira</p>
             <span className="material-symbols-outlined text-on-surface-variant">monitoring</span>
@@ -221,7 +219,7 @@ const Home: React.FC = () => {
           <p className="mt-2 text-xs text-on-surface-variant">Variação sobre o preço médio</p>
         </button>
 
-        <button onClick={() => navigate('/gastos')} className="glass-card rounded-2xl border border-outline-variant/50 p-5 text-left transition-colors hover:border-outline-variant">
+        <button onClick={() => navigate('/gastos')} className="glass-card rounded-2xl border border-outline-variant/50 p-4 text-left transition-colors hover:border-outline-variant">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-medium text-on-surface-variant">Gastos neste mês</p>
             <span className="material-symbols-outlined text-on-surface-variant">payments</span>
@@ -233,37 +231,41 @@ const Home: React.FC = () => {
             {user?.monthly_expense_budget_limit != null ? `Limite ${formatBRL(Number(user.monthly_expense_budget_limit))}` : 'Acompanhe suas despesas do mês'}
           </p>
         </button>
+        <div className="glass-card flex items-center gap-3 rounded-2xl border border-outline-variant/50 p-4">
+          <span className={`material-symbols-outlined rounded-xl p-2 ${connected ? 'bg-tertiary/10 text-tertiary' : 'bg-error/10 text-error'}`}>{connected ? 'wifi' : 'wifi_off'}</span>
+          <div className="min-w-0"><p className="text-xs text-on-surface-variant">WhatsApp conectado</p><p className="truncate text-sm font-semibold text-on-surface">{loadingProfile ? 'Verificando…' : connected ? (profile?.pushName || user?.whatsapp_number || 'Conectado') : 'Desconectado'}</p></div>
+        </div>
       </section>
 
-      <section className="glass-card rounded-2xl border border-outline-variant/50 p-5" aria-labelledby="ativos-destaque-titulo">
+      <section className="grid gap-3 xl:grid-cols-2" aria-label="Maiores variações da carteira">
+      {[{ title: 'Maiores altas', up: true }, { title: 'Maiores baixas', up: false }].map(({ title, up }) => {
+        const destaques = ativos.filter((ativo) => ativo.quantity > 0 && ativo.profit_loss_pct !== null).sort((a, b) => up ? (b.profit_loss_pct ?? 0) - (a.profit_loss_pct ?? 0) : (a.profit_loss_pct ?? 0) - (b.profit_loss_pct ?? 0)).slice(0, 3)
+        return <section key={title} className="glass-card rounded-2xl border border-outline-variant/50 p-4" aria-label={title}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h2 id="ativos-destaque-titulo" className="text-base font-semibold text-on-surface">Sua carteira</h2>
-            <p className="mt-0.5 text-xs text-on-surface-variant">Ativos com maior posição na carteira</p>
+            <h2 className="text-base font-semibold text-on-surface">{title}</h2>
+            <p className="mt-0.5 text-xs text-on-surface-variant">Variação percentual das posições</p>
           </div>
           <button onClick={() => navigate('/ativos/carteira')} className="min-h-[44px] shrink-0 text-xs font-medium text-primary hover:text-primary/80">Ver carteira →</button>
         </div>
         {loading ? (
           <div className="space-y-3"><SkeletonRow /><SkeletonRow /></div>
-        ) : ativos.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-outline-variant/60 px-4 py-6 text-center">
-            <p className="text-sm text-on-surface-variant">Sua carteira ainda está vazia.</p>
-            <button onClick={() => navigate('/ativos/carteira')} className="btn-primary mx-auto mt-3 min-h-[44px]">Adicionar primeiro ativo</button>
-          </div>
+        ) : destaques.length === 0 ? (
+          <p className="py-5 text-center text-sm text-on-surface-variant">Sem posições com variação disponível.</p>
         ) : (
           <div className="divide-y divide-outline-variant/30">
-            {ativosEmDestaque.map((ativo) => {
+            {destaques.map((ativo) => {
               const resultado = ativo.profit_loss
               return (
-                <button key={ativo.id} onClick={() => navigate('/ativos/carteira')} className="flex min-h-[68px] w-full items-center gap-3 py-3 text-left hover:bg-surface-container/40">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-sm font-bold text-primary">{ativo.ticker.slice(0, 2)}</span>
+                <button key={ativo.id} onClick={() => navigate('/ativos/carteira')} className="flex min-h-[56px] w-full items-center gap-3 py-2 text-left hover:bg-surface-container/40">
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${up ? 'bg-tertiary/10 text-tertiary' : 'bg-error/10 text-error'}`}>{ativo.ticker.slice(0, 2)}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-on-surface">{ativo.ticker}</span>
-                    <span className="block truncate text-xs text-on-surface-variant">{ativo.short_name}</span>
+                    <span className="block truncate text-xs text-on-surface-variant">{ativo.short_name} · {formatBRL(ativo.current_value ?? 0)}</span>
                   </span>
                   <span className="text-right">
-                    <span className="block text-sm font-semibold tabular-nums text-on-surface">{ativo.current_value !== null ? formatBRL(ativo.current_value) : ativo.quantity > 0 ? 'Sem cotação' : 'Em acompanhamento'}</span>
-                    {ativo.quantity > 0 && resultado !== null && <span className={`block text-xs tabular-nums ${resultado >= 0 ? 'text-tertiary' : 'text-error'}`}>{resultado > 0 ? '+' : ''}{formatBRL(resultado)}</span>}
+                    <span className={`block text-sm font-semibold tabular-nums ${up ? 'text-tertiary' : 'text-error'}`}>{(ativo.profit_loss_pct ?? 0) > 0 ? '+' : ''}{(ativo.profit_loss_pct ?? 0).toFixed(2)}%</span>
+                    <span className="block text-xs tabular-nums text-on-surface-variant">{resultado !== null ? formatBRL(resultado) : '—'}</span>
                   </span>
                   <span className="material-symbols-outlined text-lg text-on-surface-variant">chevron_right</span>
                 </button>
@@ -271,8 +273,11 @@ const Home: React.FC = () => {
             })}
           </div>
         )}
+      </section>})}
       </section>
 
+      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="xl:col-span-2">
       <WhatsAppProfileCard
         profile={profile}
         whatsappNumber={user?.whatsapp_number ?? null}
@@ -281,8 +286,9 @@ const Home: React.FC = () => {
         connected={connected}
         compact
       />
+      </div>
 
-      <section className="glass-card rounded-2xl border border-outline-variant/50 p-5" aria-labelledby="gastos-mes-titulo">
+      <section className="glass-card rounded-2xl border border-outline-variant/50 p-4" aria-labelledby="gastos-mes-titulo">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <p id="gastos-mes-titulo" className="text-sm font-semibold text-on-surface">Gastos neste mês</p>
@@ -328,6 +334,10 @@ const Home: React.FC = () => {
           <button onClick={() => navigate('/gastos')} className="min-h-[44px] shrink-0 text-xs font-medium text-primary hover:text-primary/80">
             Ver gastos →
           </button>
+        </div>
+        <div className="mt-4 border-t border-outline-variant/30 pt-3">
+          <div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold text-on-surface">Últimos gastos</p><span className="text-xs text-on-surface-variant">{gastos?.gastos.length ?? 0} no mês</span></div>
+          {loading ? <p className="text-xs text-on-surface-variant">Carregando…</p> : gastosErro ? <p className="text-xs text-on-surface-variant">Gastos indisponíveis.</p> : gastosRecentes.length === 0 ? <p className="text-xs text-on-surface-variant">Nenhum gasto registrado neste mês.</p> : <div className="divide-y divide-outline-variant/30">{gastosRecentes.map((gasto) => <button key={gasto.id} onClick={() => navigate('/gastos')} className="flex min-h-10 w-full items-center gap-2 py-2 text-left"><span className="min-w-0 flex-1 truncate text-xs text-on-surface">{gasto.description}</span><span className="shrink-0 text-xs tabular-nums text-on-surface-variant">{formatDate(gasto.spent_on)}</span><span className="shrink-0 text-xs font-semibold tabular-nums text-on-surface">{formatBRL(gasto.amount)}</span></button>)}</div>}
         </div>
       </section>
 
@@ -394,7 +404,7 @@ const Home: React.FC = () => {
       </section>
 
       {!loading && pendencias.length > 0 && (
-        <div>
+        <div className="xl:col-span-2">
           <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide mb-3 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-sm text-primary">priority_high</span>
             Precisa de você hoje
@@ -415,9 +425,9 @@ const Home: React.FC = () => {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-3 xl:col-span-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-on-surface">Próximos Vencimentos</h3>
+          <h3 className="text-base font-semibold text-on-surface">Próximos vencimentos <span className="ml-1 text-xs font-normal text-on-surface-variant">{occurrences.length} no período</span></h3>
           <button
             onClick={() => navigate('/notificacoes')}
             className="text-xs text-primary hover:text-primary/80 font-medium transition-colors min-h-[44px]"
@@ -442,9 +452,10 @@ const Home: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            {occurrences.map((occ) => <OccurrenceRow key={occ.id} occurrence={occ} />)}
+            {occurrences.slice(0, 3).map((occ) => <OccurrenceRow key={occ.id} occurrence={occ} />)}
           </div>
         )}
+      </div>
       </div>
     </div>
   )
