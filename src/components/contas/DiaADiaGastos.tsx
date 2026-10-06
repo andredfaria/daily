@@ -11,7 +11,8 @@ const COR_GRADE = '#464554'
 const COR_EIXO = '#c7c4d7'
 const COR_REFERENCIA = '#908fa0'
 
-type Visao = 'dia' | 'acumulado' | 'categorias'
+type Visao = 'barras' | 'linha' | 'acumulado' | 'categorias'
+type VisaoDica = 'dia' | 'acumulado'
 
 interface Props {
   resumo: ResumoDiario
@@ -20,12 +21,14 @@ interface Props {
   diaSelecionado: string | null
   onSelecionarDia: (dia: string | null) => void
   categoriasData: Array<{ nome: string; total: number; key: string }>
-  onSelecionarCategoria: (categoria: string | null) => void
+  serieCategorias: Array<Record<string, string | number>>
 }
+
+const CORES_CATEGORIA = ['#c0c1ff', '#ffb4ab', '#a8dab5', '#f2c078', '#80d5df', '#e8b7d4', '#d0bcff', '#f5a97f']
 
 const rotuloDia = (dia: string) => formatDate(dia, 'EEE, dd/MM')
 
-const Dica: React.FC<{ active?: boolean; payload?: Array<{ payload: DiaGasto }>; visao: Visao }> = ({ active, payload, visao }) => {
+const Dica: React.FC<{ active?: boolean; payload?: Array<{ payload: DiaGasto }>; visao: VisaoDica }> = ({ active, payload, visao }) => {
   const p = active ? payload?.[0]?.payload : undefined
   if (!p) return null
   return (
@@ -48,6 +51,30 @@ const Dica: React.FC<{ active?: boolean; payload?: Array<{ payload: DiaGasto }>;
   )
 }
 
+const TooltipCategorias: React.FC<{
+  active?: boolean
+  payload?: Array<{ payload: Record<string, string | number> }>
+  categoriasData: Array<{ nome: string; total: number; key: string }>
+}> = ({ active, payload, categoriasData }) => {
+  const ponto = active ? payload?.[0]?.payload : undefined
+  if (!ponto || typeof ponto.dia !== 'string') return null
+  const valores = categoriasData
+    .map((categoria) => ({ ...categoria, valor: Number(ponto[categoria.key] ?? 0) }))
+    .filter((categoria) => categoria.valor > 0)
+  const total = valores.reduce((soma, categoria) => soma + categoria.valor, 0)
+  return (
+    <div className="rounded-xl border border-outline-variant bg-[#1f1f25] px-3 py-2 text-xs shadow-lg">
+      <p className="text-on-surface-variant capitalize mb-1">{rotuloDia(ponto.dia)}</p>
+      {valores.map((categoria) => (
+        <p key={categoria.key} className="flex justify-between gap-4 text-on-surface-variant">
+          <span>{categoria.nome}</span><span className="text-on-surface">{formatBRL(categoria.valor)}</span>
+        </p>
+      ))}
+      <p className="mt-1 border-t border-outline-variant pt-1 font-semibold text-on-surface">Total {formatBRL(total)}</p>
+    </div>
+  )
+}
+
 const Destaque: React.FC<{ rotulo: React.ReactNode; valor: string; detalhe?: string }> = ({ rotulo, valor, detalhe }) => (
   <div className="min-w-0">
     <p className="flex items-center gap-1.5 text-[11px] text-on-surface-variant uppercase tracking-wide">{rotulo}</p>
@@ -56,8 +83,8 @@ const Destaque: React.FC<{ rotulo: React.ReactNode; valor: string; detalhe?: str
   </div>
 )
 
-const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onSelecionarDia, categoriasData, onSelecionarCategoria }) => {
-  const [visao, setVisao] = useState<Visao>('dia')
+const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onSelecionarDia, categoriasData, serieCategorias }) => {
+  const [visao, setVisao] = useState<Visao>('barras')
   const { serie, mediaPorDia, maiorDia, diasComGasto } = resumo
 
   // A coluna inteira é a área de toque, não só a barra: dia de R$ 5 vira um
@@ -107,7 +134,7 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
           </p>
         </div>
         <div className="flex rounded-xl bg-surface-container p-1" role="group" aria-label="Visão do gráfico">
-          {([['dia', 'Por dia'], ['acumulado', 'Acumulado'], ['categorias', 'Categorias']] as const).map(([v, rotulo]) => (
+          {([['barras', 'Barras'], ['linha', 'Linha'], ['categorias', 'Por categoria'], ['acumulado', 'Acumulado']] as const).map(([v, rotulo]) => (
             <button
               key={v}
               onClick={() => setVisao(v)}
@@ -124,7 +151,7 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
 
       {visao !== 'categorias' && <div className="grid grid-cols-3 gap-3 mb-4">
         <Destaque
-          rotulo={visao === 'dia'
+          rotulo={visao === 'barras' || visao === 'linha'
             ? <><span className="w-3 border-t border-dashed border-outline" aria-hidden="true" />Média/dia</>
             : 'Média/dia'}
           valor={formatBRL(mediaPorDia)}
@@ -140,16 +167,16 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
       <div className="w-full h-56" role="img" aria-label={descricao}>
         <ResponsiveContainer width="100%" height="100%">
           {visao === 'categorias' ? (
-            <BarChart data={categoriasData} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }}>
-              <CartesianGrid horizontal={false} stroke={COR_GRADE} strokeOpacity={0.3} />
-              <XAxis type="number" tick={{ fontSize: 11, fill: COR_EIXO }} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="nome" width={92} tick={{ fontSize: 11, fill: COR_EIXO }} axisLine={false} tickLine={false} />
-              <Tooltip formatter={(value) => formatBRL(Number(value))} contentStyle={{ background: '#1f1f25', borderColor: COR_GRADE, borderRadius: 12 }} />
-              <Bar dataKey="total" radius={[0, 4, 4, 0]} maxBarSize={22} onClick={(item) => { if (typeof item.key === 'string') onSelecionarCategoria(item.key) }} className="cursor-pointer">
-                {categoriasData.map((item, i) => <Cell key={item.key} fill={['#c0c1ff', '#ffb4ab', '#a8dab5', '#f2c078', '#80d5df', '#e8b7d4'][i % 6]} />)}
-              </Bar>
+            <BarChart data={serieCategorias} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} onClick={tocar}>
+              <CartesianGrid vertical={false} stroke={COR_GRADE} strokeOpacity={0.3} />
+              {eixoX}
+              {eixoY}
+              <Tooltip content={<TooltipCategorias categoriasData={categoriasData} />} cursor={{ fill: COR_SERIE, fillOpacity: 0.08 }} />
+              {categoriasData.map((item, i) => (
+                <Bar key={item.key} dataKey={item.key} name={item.nome} stackId="gastos" fill={CORES_CATEGORIA[i % CORES_CATEGORIA.length]} maxBarSize={18} isAnimationActive={false} />
+              ))}
             </BarChart>
-          ) : visao === 'dia' ? (
+          ) : visao === 'linha' ? (
             <LineChart data={serie} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} onClick={tocar}>
               <CartesianGrid vertical={false} stroke={COR_GRADE} strokeOpacity={0.3} />
               {eixoX}
@@ -158,6 +185,17 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
               {mediaPorDia > 0 && <ReferenceLine y={mediaPorDia} stroke={COR_REFERENCIA} strokeDasharray="3 3" />}
               <Line type="monotone" dataKey="total" stroke={COR_SERIE} strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} isAnimationActive={false} />
             </LineChart>
+          ) : visao === 'barras' ? (
+            <BarChart data={serie} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} onClick={tocar}>
+              <CartesianGrid vertical={false} stroke={COR_GRADE} strokeOpacity={0.3} />
+              {eixoX}
+              {eixoY}
+              <Tooltip content={<Dica visao="dia" />} cursor={{ fill: COR_SERIE, fillOpacity: 0.08 }} />
+              {mediaPorDia > 0 && <ReferenceLine y={mediaPorDia} stroke={COR_REFERENCIA} strokeDasharray="3 3" />}
+              <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={18} isAnimationActive={false} className="cursor-pointer">
+                {serie.map((p) => <Cell key={p.dia} fill={COR_SERIE} fillOpacity={diaSelecionado && p.dia !== diaSelecionado ? 0.3 : 1} />)}
+              </Bar>
+            </BarChart>
           ) : (
             <AreaChart data={serie} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} onClick={tocar}>
               <defs>
@@ -186,6 +224,16 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
           )}
         </ResponsiveContainer>
       </div>
+      {visao === 'categorias' && (
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2" aria-label="Legenda de categorias">
+          {categoriasData.map((item, i) => (
+            <span key={item.key} className="flex items-center gap-1.5 text-[11px] text-on-surface-variant">
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: CORES_CATEGORIA[i % CORES_CATEGORIA.length] }} />
+              {item.nome}
+            </span>
+          ))}
+        </div>
+      )}
     </section>
   )
 }

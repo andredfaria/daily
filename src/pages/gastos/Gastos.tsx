@@ -286,6 +286,17 @@ const Gastos: React.FC = () => {
   const daCategoria = filtroAtivo ? gastos.filter((g) => infoCategoria(g.category, categorias).key === filtroAtivo) : gastos
   // Gráfico segue a categoria; o dia filtra só a lista, senão o gráfico viraria uma barra.
   const resumo = resumoDiario(daCategoria, mes, hojeLocal())
+  const categoriasGrafico = totaisPorCategoria(daCategoria, categorias)
+  const serieCategorias = resumo.serie.map((ponto) => {
+    const porCategoria: Record<string, string | number> = { dia: ponto.dia, numero: ponto.numero }
+    for (const { categoria: key } of categoriasGrafico) porCategoria[key] = 0
+    for (const gasto of daCategoria) {
+      if (gasto.spent_on !== ponto.dia) continue
+      const key = infoCategoria(gasto.category, categorias).key
+      porCategoria[key] = Number(porCategoria[key] ?? 0) + gasto.amount
+    }
+    return porCategoria
+  })
   const diaAtivo = diaFiltro && daCategoria.some((g) => g.spent_on === diaFiltro) ? diaFiltro : null
   const visiveis = diaAtivo ? daCategoria.filter((g) => g.spent_on === diaAtivo) : daCategoria
 
@@ -407,8 +418,8 @@ const Gastos: React.FC = () => {
           categoria={filtroAtivo ? infoCategoria(filtroAtivo, categorias).nome : null}
           diaSelecionado={diaAtivo}
           onSelecionarDia={setDiaFiltro}
-          categoriasData={totais.map(({ categoria: key, total }) => ({ key, total, nome: infoCategoria(key, categorias).nome }))}
-          onSelecionarCategoria={(key) => setFiltro(filtro === key ? null : key)}
+          categoriasData={categoriasGrafico.map(({ categoria: key, total }) => ({ key, total, nome: infoCategoria(key, categorias).nome }))}
+          serieCategorias={serieCategorias}
         />
       )}
 
