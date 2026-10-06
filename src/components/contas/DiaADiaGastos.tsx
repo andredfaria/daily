@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import {
-  BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Cell,
+  BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Cell,
 } from 'recharts'
 import type { DiaGasto, ResumoDiario } from '../../utils/gastosDiarios'
 import { formatBRL, formatDate } from '../../utils/format'
@@ -11,7 +11,7 @@ const COR_GRADE = '#464554'
 const COR_EIXO = '#c7c4d7'
 const COR_REFERENCIA = '#908fa0'
 
-type Visao = 'dia' | 'acumulado'
+type Visao = 'dia' | 'acumulado' | 'categorias'
 
 interface Props {
   resumo: ResumoDiario
@@ -19,6 +19,8 @@ interface Props {
   categoria: string | null
   diaSelecionado: string | null
   onSelecionarDia: (dia: string | null) => void
+  categoriasData: Array<{ nome: string; total: number; key: string }>
+  onSelecionarCategoria: (categoria: string | null) => void
 }
 
 const rotuloDia = (dia: string) => formatDate(dia, 'EEE, dd/MM')
@@ -54,7 +56,7 @@ const Destaque: React.FC<{ rotulo: React.ReactNode; valor: string; detalhe?: str
   </div>
 )
 
-const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onSelecionarDia }) => {
+const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onSelecionarDia, categoriasData, onSelecionarCategoria }) => {
   const [visao, setVisao] = useState<Visao>('dia')
   const { serie, mediaPorDia, maiorDia, diasComGasto } = resumo
 
@@ -105,7 +107,7 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
           </p>
         </div>
         <div className="flex rounded-xl bg-surface-container p-1" role="group" aria-label="Visão do gráfico">
-          {([['dia', 'Por dia'], ['acumulado', 'Acumulado']] as const).map(([v, rotulo]) => (
+          {([['dia', 'Por dia'], ['acumulado', 'Acumulado'], ['categorias', 'Categorias']] as const).map(([v, rotulo]) => (
             <button
               key={v}
               onClick={() => setVisao(v)}
@@ -120,7 +122,7 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      {visao !== 'categorias' && <div className="grid grid-cols-3 gap-3 mb-4">
         <Destaque
           rotulo={visao === 'dia'
             ? <><span className="w-3 border-t border-dashed border-outline" aria-hidden="true" />Média/dia</>
@@ -133,33 +135,29 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
           detalhe={maiorDia ? rotuloDia(maiorDia.dia) : undefined}
         />
         <Destaque rotulo="Com gasto" valor={`${diasComGasto} de ${serie.length}`} detalhe="dias" />
-      </div>
+      </div>}
 
       <div className="w-full h-56" role="img" aria-label={descricao}>
         <ResponsiveContainer width="100%" height="100%">
-          {visao === 'dia' ? (
-            <BarChart data={serie} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} onClick={tocar}>
+          {visao === 'categorias' ? (
+            <BarChart data={categoriasData} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }}>
+              <CartesianGrid horizontal={false} stroke={COR_GRADE} strokeOpacity={0.3} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: COR_EIXO }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="nome" width={92} tick={{ fontSize: 11, fill: COR_EIXO }} axisLine={false} tickLine={false} />
+              <Tooltip formatter={(value) => formatBRL(Number(value))} contentStyle={{ background: '#1f1f25', borderColor: COR_GRADE, borderRadius: 12 }} />
+              <Bar dataKey="total" radius={[0, 4, 4, 0]} maxBarSize={22} onClick={(item) => { if (typeof item.key === 'string') onSelecionarCategoria(item.key) }} className="cursor-pointer">
+                {categoriasData.map((item, i) => <Cell key={item.key} fill={['#c0c1ff', '#ffb4ab', '#a8dab5', '#f2c078', '#80d5df', '#e8b7d4'][i % 6]} />)}
+              </Bar>
+            </BarChart>
+          ) : visao === 'dia' ? (
+            <LineChart data={serie} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} onClick={tocar}>
               <CartesianGrid vertical={false} stroke={COR_GRADE} strokeOpacity={0.3} />
               {eixoX}
               {eixoY}
-              <Tooltip content={<Dica visao="dia" />} cursor={{ fill: COR_SERIE, fillOpacity: 0.08 }} />
-              {mediaPorDia > 0 && (
-                <ReferenceLine
-                  y={mediaPorDia}
-                  stroke={COR_REFERENCIA}
-                  strokeDasharray="3 3"
-                />
-              )}
-              <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={18} isAnimationActive={false} className="cursor-pointer">
-                {serie.map((p) => (
-                  <Cell
-                    key={p.dia}
-                    fill={COR_SERIE}
-                    fillOpacity={diaSelecionado && p.dia !== diaSelecionado ? 0.3 : 1}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
+              <Tooltip content={<Dica visao="dia" />} cursor={{ stroke: COR_REFERENCIA, strokeDasharray: '3 3' }} />
+              {mediaPorDia > 0 && <ReferenceLine y={mediaPorDia} stroke={COR_REFERENCIA} strokeDasharray="3 3" />}
+              <Line type="monotone" dataKey="total" stroke={COR_SERIE} strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} isAnimationActive={false} />
+            </LineChart>
           ) : (
             <AreaChart data={serie} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} onClick={tocar}>
               <defs>

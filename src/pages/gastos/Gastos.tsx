@@ -407,6 +407,8 @@ const Gastos: React.FC = () => {
           categoria={filtroAtivo ? infoCategoria(filtroAtivo, categorias).nome : null}
           diaSelecionado={diaAtivo}
           onSelecionarDia={setDiaFiltro}
+          categoriasData={totais.map(({ categoria: key, total }) => ({ key, total, nome: infoCategoria(key, categorias).nome }))}
+          onSelecionarCategoria={(key) => setFiltro(filtro === key ? null : key)}
         />
       )}
 
