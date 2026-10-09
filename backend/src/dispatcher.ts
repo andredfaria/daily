@@ -4,6 +4,7 @@ import axios from 'axios'
 import { materializeForUser } from './services/notificationMaterializer'
 import { sendWhatsAppText, WhatsAppNumberNotFoundError } from './services/waha'
 import { decryptPix } from './services/pixCrypto'
+import { buildMessage, lembreteDevePular } from './services/lembreteConta'
 
 function wahaClient() {
   return axios.create({
@@ -26,57 +27,6 @@ function getTodayStringBRT(): string {
   return `${p.year}-${p.month}-${p.day}`
 }
 
-function buildRelativeDate(dueDate: string): string {
-  const todayStr = getTodayStringBRT()
-  const today = new Date(todayStr + 'T00:00:00')
-  const due = new Date(dueDate + 'T00:00:00')
-  const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-
-  if (diffDays === 0) return 'hoje'
-  if (diffDays === 1) return 'amanhã'
-  if (diffDays > 1) return `em ${diffDays} dias`
-  if (diffDays === -1) return 'venceu ontem'
-  return `venceu há ${Math.abs(diffDays)} dias`
-}
-
-function formatAmount(amount: number): string {
-  return amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function buildPaymentSection(pm: any): string {
-  if (!pm) return ''
-  if (pm.type === 'pix') {
-    const keyTypeLabel: Record<string, string> = {
-      cpf: 'CPF', email: 'E-mail', phone: 'Telefone', random: 'Chave aleatória',
-    }
-    const label = keyTypeLabel[pm.pix_key_type] ?? pm.pix_key_type
-    const beneficiary = pm.pix_beneficiary ? `\nFavorecido: ${pm.pix_beneficiary}` : ''
-    return `\n💳 *Pagamento:*\nPIX — ${label}: ${pm.pix_key}${beneficiary}`
-  }
-  if (pm.type === 'boleto') {
-    return `\n💳 *Pagamento:*\nBoleto:\n${pm.boleto_code}`
-  }
-  return ''
-}
-
-// estimado: conta variável cujo valor real do mês ainda não foi informado.
-function buildMessage(billName: string, amount: number, dueDate: string, pm: any, estimado = false): string {
-  const [y, m, d] = dueDate.split('-')
-  const dueFmt = `${d}/${m}/${y}`
-  const relative = buildRelativeDate(dueDate)
-  const paymentSection = buildPaymentSection(pm)
-
-  return (
-    `📅 *Lembrete de Vencimento — Rotina*\n\n` +
-    `Conta: *${billName}*\n` +
-    (estimado
-      ? `Valor estimado: R$ ${formatAmount(amount)}\n`
-      : `Valor: R$ ${formatAmount(amount)}\n`) +
-    `Vencimento: *${relative} (${dueFmt})*` +
-    paymentSection
-  )
-}
-
 export async function sendSingleNotification(notifId: string): Promise<'sent' | 'failed' | 'skipped'> {
   // Claim atômico — só prossegue se conseguir mudar de 'scheduled' para 'processing'
   const [claimResult]: any = await pool.query(
@@ -94,7 +44,7 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
 
   const [notifRows]: any = await pool.query(
     `SELECT n.id, n.bill_occurrence_id, n.type,
-            o.due_date, o.amount, o.amount_is_actual,
+            o.due_date, o.amount, o.amount_is_actual, o.paid_at,
             b.name AS bill_name, b.is_active AS bill_is_active, b.is_fixed AS bill_is_fixed,
             u.whatsapp_number, u.whatsapp_alerts_enabled,
             pm.type AS pm_type, pm.pix_key_type, pm.pix_key, pm.pix_beneficiary, pm.boleto_code
@@ -110,7 +60,9 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
   if (!notifRows.length) throw new Error(`Notificação ${notifId} não encontrada`)
   const notif = notifRows[0]
 
-  if (!notif.bill_is_active) {
+  // Conta desativada ou vencimento já pago (inclusive pago depois de o
+  // lembrete entrar na fila): não envia.
+  if (lembreteDevePular(notif)) {
     await pool.query(`UPDATE notifications SET status='skipped' WHERE id=?`, [notifId])
     return 'skipped'
   }
@@ -157,7 +109,7 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
     : String(notif.due_date).slice(0, 10)
 
   const estimado = !notif.bill_is_fixed && !notif.amount_is_actual
-  const messageBody = buildMessage(notif.bill_name, notif.amount, dueDateStr, pm, estimado)
+  const messageBody = buildMessage(notif.bill_name, Number(notif.amount), dueDateStr, pm, estimado, getTodayStringBRT())
 
   try {
     const { id: wahaMessageId } = await sendWhatsAppText(notif.whatsapp_number, messageBody)

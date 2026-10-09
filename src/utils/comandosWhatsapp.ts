@@ -38,6 +38,12 @@ export const COMANDOS_WHATSAPP: ComandoWhatsapp[] = [
     resposta: '💸 Anotado: mercado — R$ 45,00\nCategoria: Alimentação\n\nGastos do mês: R$ 312,40',
   },
   {
+    comando: '/paguei',
+    descricao: 'Marca uma conta do mês como paga (na variável, com o valor)',
+    exemplo: '/paguei luz 187,40',
+    resposta: '✅ Luz paga (R$ 187,40, venc. 10/10).',
+  },
+  {
     comando: '/carteira',
     descricao: 'Patrimônio e variação do dia',
     exemplo: '/carteira',

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import axios from 'axios'
 import pool from '../db'
 import { validarValorReal } from '../services/billValidation'
+import { marcarPaga, desmarcarPaga, ErroPagamento } from '../services/billPayment'
 
 const router = Router()
 
@@ -67,6 +68,7 @@ router.get('/stats', async (req: Request, res: Response) => {
 // GET /api/occurrences/upcoming
 // Desativar a conta não apaga as ocorrências já geradas, então o filtro por
 // is_active é o que tira a conta inativa dos próximos vencimentos da home.
+// o.* traz paid_at, que a home usa para marcar o vencimento já pago.
 router.get('/upcoming', async (req: Request, res: Response) => {
   try {
     const days = Number(req.query.days) || 30
@@ -225,6 +227,56 @@ router.patch('/:id', async (req: Request, res: Response) => {
     )
     res.json(atualizada[0])
   } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// A ocorrência é do usuário? (dono via bills.user_id)
+async function ocorrenciaDoUsuario(id: string, userId: string | undefined): Promise<boolean> {
+  const [rows]: any = await pool.query(
+    'SELECT o.id FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id WHERE o.id = ? AND b.user_id = ?',
+    [id, userId]
+  )
+  return rows.length > 0
+}
+
+// POST /api/occurrences/:id/pagar — marca o vencimento como pago.
+// { amount } é obrigatório na conta variável (vira o valor real) e ignorado na fixa.
+router.post('/:id/pagar', async (req: Request, res: Response) => {
+  try {
+    const bruto = req.body?.amount
+    let amount: number | null = null
+    if (bruto !== undefined && bruto !== null) {
+      const r = validarValorReal(bruto)
+      if ('erro' in r) return res.status(400).json({ error: r.erro })
+      amount = r.valor
+    }
+
+    if (!(await ocorrenciaDoUsuario(req.params.id, req.userId))) {
+      return res.status(404).json({ error: 'Not found' })
+    }
+
+    res.json(await marcarPaga(req.params.id, 'app', amount))
+  } catch (err: any) {
+    if (err instanceof ErroPagamento) {
+      if (err.codigo === 'valor_obrigatorio') return res.status(400).json({ error: err.message })
+      return res.status(404).json({ error: 'Not found' })
+    }
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// DELETE /api/occurrences/:id/pagar — desfaz o pagamento (o valor real fica).
+router.delete('/:id/pagar', async (req: Request, res: Response) => {
+  try {
+    if (!(await ocorrenciaDoUsuario(req.params.id, req.userId))) {
+      return res.status(404).json({ error: 'Not found' })
+    }
+    res.json(await desmarcarPaga(req.params.id))
+  } catch (err: any) {
+    if (err instanceof ErroPagamento) return res.status(404).json({ error: 'Not found' })
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })
   }

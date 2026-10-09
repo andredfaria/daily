@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { parseISO, isToday, isTomorrow } from 'date-fns'
 import { totalCarteira } from '../utils/carteira'
+import { rotuloPaga } from '../utils/pagamento'
 
 function mesAtualSaoPaulo(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -34,21 +35,26 @@ const OccurrenceRow: React.FC<{ occurrence: BillOccurrence }> = ({ occurrence })
   const { label, color } = formatRelativeDate(occurrence.due_date)
   const icon = getBillIcon(occurrence.bill_name ?? occurrence.bill?.name ?? '')
   const billName = occurrence.bill_name ?? occurrence.bill?.name ?? 'Sem nome'
+  const paga = !!occurrence.paid_at
 
   return (
     <div className="p-3 sm:p-4 rounded-xl border bg-surface-container/50 hover:bg-surface-container transition-all duration-200 border-outline-variant/40">
       <div className="flex items-center gap-3">
-        <div className="w-1 h-10 rounded-full flex-shrink-0 bg-primary/40" />
-        <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
-          <span className="material-symbols-outlined text-primary text-lg">{icon}</span>
+        <div className={`w-1 h-10 rounded-full flex-shrink-0 ${paga ? 'bg-tertiary/50' : 'bg-primary/40'}`} />
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${paga ? 'bg-tertiary/15' : 'bg-primary/15'}`}>
+          <span className={`material-symbols-outlined text-lg ${paga ? 'text-tertiary' : 'text-primary'}`} aria-hidden="true">
+            {paga ? 'check_circle' : icon}
+          </span>
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-on-surface truncate">{billName}</p>
-          <p className={`text-xs ${color} font-medium`}>
-            {formatDate(occurrence.due_date)} · {label}
+          <p className={`text-xs font-medium ${paga ? 'text-tertiary' : color}`}>
+            {formatDate(occurrence.due_date)} · {paga && occurrence.paid_at ? rotuloPaga(occurrence.paid_at) : label}
           </p>
         </div>
-        <p className="text-sm font-bold text-on-surface flex-shrink-0">{formatBRL(occurrence.amount)}</p>
+        <p className={`text-sm font-bold flex-shrink-0 ${paga ? 'text-on-surface-variant' : 'text-on-surface'}`}>
+          {formatBRL(occurrence.amount)}
+        </p>
       </div>
     </div>
   )
@@ -141,11 +147,11 @@ const Home: React.FC = () => {
     }
   }
 
-  // Não há estado de pagamento em bill_occurrences (a migration 010 removeu
-  // status/paid_at), então a pendência de conta é apenas a data de vencimento.
+  // Pendência de conta: vence hoje ou amanhã e ainda não foi marcada como paga.
   const pendencias: Pendencia[] = []
 
   for (const occ of occurrences) {
+    if (occ.paid_at) continue
     const vencimento = parseISO(occ.due_date)
     if (isToday(vencimento) || isTomorrow(vencimento)) {
       pendencias.push({

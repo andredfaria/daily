@@ -18,15 +18,157 @@ import { SkeletonCard } from '../../components/ui/Skeleton'
 import { useToast } from '../../context/ToastContext'
 import { useCategorias } from '../../hooks/useCategorias'
 import { infoCategoria } from '../../utils/categoriasGasto'
+import { rotuloPaga, valorSugeridoDoPagamento } from '../../utils/pagamento'
 
 // --- Filter types ---
 type RecurrenceFilter = 'all' | RecurrenceType
 type ActiveFilter = 'all' | 'active' | 'inactive'
 type CategoryFilter = 'all' | BillCategory
 
-/** Valor que a conta pesa no mês: na variável, o do vencimento corrente (real ou estimado). */
+/**
+ * Valor que a conta pesa no mês: na variável, o do vencimento corrente (real ou
+ * estimado). A fixa usa sempre o valor da conta — `ocorrencia_atual` agora vem
+ * para ela também (por causa do pagamento), mas não muda o que ela pesa.
+ */
 const valorDoMes = (bill: Bill): number =>
   Number(!bill.is_fixed && bill.ocorrencia_atual ? bill.ocorrencia_atual.amount : bill.amount)
+
+const erroDaApi = (err: unknown, padrao: string): string =>
+  (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? padrao
+
+// --- Pagamento do vencimento corrente ---
+interface PagamentoDoMesProps {
+  bill: Bill
+  ocorrencia: OcorrenciaAtual
+  onAtualizada: (billId: string, ocorrencia: OcorrenciaAtual) => void
+}
+
+/**
+ * Marca o vencimento corrente como pago. Fixa: um toque. Variável: pede o valor
+ * pago num modal (preenchido com o real, se já houver, senão a estimativa).
+ */
+const PagamentoDoMes: React.FC<PagamentoDoMesProps> = ({ bill, ocorrencia, onAtualizada }) => {
+  const [enviando, setEnviando] = useState(false)
+  const [modalAberto, setModalAberto] = useState(false)
+  const [valor, setValor] = useState('')
+  const { success, error: showError } = useToast()
+  const vencimento = formatDate(ocorrencia.due_date, 'dd/MM')
+
+  const pagar = async (amount?: number) => {
+    setEnviando(true)
+    try {
+      onAtualizada(bill.id, await occurrencesApi.pagar(ocorrencia.id, amount))
+      success(`${bill.name} marcada como paga.`)
+      setModalAberto(false)
+    } catch (err) {
+      showError(erroDaApi(err, 'Erro ao marcar a conta como paga.'))
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const desfazer = async () => {
+    setEnviando(true)
+    try {
+      onAtualizada(bill.id, await occurrencesApi.desfazerPagamento(ocorrencia.id))
+      success(`${bill.name} voltou para em aberto.`)
+    } catch (err) {
+      showError(erroDaApi(err, 'Erro ao desfazer o pagamento.'))
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const marcar = () => {
+    if (bill.is_fixed) return pagar()
+    setValor(formatNumericInput(valorSugeridoDoPagamento(ocorrencia, bill.amount), 2, { padDecimals: true }))
+    setModalAberto(true)
+  }
+
+  const confirmarVariavel = () => {
+    const amount = parseNumericInput(valor)
+    if (amount === null || amount < 0) return showError('Informe o valor pago.')
+    pagar(amount)
+  }
+
+  const spinner = <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+
+  if (ocorrencia.paid_at) {
+    return (
+      <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-outline-variant/30">
+        <div className="min-w-0">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-tertiary/15 text-tertiary">
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">check_circle</span>
+            {rotuloPaga(ocorrencia.paid_at)}
+          </span>
+          <p className="text-[11px] text-on-surface-variant mt-1">
+            Venc. {vencimento}{ocorrencia.paid_source === 'whatsapp' ? ' · pelo WhatsApp' : ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={desfazer}
+          disabled={enviando}
+          aria-busy={enviando}
+          aria-label={`Desfazer pagamento de ${bill.name}`}
+          className="flex-shrink-0 flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-semibold text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors disabled:opacity-50 cursor-pointer"
+        >
+          {enviando ? spinner : <span className="material-symbols-outlined text-base" aria-hidden="true">undo</span>}
+          {enviando ? 'Desfazendo…' : 'Desfazer'}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-outline-variant/30">
+      <p className="flex items-center gap-1 text-xs text-on-surface-variant min-w-0">
+        <span className="material-symbols-outlined text-sm" aria-hidden="true">schedule</span>
+        Em aberto · vence {vencimento}
+      </p>
+      <button
+        type="button"
+        onClick={marcar}
+        disabled={enviando}
+        aria-busy={enviando}
+        className="flex-shrink-0 flex items-center gap-1.5 min-h-[44px] px-3 rounded-lg border border-tertiary/40 text-xs font-semibold text-tertiary hover:bg-tertiary/10 transition-colors disabled:opacity-50 cursor-pointer"
+      >
+        {enviando && bill.is_fixed ? spinner : <span className="material-symbols-outlined text-base" aria-hidden="true">check_circle</span>}
+        {enviando && bill.is_fixed ? 'Marcando…' : 'Marcar como paga'}
+      </button>
+
+      {!bill.is_fixed && (
+        <Modal
+          isOpen={modalAberto}
+          onClose={() => !enviando && setModalAberto(false)}
+          onConfirm={confirmarVariavel}
+          title={`Pagar ${bill.name}`}
+          description={`Quanto veio a conta com vencimento em ${vencimento}? O valor fica como o real do mês.`}
+          confirmLabel="Confirmar pagamento"
+          icon="check_circle"
+          loading={enviando}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!enviando) confirmarVariavel()
+            }}
+          >
+            <NumberField
+              label="Valor pago"
+              mode="currency"
+              min={0}
+              prefix="R$"
+              value={valor}
+              onChange={setValor}
+              autoFocus
+            />
+          </form>
+        </Modal>
+      )}
+    </div>
+  )
+}
 
 // --- Valor do mês (conta variável) ---
 interface ValorDoMesProps {
@@ -283,6 +425,11 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, o
           {bill.days_before_alert} {bill.days_before_alert === 1 ? 'dia' : 'dias'} antes
         </p>
       </div>
+
+      {/* Pagamento do vencimento corrente (fixa e variável) */}
+      {bill.is_active && bill.ocorrencia_atual && (
+        <PagamentoDoMes bill={bill} ocorrencia={bill.ocorrencia_atual} onAtualizada={onOcorrenciaAtualizada} />
+      )}
     </div>
   )
 }
@@ -360,7 +507,11 @@ const ContasLista: React.FC = () => {
   const totalAmount = filtered.reduce((s, b) => s + valorDoMes(b), 0)
 
   const ocorrenciaAtualizada = (billId: string, ocorrencia: OcorrenciaAtual) => {
-    setBills((prev) => prev.map((b) => (b.id === billId ? { ...b, ocorrencia_atual: ocorrencia } : b)))
+    // Mescla com o que já havia: a resposta do PATCH de valor pode não trazer
+    // paid_at/paid_source, e substituir tudo faria a conta paga parecer em aberto.
+    setBills((prev) =>
+      prev.map((b) => (b.id === billId ? { ...b, ocorrencia_atual: { ...b.ocorrencia_atual, ...ocorrencia } } : b)),
+    )
   }
 
   const recurrenceFilters: { value: RecurrenceFilter; label: string }[] = [

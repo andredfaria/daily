@@ -435,6 +435,15 @@ ALTER TABLE bills MODIFY COLUMN category VARCHAR(36) DEFAULT NULL;
 UPDATE bills SET category = 'casa' WHERE category = 'moradia'
     `),
   },
+  {
+    // Pagamento de conta: paga = paid_at preenchido. paid_source diz se foi
+    // marcada pelo app ou pelo /paguei do WhatsApp.
+    name: '027_pagamento_ocorrencia',
+    run: async () => {
+      await addColumnIfNotExists('bill_occurrences', 'paid_at', 'DATETIME NULL', 'amount_is_actual')
+      await addColumnIfNotExists('bill_occurrences', 'paid_source', "ENUM('app','whatsapp') NULL", 'paid_at')
+    },
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

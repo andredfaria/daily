@@ -20,10 +20,11 @@ Paga = `paid_at IS NOT NULL`. Não há coluna `status`.
 
 ## Qual vencimento é marcado
 
-O "vencimento atual" da conta: a primeira ocorrência com
-`due_date >= primeiro dia do mês corrente` (São Paulo), em ordem de data — a mesma
-regra do `ocorrencia_atual` de `GET /api/bills`. Ocorrências antigas não têm
-registro de pagamento, por isso não se usa "a mais antiga em aberto".
+Entre as ocorrências da conta a partir do dia 1º do mês corrente (São Paulo):
+a primeira do mês ainda em aberto, mesmo atrasada; com o mês todo pago, a última
+do mês (o card segue "paga"); sem vencimento no mês, o próximo
+(`escolherOcorrenciaAtual`). Na semanal, pagar a semana 1 libera a semana 2.
+Ocorrências de meses anteriores não têm registro de pagamento e ficam de fora.
 
 ## Serviço `backend/src/services/billPayment.ts`
 

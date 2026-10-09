@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useId } from 'react'
 
 interface ModalProps {
   isOpen: boolean
@@ -10,6 +10,10 @@ interface ModalProps {
   cancelLabel?: string
   variant?: 'danger' | 'default'
   loading?: boolean
+  /** Ícone material do topo; o padrão segue a variante. */
+  icon?: string
+  /** Conteúdo extra entre a descrição e os botões (ex.: um campo). */
+  children?: React.ReactNode
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -22,7 +26,11 @@ const Modal: React.FC<ModalProps> = ({
   cancelLabel = 'Cancelar',
   variant = 'default',
   loading = false,
+  icon,
+  children,
 }) => {
+  const tituloId = useId()
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -48,19 +56,26 @@ const Modal: React.FC<ModalProps> = ({
       />
 
       {/* Modal */}
-      <div className="relative glass-card rounded-2xl border border-outline-variant/50 p-6 w-full max-w-md shadow-2xl animate-fadeIn">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={tituloId}
+        className="relative glass-card rounded-2xl border border-outline-variant/50 p-6 w-full max-w-md shadow-2xl animate-fadeIn"
+      >
         {/* Icon */}
         <div className={`
           w-12 h-12 rounded-full flex items-center justify-center mb-4
           ${variant === 'danger' ? 'bg-error-container' : 'bg-primary/20'}
         `}>
-          <span className={`material-symbols-outlined ${variant === 'danger' ? 'text-error' : 'text-primary'}`}>
-            {variant === 'danger' ? 'delete' : 'help'}
+          <span aria-hidden="true" className={`material-symbols-outlined ${variant === 'danger' ? 'text-error' : 'text-primary'}`}>
+            {icon ?? (variant === 'danger' ? 'delete' : 'help')}
           </span>
         </div>
 
-        <h2 className="text-lg font-semibold text-on-surface mb-2">{title}</h2>
+        <h2 id={tituloId} className="text-lg font-semibold text-on-surface mb-2">{title}</h2>
         <p className="text-sm text-on-surface-variant mb-6">{description}</p>
+
+        {children && <div className="-mt-2 mb-6">{children}</div>}
 
         <div className="flex justify-end gap-3">
           <button

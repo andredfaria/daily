@@ -33,6 +33,18 @@ export const occurrencesApi = {
     return res.data
   },
 
+  /** Marca o vencimento como pago. Na conta variável, amount (valor pago) é obrigatório. */
+  pagar: async (id: string, amount?: number | null): Promise<OcorrenciaAtual> => {
+    const res = await client.post<OcorrenciaAtual>(`/occurrences/${id}/pagar`, amount === undefined ? {} : { amount })
+    return res.data
+  },
+
+  /** Volta o vencimento para em aberto. O valor real informado continua. */
+  desfazerPagamento: async (id: string): Promise<OcorrenciaAtual> => {
+    const res = await client.delete<OcorrenciaAtual>(`/occurrences/${id}/pagar`)
+    return res.data
+  },
+
   getDashboardStats: async () => {
     const res = await client.get('/occurrences/stats')
     return res.data

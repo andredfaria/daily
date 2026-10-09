@@ -45,6 +45,9 @@ export interface OcorrenciaAtual {
   due_date: string
   amount: number
   amount_is_actual: boolean | number
+  /** Quando foi marcada como paga; null = em aberto. */
+  paid_at: string | null
+  paid_source: 'app' | 'whatsapp' | null
 }
 
 export interface BillOccurrence {
@@ -55,6 +58,7 @@ export interface BillOccurrence {
   due_date: string
   amount: number
   amount_is_actual?: boolean | number
+  paid_at?: string | null
   whatsapp_msg?: string
   created_at: string
   updated_at: string

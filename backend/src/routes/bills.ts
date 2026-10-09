@@ -5,6 +5,7 @@ import { generateOccurrencesForBill, regenerateOccurrencesForBill, aplicarValorD
 import { encryptPix, decryptPix } from '../services/pixCrypto'
 import { validarConta, camposAlterados } from '../services/billValidation'
 import { carregarCategorias } from '../services/expenseCategoryStore'
+import { ocorrenciasAtuaisDasContas } from '../services/billPayment'
 
 const router = Router()
 
@@ -35,23 +36,11 @@ router.get('/', async (req: Request, res: Response) => {
       byBill[m.bill_id].push(decryptMethod(m))
     }
 
-    // Conta variável mostra o vencimento do mês corrente (ou o próximo), onde se
-    // informa o valor real. Parte do dia 1º para o vencimento que já passou
-    // continuar editável até o mês virar.
-    const variaveis = rows.filter((b: any) => !b.is_fixed).map((b: any) => b.id)
-    const atualPorConta: Record<string, any> = {}
-    if (variaveis.length) {
-      const [ocorrencias]: any = await pool.query(
-        `SELECT id, bill_id, DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date, amount, amount_is_actual
-           FROM bill_occurrences
-          WHERE bill_id IN (?) AND due_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-          ORDER BY due_date ASC`,
-        [variaveis]
-      )
-      for (const o of ocorrencias) {
-        if (!atualPorConta[o.bill_id]) atualPorConta[o.bill_id] = o
-      }
-    }
+    // Toda conta traz o vencimento atual (do mês corrente ou o próximo, em São
+    // Paulo), com paid_at/paid_source para marcar como paga. Na variável é também
+    // onde se informa o valor real. Parte do dia 1º para o vencimento que já
+    // passou continuar editável até o mês virar.
+    const atualPorConta = await ocorrenciasAtuaisDasContas(billIds)
 
     res.json(rows.map((b: any) => ({
       ...b,

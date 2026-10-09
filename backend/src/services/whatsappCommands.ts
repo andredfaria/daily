@@ -1,5 +1,6 @@
 import { generatePhoneVariant } from './waha'
 import type { VariacaoPeriodo } from './benchmarkMath'
+import { formatDateSaoPaulo } from './assetMath'
 import { CategoriaDoUsuario, extrairCategoria, inferirCategoria, montarCategorias } from './expenseCategories'
 
 /**
@@ -8,9 +9,9 @@ import { CategoriaDoUsuario, extrairCategoria, inferirCategoria, montarCategoria
  * whatsappCommandHandler.ts / summaryService.ts.
  */
 
-export type Comando = 'contas' | 'carteira' | 'hoje' | 'gasto' | 'marcar' | 'ajuda' | 'desconhecido'
+export type Comando = 'contas' | 'carteira' | 'hoje' | 'gasto' | 'marcar' | 'paguei' | 'ajuda' | 'desconhecido'
 
-const COMANDOS: Comando[] = ['contas', 'carteira', 'hoje', 'gasto', 'marcar', 'ajuda']
+const COMANDOS: Comando[] = ['contas', 'carteira', 'hoje', 'gasto', 'marcar', 'paguei', 'ajuda']
 
 const semAcento = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
 
@@ -122,18 +123,23 @@ export type ItemAchado =
 const normalizar = (s: string): string => semAcento(s).toLowerCase().replace(/\s+/g, ' ').trim()
 
 /**
- * Casa o que foi digitado com um item dos checklists de hoje, sem ligar para
- * acento e maiúscula. Nome exato ganha de trecho: "/marcar ler" acha "Ler"
- * mesmo havendo "Ler 10 páginas". Empate vira 'varios' para a pessoa escolher,
- * em vez de marcar o item errado.
+ * Casamento por nome do /marcar e do /paguei, sem ligar para acento e
+ * maiúscula. Nome exato ganha de trecho: "ler" acha "Ler" mesmo havendo
+ * "Ler 10 páginas". Devolve todos os empatados — quem chama decide; com mais
+ * de um, a pessoa escolhe em vez de o bot acertar no chute.
  */
-export function acharItem(polls: PollParaMarcar[], termo: string): ItemAchado {
+function casarPorNome<T>(opcoes: T[], nomeDe: (o: T) => string, termo: string): T[] {
   const alvo = normalizar(termo)
-  if (!alvo) return { tipo: 'nenhum' }
-
-  const todos = polls.flatMap((p) => p.itens.map((item) => ({ p, item, chave: normalizar(item) })))
+  if (!alvo) return []
+  const todos = opcoes.map((o) => ({ o, chave: normalizar(nomeDe(o)) }))
   const exatos = todos.filter((c) => c.chave === alvo)
-  const candidatos = exatos.length > 0 ? exatos : todos.filter((c) => c.chave.includes(alvo))
+  return (exatos.length > 0 ? exatos : todos.filter((c) => c.chave.includes(alvo))).map((c) => c.o)
+}
+
+/** Casa o que foi digitado com um item dos checklists de hoje (regra em casarPorNome). */
+export function acharItem(polls: PollParaMarcar[], termo: string): ItemAchado {
+  const todos = polls.flatMap((p) => p.itens.map((item) => ({ p, item })))
+  const candidatos = casarPorNome(todos, (c) => c.item, termo)
 
   if (candidatos.length === 0) return { tipo: 'nenhum' }
   if (candidatos.length > 1) {
@@ -195,6 +201,101 @@ export function textoItemNaoEncontrado(termo: string, polls: PollParaMarcar[]): 
   const pendentes = polls.flatMap((p) => p.itens.filter((i) => !p.marcados.includes(i)))
   if (pendentes.length === 0) return `Não achei "${termo}", e o checklist de hoje já está todo marcado. ✅`
   return `Não achei "${termo}" no checklist de hoje. Ainda faltam:\n` + pendentes.map((i) => `◻️ ${i}`).join('\n')
+}
+
+// --- /paguei ---
+
+export interface PagamentoDigitado {
+  /** Nome (ou trecho) da conta, como foi digitado. */
+  termo: string
+  /** Valor pago; null quando não veio — conta fixa não precisa. */
+  valor: number | null
+}
+
+/**
+ * "/paguei luz", "/paguei luz 187,40" e "/paguei 187,40 luz". O valor aceita
+ * os formatos do /gasto e vale no começo ou no fim. Sem nome não há o que
+ * marcar. Texto igual ao nome de uma conta vale inteiro, sem valor: "/paguei
+ * iptu 2026" é a conta "IPTU 2026", não R$ 2.026 na conta "IPTU".
+ */
+export function parsePaguei(args: string, nomesDasContas: string[] = []): PagamentoDigitado | null {
+  const inteiro = normalizar(args)
+  if (inteiro && nomesDasContas.some((n) => normalizar(n) === inteiro)) return { termo: args.trim(), valor: null }
+
+  const tokens = args.split(/\s+/).filter((t) => t && t.toLowerCase() !== 'r$')
+  if (tokens.length === 0) return null
+
+  let valor = parseValor(tokens[0])
+  let resto: string[]
+  if (valor !== null) {
+    resto = tokens.slice(1)
+  } else {
+    valor = tokens.length > 1 ? parseValor(tokens[tokens.length - 1]) : null
+    resto = valor === null ? tokens : tokens.slice(0, -1)
+  }
+  const termo = resto.join(' ')
+  return termo ? { termo, valor } : null
+}
+
+export interface ContaParaPagar {
+  billId: string
+  /** Nome como cadastrado — é o que vai nas respostas. */
+  nome: string
+  variavel: boolean
+}
+
+export type ContaAchada<T extends ContaParaPagar = ContaParaPagar> =
+  | { tipo: 'achou'; conta: T }
+  | { tipo: 'varios'; opcoes: T[] }
+  | { tipo: 'nenhum' }
+
+/** Escolhe a conta entre as ativas com a mesma regra do /marcar. */
+export function acharConta<T extends ContaParaPagar>(contas: T[], termo: string): ContaAchada<T> {
+  const candidatos = casarPorNome(contas, (c) => c.nome, termo)
+  if (candidatos.length === 0) return { tipo: 'nenhum' }
+  if (candidatos.length > 1) return { tipo: 'varios', opcoes: candidatos }
+  return { tipo: 'achou', conta: candidatos[0] }
+}
+
+/** "187,40" e "1.234,50": o valor como a pessoa digitaria no comando. */
+const valorDigitavel = (v: number): string =>
+  v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+export function textoUsoPaguei(): string {
+  return (
+    'Para marcar uma conta como paga, mande o nome dela:\n/paguei luz\n\n' +
+    'Conta variável vai com o valor pago: /paguei luz 187,40\n\nMande /contas para ver o que vence.'
+  )
+}
+
+export function textoContaPaga(nome: string, valor: number, vencimento: string): string {
+  return `✅ ${nome} paga (${formatBRL(valor)}, venc. ${ddmm(vencimento)}).`
+}
+
+/** Variável sem valor não é marcada; o exemplo usa a estimativa do mês. */
+export function textoVariavelSemValor(nome: string, termo: string, estimativa: number): string {
+  return `${nome} é variável: manda /paguei ${termo} ${valorDigitavel(estimativa)}`
+}
+
+/** paid_at vem em UTC; o dia mostrado é o de São Paulo. */
+export function textoContaJaPaga(nome: string, pagaEm: string): string {
+  return `${nome} já estava paga em ${ddmm(formatDateSaoPaulo(new Date(pagaEm)))}.`
+}
+
+export function textoContaSemVencimento(nome: string): string {
+  return `${nome} não tem vencimento neste mês nem nos próximos.`
+}
+
+export function textoContaAmbigua(termo: string, opcoes: ContaParaPagar[]): string {
+  return (
+    `Achei mais de uma conta com "${termo}":\n` +
+    opcoes.map((c) => `• ${c.nome}`).join('\n') +
+    '\n\nMande o nome completo, ex.: /paguei ' + opcoes[0].nome
+  )
+}
+
+export function textoContaNaoEncontrada(termo: string): string {
+  return `Não achei a conta "${termo}". Confira os nomes em /contas.`
 }
 
 /** Texto da mensagem, que muda de lugar conforme a engine do WAHA. */
@@ -288,6 +389,7 @@ export function textoAjuda(desconhecido = false): string {
     '/hoje — itens do checklist ainda não marcados\n' +
     '/marcar academia — marca um item do checklist de hoje\n' +
     '/gasto 45 mercado — anota um gasto do dia\n' +
+    '/paguei luz 120 — marca uma conta como paga\n' +
     '/ajuda — esta lista'
   )
 }
@@ -298,6 +400,8 @@ export interface ContaAVencer {
   valor: number
   /** Conta variável sem o valor real do mês informado: valor é a estimativa. */
   estimado?: boolean
+  /** Instante do pagamento (ISO, UTC); null/ausente = em aberto. */
+  pagaEm?: string | null
 }
 
 function rotuloDia(data: string, hoje: string): string {
@@ -306,11 +410,11 @@ function rotuloDia(data: string, hoje: string): string {
   return ddmm(data)
 }
 
-/** Linhas "• Luz — R$ 120,00 (amanhã)", na ordem de vencimento. */
+/** Linhas "• Luz — R$ 120,00 (amanhã)", na ordem de vencimento; paga troca o "•" por "✅". */
 export function linhasContas(contas: ContaAVencer[], hoje: string): string[] {
   return [...contas]
     .sort((a, b) => a.vencimento.localeCompare(b.vencimento))
-    .map((c) => `• ${c.nome} — ${formatBRL(c.valor)}${c.estimado ? ' estimado' : ''} (${rotuloDia(c.vencimento, hoje)})`)
+    .map((c) => `${c.pagaEm ? '✅' : '•'} ${c.nome} — ${formatBRL(c.valor)}${c.estimado ? ' estimado' : ''} (${rotuloDia(c.vencimento, hoje)})`)
 }
 
 export function textoContas(contas: ContaAVencer[], hoje: string): string {

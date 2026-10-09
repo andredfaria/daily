@@ -6,10 +6,13 @@ import { carregarCategorias } from './expenseCategoryStore'
 import { nomeCategoria } from './expenseCategories'
 import { formatDateSaoPaulo } from './assetMath'
 import { variacaoPeriodo, SnapshotDoDia } from './benchmarkMath'
+import { ErroPagamento, marcarPaga, ocorrenciaAtualDaConta } from './billPayment'
 import { claimMessage, releaseMessageClaim, releaseMessageClaimIfUndelivered } from './messageClaim'
 import {
   Comando,
   ContaAVencer,
+  ContaParaPagar,
+  acharConta,
   PollDeHoje,
   PollParaMarcar,
   acharItem,
@@ -20,9 +23,15 @@ import {
   lerListaJson,
   parseComando,
   parseGasto,
+  parsePaguei,
   somarDias,
   textoAjuda,
   textoCarteira,
+  textoContaAmbigua,
+  textoContaJaPaga,
+  textoContaNaoEncontrada,
+  textoContaPaga,
+  textoContaSemVencimento,
   textoContas,
   textoDaMensagem,
   textoGastoAnotado,
@@ -33,6 +42,8 @@ import {
   textoMarcado,
   textoUsoGasto,
   textoUsoMarcar,
+  textoUsoPaguei,
+  textoVariavelSemValor,
   unirMarcados,
 } from './whatsappCommands'
 
@@ -63,8 +74,8 @@ export async function handleIncomingMessage(data: any): Promise<void> {
   }
 
   // Id da mensagem pode passar dos 60 caracteres de ref_key; o hash cabe e
-  // continua único por mensagem. A trava vem antes da resposta porque /gasto e
-  // /marcar gravam: reentrega do webhook não pode anotar o gasto duas vezes.
+  // continua único por mensagem. A trava vem antes da resposta porque /gasto,
+  // /marcar e /paguei gravam: reentrega do webhook não pode anotar o gasto duas vezes.
   const refKey = crypto.createHash('sha256').update(mensagemId).digest('hex').slice(0, 40)
   if (!await claimMessage(userId, 'command_reply', refKey)) return
 
@@ -124,6 +135,8 @@ async function montarResposta(comando: Comando, userId: string, args: string, re
       return anotarGasto(userId, args, hoje, refKey)
     case 'marcar':
       return marcarItem(userId, args, hoje)
+    case 'paguei':
+      return marcarContaPaga(userId, args)
     case 'ajuda':
       return textoAjuda()
     case 'desconhecido':
@@ -133,7 +146,7 @@ async function montarResposta(comando: Comando, userId: string, args: string, re
 
 export async function contasDaSemana(userId: string, hoje: string): Promise<ContaAVencer[]> {
   const [rows]: any = await pool.query(
-    `SELECT b.name, DATE_FORMAT(o.due_date, '%Y-%m-%d') AS due_date, o.amount,
+    `SELECT b.name, DATE_FORMAT(o.due_date, '%Y-%m-%d') AS due_date, o.amount, o.paid_at,
             (b.is_fixed = 0 AND o.amount_is_actual = 0) AS estimado
        FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id
       WHERE b.user_id = ? AND b.is_active = 1 AND o.due_date BETWEEN ? AND ?
@@ -145,6 +158,8 @@ export async function contasDaSemana(userId: string, hoje: string): Promise<Cont
     vencimento: r.due_date,
     valor: Number(r.amount) || 0,
     estimado: Number(r.estimado) === 1,
+    // O mysql2 devolve DATETIME como Date.
+    pagaEm: r.paid_at instanceof Date ? r.paid_at.toISOString() : (r.paid_at ?? null),
   }))
 }
 
@@ -293,4 +308,41 @@ async function marcarItem(userId: string, args: string, hoje: string): Promise<s
   )
   console.log(`[comandos] item marcado por mensagem para ${userId}`)
   return textoMarcado(achado.item, achado.nome, marcados.length, total)
+}
+
+async function marcarContaPaga(userId: string, args: string): Promise<string> {
+  const [rows]: any = await pool.query(
+    'SELECT id, name, is_fixed FROM bills WHERE user_id = ? AND is_active = 1 ORDER BY name',
+    [userId],
+  )
+  const contas: ContaParaPagar[] = rows.map((r: any) => ({ billId: r.id, nome: r.name, variavel: !r.is_fixed }))
+
+  const pedido = parsePaguei(args, contas.map((c) => c.nome))
+  if (!pedido) return textoUsoPaguei()
+
+  const achada = acharConta(contas, pedido.termo)
+  if (achada.tipo === 'nenhum') return textoContaNaoEncontrada(pedido.termo)
+  if (achada.tipo === 'varios') return textoContaAmbigua(pedido.termo, achada.opcoes)
+
+  const { conta } = achada
+  const ocorrencia = await ocorrenciaAtualDaConta(conta.billId)
+  if (!ocorrencia) return textoContaSemVencimento(conta.nome)
+  // Marcar de novo não dá erro e mantém a data: a resposta avisa em vez de
+  // fingir que pagou agora.
+  if (ocorrencia.paid_at) return textoContaJaPaga(conta.nome, ocorrencia.paid_at)
+  if (conta.variavel && pedido.valor === null) {
+    return textoVariavelSemValor(conta.nome, pedido.termo, ocorrencia.amount)
+  }
+
+  // A trava command_reply já foi tomada antes daqui: se a gravação falhar, o
+  // erro sobe e handleIncomingMessage a libera para a reentrega tentar de novo.
+  try {
+    const paga = await marcarPaga(ocorrencia.id, 'whatsapp', conta.variavel ? pedido.valor : undefined)
+    console.log(`[comandos] conta marcada como paga por mensagem para ${userId}`)
+    return textoContaPaga(conta.nome, paga.amount, paga.due_date)
+  } catch (err) {
+    // Entre a busca e a gravação a ocorrência pode ter sumido (conta editada).
+    if (err instanceof ErroPagamento && err.codigo === 'nao_encontrada') return textoContaSemVencimento(conta.nome)
+    throw err
+  }
 }
