@@ -15,3 +15,21 @@ export function classificarItem(pct: number, totalPolls: number): ClassificacaoI
   if (pct < 80) return 'oscilando'
   return 'firme'
 }
+
+/**
+ * Quebra uma lista colada em itens: uma linha por item, sem o marcador que
+ * vem junto do bloco de notas ou do WhatsApp ("- ", "• ", "1. ", "[ ] ", "☐ ").
+ * Linhas vazias e repetidas caem fora — o formulário recusa duplicata.
+ */
+export function separarItensColados(texto: string): string[] {
+  const vistos = new Set<string>()
+  return String(texto ?? '')
+    .split(/\r?\n/)
+    .map((linha) => linha.replace(/^\s*(?:[-*•·–—]|\d+[.)]|\[[ xX]?\]|[☐☑✅✔])\s*/, '').trim())
+    .filter((linha) => {
+      const chave = linha.toLowerCase()
+      if (!linha || vistos.has(chave)) return false
+      vistos.add(chave)
+      return true
+    })
+}

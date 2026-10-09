@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { requestOtp, verifyOtp } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
+import { formatarTelefoneBR } from '../utils/telefone'
 
 type Step = 'phone' | 'otp'
 
@@ -27,15 +28,8 @@ export const Login: React.FC = () => {
     return () => clearTimeout(id)
   }, [cooldown])
 
-  const formatPhone = (val: string) => {
-    const d = val.replace(/\D/g, '').slice(0, 11)
-    if (d.length <= 2) return d
-    if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`
-    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
-  }
-
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPhone(formatPhone(e.target.value))
+    setPhone(formatarTelefoneBR(e.target.value))
     setError(null)
   }
 
@@ -138,18 +132,20 @@ export const Login: React.FC = () => {
               </p>
 
               <div className="mb-4">
-                <label className="block text-xs font-medium text-on-surface-variant mb-2">
+                <label htmlFor="login-telefone" className="label">
                   Número de telefone
                 </label>
-                <div className="flex items-center gap-2 bg-surface-container-high rounded-xl px-4 py-3 border border-outline-variant focus-within:border-primary transition-colors">
+                <div className="flex min-h-[48px] items-center gap-2 bg-surface-container-high rounded-xl px-4 py-3 border border-outline-variant focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-colors">
                   <span className="text-on-surface-variant text-sm font-medium shrink-0">+55</span>
                   <input
+                    id="login-telefone"
                     type="tel"
+                    inputMode="tel"
                     value={phone}
                     onChange={handlePhoneChange}
                     onKeyDown={handlePhoneKeyDown}
                     placeholder="(11) 99999-9999"
-                    className="bg-transparent flex-1 text-on-surface placeholder-on-surface-variant text-sm outline-none"
+                    className="bg-transparent flex-1 text-on-surface placeholder-on-surface-variant text-base sm:text-sm tabular-nums outline-none"
                     autoComplete="tel"
                     autoFocus
                   />
@@ -157,7 +153,7 @@ export const Login: React.FC = () => {
               </div>
 
               {error && (
-                <p className="text-error text-xs mb-4">{error}</p>
+                <p role="alert" className="text-error text-xs mb-4">{error}</p>
               )}
 
               <button
@@ -204,7 +200,7 @@ export const Login: React.FC = () => {
               </div>
 
               {error && (
-                <p className="text-error text-xs mb-4 text-center">{error}</p>
+                <p role="alert" className="text-error text-xs mb-4 text-center">{error}</p>
               )}
 
               <button

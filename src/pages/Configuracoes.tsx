@@ -4,6 +4,7 @@ import client from '../api/client'
 import { notificationsApi } from '../api/notifications'
 import type { User } from '../types'
 import { useToast } from '../context/ToastContext'
+import { whatsappParaGravar } from '../utils/telefone'
 import NumberField from '../components/ui/NumberField'
 import { formatNumericInput, parseNumericInput } from '../utils/numberInput'
 import { useAuth } from '../context/AuthContext'
@@ -175,14 +176,15 @@ const Configuracoes: React.FC = () => {
 
   const handleSaveProfile = async () => {
     if (!profileName.trim()) return
+    const whatsapp = whatsappParaGravar(profileWhatsapp)
     setSavingProfile(true)
     try {
       await client.patch('/users/me', {
         name: profileName.trim(),
-        whatsapp_number: profileWhatsapp.trim(),
+        whatsapp_number: whatsapp,
       })
       setUser((prev) =>
-        prev ? { ...prev, name: profileName.trim(), whatsapp_number: profileWhatsapp.trim() } : prev
+        prev ? { ...prev, name: profileName.trim(), whatsapp_number: whatsapp } : prev
       )
       setEditingProfile(false)
       success('Perfil atualizado!')
@@ -353,7 +355,7 @@ const Configuracoes: React.FC = () => {
                     autoComplete="name"
                     value={profileName}
                     onChange={(e) => setProfileName(e.target.value)}
-                    className="input-field min-h-[48px]"
+                    className="input-field"
                   />
                 </div>
                 <div>
@@ -365,7 +367,7 @@ const Configuracoes: React.FC = () => {
                     autoComplete="tel"
                     value={profileWhatsapp}
                     onChange={(e) => setProfileWhatsapp(e.target.value)}
-                    className="input-field min-h-[48px] tabular-nums"
+                    className="input-field tabular-nums"
                     placeholder="+55 (11) 99999-9999"
                   />
                 </div>
@@ -423,13 +425,14 @@ const Configuracoes: React.FC = () => {
 
               {summarySettings.summary_enabled && (
                 <div>
-                  <label className="label">Dia do resumo</label>
+                  <label htmlFor="resumo-dia" className="label">Dia do resumo</label>
                   <select
+                    id="resumo-dia"
                     value={summarySettings.summary_day_of_week}
                     onChange={(e) =>
                       setSummarySettings((prev) => ({ ...prev, summary_day_of_week: Number(e.target.value) }))
                     }
-                    className="input-field mt-1"
+                    className="input-field"
                   >
                     {DAYS_OF_WEEK.map((day, idx) => (
                       <option key={idx} value={idx}>{day}</option>
@@ -550,13 +553,14 @@ const Configuracoes: React.FC = () => {
 
                 {notifSettings.whatsapp_alerts && (
                   <div>
-                    <label className="label">Horário de envio</label>
+                    <label htmlFor="notif-horario" className="label">Horário de envio</label>
                     <select
+                      id="notif-horario"
                       value={notifSettings.notification_time}
                       onChange={(e) =>
                         setNotifSettings((p) => ({ ...p, notification_time: Number(e.target.value) }))
                       }
-                      className="input-field mt-1"
+                      className="input-field"
                     >
                       {NOTIFICATION_HOURS.map((h) => (
                         <option key={h} value={h}>
@@ -569,13 +573,14 @@ const Configuracoes: React.FC = () => {
 
                 {notifSettings.asset_alerts_enabled && (
                   <div>
-                    <label className="label">Horário do alerta de ativos</label>
+                    <label htmlFor="ativos-horario" className="label">Horário do alerta de ativos</label>
                     <select
+                      id="ativos-horario"
                       value={notifSettings.asset_alert_hour}
                       onChange={(e) =>
                         setNotifSettings((p) => ({ ...p, asset_alert_hour: Number(e.target.value) }))
                       }
-                      className="input-field mt-1"
+                      className="input-field"
                     >
                       {ASSET_ALERT_HOURS.map((h) => (
                         <option key={h} value={h}>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classificarItem, STREAK_MINIMO_EXIBIDO } from '../checklistItem'
+import { classificarItem, separarItensColados, STREAK_MINIMO_EXIBIDO } from '../checklistItem'
 
 describe('classificarItem', () => {
   it('devolve sem_dados quando o item nunca entrou num poll', () => {
@@ -38,5 +38,25 @@ describe('classificarItem', () => {
 describe('STREAK_MINIMO_EXIBIDO', () => {
   it('é 3', () => {
     expect(STREAK_MINIMO_EXIBIDO).toBe(3)
+  })
+})
+
+describe('separarItensColados', () => {
+  it('uma linha por item, sem marcador', () => {
+    expect(separarItensColados('- Academia\n• Ler 10 páginas\n1. Água\n[ ] Meditar\n☐ Alongar')).toEqual([
+      'Academia',
+      'Ler 10 páginas',
+      'Água',
+      'Meditar',
+      'Alongar',
+    ])
+  })
+
+  it('descarta linha vazia e repetida', () => {
+    expect(separarItensColados('Academia\r\n\n  \nacademia\nLer')).toEqual(['Academia', 'Ler'])
+  })
+
+  it('não confunde número do item com marcador', () => {
+    expect(separarItensColados('2 litros de água')).toEqual(['2 litros de água'])
   })
 })

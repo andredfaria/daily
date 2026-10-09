@@ -253,7 +253,7 @@ const AtivosCarteira: React.FC = () => {
                 placeholder={KIND_PLACEHOLDER[form.kind]}
                 aria-invalid={!!erros.ticker}
                 aria-describedby={erros.ticker ? 'ativo-ticker-erro' : 'ativo-ticker-hint'}
-                className={`input-field min-h-[48px] uppercase ${erros.ticker ? 'error' : ''}`}
+                className={`input-field uppercase ${erros.ticker ? 'error' : ''}`}
               />
               {erros.ticker ? (
                 <p id="ativo-ticker-erro" role="alert" className="mt-1 flex items-center gap-1 text-xs text-error">
@@ -272,7 +272,7 @@ const AtivosCarteira: React.FC = () => {
                 id="ativo-tipo"
                 value={form.kind}
                 onChange={(e) => trocarTipo(e.target.value as AssetKind)}
-                className="input-field min-h-[48px]"
+                className="input-field"
               >
                 <option value="stock">Ação</option>
                 <option value="fii">FII</option>

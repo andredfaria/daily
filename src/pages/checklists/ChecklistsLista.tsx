@@ -8,6 +8,7 @@ import { ProgressBar } from '../../components/checklist/ProgressBar'
 import { ChecklistCard } from '../../components/checklist/ChecklistCard'
 import { LinhaItemHoje } from '../../components/checklist/LinhaItemHoje'
 import { RECURRENCE_LABELS, DAYS_LABELS } from '../../components/checklist/constants'
+import { separarItensColados } from '../../utils/checklistItem'
 
 // -------- Checklist Page --------
 const ChecklistsLista: React.FC = () => {
@@ -95,6 +96,24 @@ const ChecklistsLista: React.FC = () => {
   // -------- Item management --------
   const updateItem = (index: number, value: string) => {
     setFormItems((prev) => { const next = [...prev]; next[index] = value; return next })
+  }
+  // Lista colada (bloco de notas, WhatsApp) vira um item por linha a partir do
+  // campo atual, sobrescrevendo os vazios e criando os que faltam até 12.
+  const colarItens = (index: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const linhas = separarItensColados(e.clipboardData.getData('text'))
+    if (linhas.length < 2) return
+    e.preventDefault()
+    setFormItems((prev) => {
+      const next = [...prev]
+      let pos = index
+      for (const linha of linhas) {
+        while (pos < next.length && pos !== index && next[pos].trim()) pos++
+        if (pos >= 12) break
+        next[pos] = linha
+        pos++
+      }
+      return next
+    })
   }
   const addItem = () => setFormItems((prev) => (prev.length < 12 ? [...prev, ''] : prev))
   const removeItem = (index: number) => setFormItems((prev) => (prev.length > 2 ? prev.filter((_, i) => i !== index) : prev))
@@ -334,6 +353,7 @@ const ChecklistsLista: React.FC = () => {
                 className="input-field flex-1"
                 value={item}
                 onChange={(e) => updateItem(i, e.target.value)}
+                onPaste={(e) => colarItens(i, e)}
                 placeholder="Digite a tarefa..."
                 aria-label={`Item ${i + 1}`}
                 maxLength={255}

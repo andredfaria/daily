@@ -1,6 +1,7 @@
 import React, { useId, useMemo, useRef } from 'react'
 import {
   DEFAULT_DECIMALS,
+  interpretarNumeroColado,
   normalizeNumericInput,
   parseNumericInput,
   sanitizeNumericInput,
@@ -99,6 +100,18 @@ const NumberField: React.FC<NumberFieldProps> = ({
     onChange(sanitizeNumericInput(e.target.value, { decimals: casas }))
   }
 
+  // Colar não passa pelo handleChange: lá "R$ 1.234,56" já chegaria grudado
+  // no que havia no campo e o ponto de milhar viraria vírgula decimal.
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const colado = interpretarNumeroColado(e.clipboardData.getData('text'))
+    e.preventDefault()
+    if (colado === null) return
+    const campo = e.currentTarget
+    const inicio = campo.selectionStart ?? value.length
+    const fim = campo.selectionEnd ?? value.length
+    onChange(sanitizeNumericInput(value.slice(0, inicio) + colado + value.slice(fim), { decimals: casas }))
+  }
+
   const handleBlur = () => {
     const normalizado = normalizeNumericInput(value, opcoes)
     if (normalizado !== value) onChange(normalizado)
@@ -154,12 +167,13 @@ const NumberField: React.FC<NumberFieldProps> = ({
           value={value}
           placeholder={placeholder}
           onChange={handleChange}
+          onPaste={handlePaste}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           aria-invalid={!!error}
           aria-describedby={descricao}
           className={[
-            'input-field tabular-nums min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed',
+            'input-field tabular-nums',
             error ? 'error' : '',
             prefix ? 'pl-10' : '',
             // Espaço reservado o tempo todo: o botão limpar aparecendo não

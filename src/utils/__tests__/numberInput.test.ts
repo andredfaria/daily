@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   clampNumber,
   formatNumericInput,
+  interpretarNumeroColado,
   normalizeNumericInput,
   parseNumericInput,
   sanitizeNumericInput,
@@ -65,6 +66,48 @@ describe('sanitizeNumericInput', () => {
 
   it('entende valor colado com separador de milhar', () => {
     expect(sanitizeNumericInput('1.234.567,89')).toBe('1234567,89')
+  })
+})
+
+describe('interpretarNumeroColado', () => {
+  it('ignora moeda e espaços antes de olhar os separadores', () => {
+    // O bug: "R$ 1.234,56" colado virava 1,23.
+    expect(interpretarNumeroColado('R$ 1.234,56')).toBe('1234,56')
+    expect(interpretarNumeroColado('R$\u00a01.234,56')).toBe('1234,56')
+    expect(interpretarNumeroColado('2.500,00 BRL')).toBe('2500,00')
+    expect(interpretarNumeroColado('1 234,56')).toBe('1234,56')
+    expect(interpretarNumeroColado('R$ 12.345')).toBe('12345')
+  })
+
+  it('entende o formato americano', () => {
+    expect(interpretarNumeroColado('1,234.56')).toBe('1234,56')
+    expect(interpretarNumeroColado('$1,234,567')).toBe('1234567')
+    expect(interpretarNumeroColado('1234.56')).toBe('1234,56')
+  })
+
+  it('distingue milhar de decimal pelo agrupamento', () => {
+    expect(interpretarNumeroColado('1.234')).toBe('1234')
+    expect(interpretarNumeroColado('1.234.567')).toBe('1234567')
+    expect(interpretarNumeroColado('1,234')).toBe('1,234')
+    expect(interpretarNumeroColado('0.123')).toBe('0,123')
+    expect(interpretarNumeroColado('0.00012345')).toBe('0,00012345')
+    expect(interpretarNumeroColado('42,9')).toBe('42,9')
+  })
+
+  it('preserva o sinal negativo, inclusive o contábil', () => {
+    expect(interpretarNumeroColado('-R$ 50,00')).toBe('-50,00')
+    expect(interpretarNumeroColado('R$ -50,00')).toBe('-50,00')
+    expect(interpretarNumeroColado('(50,00)')).toBe('-50,00')
+  })
+
+  it('descarta separador pendurado no fim', () => {
+    expect(interpretarNumeroColado('R$ 10,')).toBe('10')
+    expect(interpretarNumeroColado('Total: 99.')).toBe('99')
+  })
+
+  it('devolve null quando não há número', () => {
+    expect(interpretarNumeroColado('')).toBeNull()
+    expect(interpretarNumeroColado('R$ ,')).toBeNull()
   })
 })
 

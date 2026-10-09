@@ -45,6 +45,57 @@ export const stripGrouping = (raw: string): string =>
   /^\s*-?\d{1,3}(\.\d{3})+(,\d*)?\s*$/.test(raw) ? raw.replace(/\./g, '') : raw
 
 /**
+ * Interpreta um número colado de qualquer lugar — extrato, planilha,
+ * calculadora, site em inglês — e devolve no formato do campo ("1234,56").
+ *
+ * A digitação não passa por aqui: tecla a tecla, "1,2." é alguém corrigindo
+ * o separador, não um "1.2" americano. Já o texto colado chega inteiro, então
+ * dá para decidir pelo conjunto:
+ * - moeda, letras e espaços (inclusive o NBSP do Excel) caem fora antes de
+ *   olhar os separadores — era o "R$ " que fazia "R$ 1.234,56" virar 1,23;
+ * - com ponto e vírgula juntos, o que vem por último é o decimal;
+ * - um separador repetido em grupos de 3 é milhar ("1.234.567", "1,234,567");
+ * - ponto único seguido de exatamente 3 dígitos é milhar ("1.234"), como o
+ *   `stripGrouping` já tratava; vírgula única é sempre decimal.
+ *
+ * Retorna null quando não há dígito nenhum no texto.
+ */
+export const interpretarNumeroColado = (texto: string): string | null => {
+  const bruto = String(texto ?? '')
+  const primeiroDigito = bruto.search(/\d/)
+  if (primeiroDigito < 0) return null
+
+  // Sinal: hífen ou "−" antes do primeiro dígito, ou contábil "(50,00)".
+  const antes = bruto.slice(0, primeiroDigito)
+  const negativo = /[-−]/.test(antes) || (antes.includes('(') && bruto.includes(')'))
+
+  const numero = bruto.slice(primeiroDigito).replace(/[^\d.,]/g, '').replace(/[.,]+$/, '')
+  const ultimoPonto = numero.lastIndexOf('.')
+  const ultimaVirgula = numero.lastIndexOf(',')
+
+  let inteiro = numero
+  let casas = ''
+  const separarEm = (pos: number) => {
+    inteiro = numero.slice(0, pos).replace(/[.,]/g, '')
+    casas = numero.slice(pos + 1).replace(/[.,]/g, '')
+  }
+
+  if (ultimoPonto >= 0 && ultimaVirgula >= 0) {
+    separarEm(Math.max(ultimoPonto, ultimaVirgula))
+  } else if (ultimoPonto >= 0 || ultimaVirgula >= 0) {
+    const sep = ultimoPonto >= 0 ? '.' : ','
+    const partes = numero.split(sep)
+    const agrupado = /^\d{1,3}$/.test(partes[0]) && partes.slice(1).every((p) => p.length === 3)
+    const milhar = agrupado && (partes.length > 2 || (sep === '.' && partes[0] !== '0'))
+    if (milhar) inteiro = partes.join('')
+    else separarEm(numero.lastIndexOf(sep))
+  }
+
+  const corpo = casas ? `${inteiro || '0'},${casas}` : inteiro
+  return negativo ? `-${corpo}` : corpo
+}
+
+/**
  * Higieniza o que o usuário digitou, preservando a string vazia.
  * Descarta letras e símbolos, aceita vírgula ou ponto como separador
  * decimal (normalizando para vírgula) e corta casas decimais em excesso.
