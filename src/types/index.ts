@@ -1,5 +1,6 @@
 export type RecurrenceType = 'monthly' | 'weekly' | 'once' | 'biweekly' | 'quarterly' | 'semiannual' | 'annual'
-export type BillCategory = 'moradia' | 'assinaturas' | 'serviços' | 'saúde' | 'educação' | 'transporte' | 'alimentação' | 'outro'
+/** Chave de categoria — a mesma lista dos gastos (padrão ou id da criada pelo usuário). */
+export type BillCategory = string
 export type NotificationStatus = 'scheduled' | 'sent' | 'failed' | 'skipped'
 export type PaymentMethodType = 'pix' | 'boleto'
 export type PixKeyType = 'cpf' | 'email' | 'phone' | 'random'

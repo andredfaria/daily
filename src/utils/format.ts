@@ -84,20 +84,6 @@ export const getRecurrenceShortLabel = (type: string): string => {
   return 'AVULSO'
 }
 
-export const getCategoryLabel = (category?: string): string => {
-  const labels: Record<string, string> = {
-    moradia: 'Moradia',
-    assinaturas: 'Assinaturas',
-    'serviços': 'Serviços',
-    'saúde': 'Saúde',
-    'educação': 'Educação',
-    transporte: 'Transporte',
-    'alimentação': 'Alimentação',
-    outro: 'Outro',
-  }
-  return category ? (labels[category] ?? category) : ''
-}
-
 export const buildMessagePreview = (notif: NotificationEnriched): string => {
   const dueDateStr = typeof notif.due_date === 'string'
     ? notif.due_date.slice(0, 10)

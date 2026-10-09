@@ -5,23 +5,14 @@ import client from '../api/client'
 import { wahaApi } from '../api/waha'
 import NumberField from '../components/ui/NumberField'
 import { parseNumericInput } from '../utils/numberInput'
+import { useCategorias } from '../hooks/useCategorias'
 
 type Step = 0 | 1 | 2 | 3
-
-const CATEGORIES: { value: string; label: string }[] = [
-  { value: 'moradia', label: 'Moradia' },
-  { value: 'assinaturas', label: 'Assinaturas' },
-  { value: 'serviços', label: 'Serviços' },
-  { value: 'saúde', label: 'Saúde' },
-  { value: 'educação', label: 'Educação' },
-  { value: 'transporte', label: 'Transporte' },
-  { value: 'alimentação', label: 'Alimentação' },
-  { value: 'outro', label: 'Outro' },
-]
 
 const Onboarding: React.FC = () => {
   const navigate = useNavigate()
   const { refreshUser } = useAuth()
+  const categorias = useCategorias()
 
   const [step, setStep] = useState<Step>(0)
   const [error, setError] = useState('')
@@ -31,7 +22,7 @@ const Onboarding: React.FC = () => {
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
   const [dayOfMonth, setDayOfMonth] = useState('')
-  const [category, setCategory] = useState('moradia')
+  const [category, setCategory] = useState('casa')
   const [billCreated, setBillCreated] = useState(false)
 
   // Passo 2 — WhatsApp
@@ -171,7 +162,7 @@ const Onboarding: React.FC = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex.: Aluguel, Netflix, Energia"
-                  className="input-field min-h-[48px] bg-surface-container-high"
+                  className="input-field bg-surface-container-high"
                   aria-required="true"
                 />
               </div>
@@ -205,10 +196,10 @@ const Onboarding: React.FC = () => {
                   id="onb-categoria"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="input-field min-h-[48px] bg-surface-container-high"
+                  className="input-field bg-surface-container-high"
                 >
-                  {CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
+                  {categorias.filter((c) => !c.oculta).map((c) => (
+                    <option key={c.key} value={c.key}>{c.nome}</option>
                   ))}
                 </select>
               </div>

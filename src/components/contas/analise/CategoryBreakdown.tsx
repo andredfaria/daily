@@ -1,7 +1,9 @@
 import React from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { ByCategoryResponse } from '../../../types'
-import { categoryColor, categoryLabel } from '../../../utils/categoryColors'
+import { categoryColor } from '../../../utils/categoryColors'
+import { infoCategoria } from '../../../utils/categoriasGasto'
+import { useCategorias } from '../../../hooks/useCategorias'
 import { formatBRL } from '../../../utils/format'
 
 interface CategoryBreakdownProps {
@@ -10,8 +12,9 @@ interface CategoryBreakdownProps {
 }
 
 export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({ data, loading }) => {
+  const categorias = useCategorias()
   const pieData = (data?.categorias ?? []).map((c) => ({
-    name: categoryLabel(c.category),
+    name: infoCategoria(c.category, categorias).nome,
     value: c.total,
     color: categoryColor(c.category),
     pct: c.pct,

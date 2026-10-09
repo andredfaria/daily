@@ -11,6 +11,7 @@ import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import { infoCategoria, type CategoriaGasto } from '../../utils/categoriasGasto'
 import GerenciarCategorias from '../../components/contas/GerenciarCategorias'
+import { useCategorias, definirCategorias } from '../../hooks/useCategorias'
 import DiaADiaGastos from '../../components/contas/DiaADiaGastos'
 import { resumoDiario } from '../../utils/gastosDiarios'
 
@@ -189,7 +190,7 @@ const Gastos: React.FC = () => {
   const [dia, setDia] = useState(hojeLocal())
   const [filtro, setFiltro] = useState<string | null>(null)
   const [diaFiltro, setDiaFiltro] = useState<string | null>(null)
-  const [categorias, setCategorias] = useState<CategoriaGasto[]>([])
+  const categorias = useCategorias()
   const [gerenciando, setGerenciando] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
@@ -217,12 +218,8 @@ const Gastos: React.FC = () => {
   // Dia escolhido no gráfico é do mês que estava aberto.
   useEffect(() => { setDiaFiltro(null) }, [mes])
 
-  useEffect(() => {
-    expensesApi.categorias().then(setCategorias).catch(() => showError('Erro ao carregar categorias.'))
-  }, [showError])
-
   const categoriasMudaram = (novas: CategoriaGasto[], gastosMudaram?: boolean) => {
-    setCategorias(novas)
+    definirCategorias(novas)
     // Categoria apagada leva os gastos para "outro": a lista precisa refletir.
     if (gastosMudaram) carregar()
   }

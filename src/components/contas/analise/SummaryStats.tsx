@@ -1,6 +1,7 @@
 import React from 'react'
 import type { ByCategoryResponse, ProjectionResponse } from '../../../types'
-import { categoryLabel } from '../../../utils/categoryColors'
+import { infoCategoria } from '../../../utils/categoriasGasto'
+import { useCategorias } from '../../../hooks/useCategorias'
 import { formatBRL } from '../../../utils/format'
 import { StatCard } from '../../ui/StatCard'
 import { SkeletonStatCard } from '../../ui/Skeleton'
@@ -13,6 +14,7 @@ interface SummaryStatsProps {
 }
 
 export const SummaryStats: React.FC<SummaryStatsProps> = ({ byCat, history, projection, loading }) => {
+  const categorias = useCategorias()
   if (loading) {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -45,7 +47,7 @@ export const SummaryStats: React.FC<SummaryStatsProps> = ({ byCat, history, proj
       <StatCard
         icon="donut_large"
         label={topCategory ? `Maior categoria · ${topCategory.pct}%` : 'Maior categoria'}
-        value={topCategory ? categoryLabel(topCategory.category) : '—'}
+        value={topCategory ? infoCategoria(topCategory.category, categorias).nome : '—'}
         iconColor="text-primary"
         iconBg="bg-primary/15"
       />

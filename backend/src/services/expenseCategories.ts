@@ -1,6 +1,8 @@
 /**
- * Categorias dos gastos avulsos. Lista própria, separada da das contas: conta
- * fixa é moradia e assinatura, gasto do dia é mercado, café e uber.
+ * Categorias do sistema todo: gastos avulsos e contas usam a mesma lista, para
+ * a análise de um lado bater com a do outro. Até a 026 as contas tinham lista
+ * própria; o que só existia lá (assinaturas, serviços, educação) virou padrão
+ * aqui e "moradia" foi para "casa".
  *
  * Há as padrão (chave fixa, abaixo) e as criadas pelo usuário (chave = id da
  * linha em expense_categories). A padrão pode ser renomeada, trocar de ícone e
@@ -15,6 +17,9 @@ export const CATEGORIAS_GASTO = [
   'lazer',
   'compras',
   'casa',
+  'assinaturas',
+  'serviços',
+  'educação',
   'outro',
 ] as const
 
@@ -31,6 +36,9 @@ export const PADRAO: Record<CategoriaPadrao, { nome: string; icone: string }> = 
   lazer: { nome: 'Lazer', icone: 'celebration' },
   compras: { nome: 'Compras', icone: 'shopping_bag' },
   casa: { nome: 'Casa', icone: 'home' },
+  assinaturas: { nome: 'Assinaturas', icone: 'subscriptions' },
+  'serviços': { nome: 'Serviços', icone: 'bolt' },
+  'educação': { nome: 'Educação', icone: 'school' },
   outro: { nome: 'Outro', icone: 'more_horiz' },
 }
 
@@ -44,6 +52,7 @@ export const ICONES_CATEGORIA = [
   'shopping_bag', 'home', 'more_horiz', 'pets', 'child_care', 'school',
   'fitness_center', 'local_cafe', 'local_bar', 'flight', 'checkroom', 'spa',
   'sports_esports', 'redeem', 'build', 'savings', 'work', 'favorite', 'devices',
+  'subscriptions', 'bolt', 'wifi', 'credit_card', 'receipt_long', 'shield',
 ] as const
 
 export const ehPadrao = (key: string): key is CategoriaPadrao =>
@@ -117,7 +126,10 @@ const PALAVRAS: Array<[CategoriaPadrao, string[]]> = [
   ['saúde', ['farmac', 'remedio', 'drogaria', 'medic', 'consulta', 'exame', 'dentista', 'hospital', 'academia', 'psicolog', 'terapia']],
   ['lazer', ['cinema', 'show', 'viagem', 'passeio', 'ingresso', 'jogo', 'teatro', 'festa', 'hotel', 'parque']],
   ['compras', ['roupa', 'loja', 'amazon', 'shopee', 'shein', 'presente', 'sapato', 'tenis', 'eletronic', 'livro']],
-  ['casa', ['limpeza', 'material', 'conserto', 'manutencao', 'reforma', 'ferragem', 'gas', 'agua', 'movel', 'moveis', 'pet', 'racao']],
+  ['casa', ['limpeza', 'material', 'conserto', 'manutencao', 'reforma', 'ferragem', 'gas', 'agua', 'movel', 'moveis', 'pet', 'racao', 'aluguel', 'condominio', 'iptu']],
+  ['assinaturas', ['netflix', 'spotify', 'assinatura', 'streaming', 'disney', 'hbo', 'deezer', 'youtube', 'icloud', 'globoplay']],
+  ['serviços', ['internet', 'energia', 'luz', 'telefone', 'celular', 'fibra', 'seguro']],
+  ['educação', ['escola', 'faculdade', 'curso', 'mensalidade', 'apostila', 'matricula']],
 ]
 
 /**

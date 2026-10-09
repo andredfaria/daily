@@ -43,7 +43,7 @@ export const expensesApi = {
     return res.data
   },
 
-  apagarCategoria: async (key: string): Promise<{ gastosMovidos: number; categorias: CategoriaGasto[] }> => {
+  apagarCategoria: async (key: string): Promise<{ gastosMovidos: number; contasMovidas: number; categorias: CategoriaGasto[] }> => {
     const res = await client.delete(`/expenses/categories/${encodeURIComponent(key)}`)
     return res.data
   },

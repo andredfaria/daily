@@ -5,21 +5,12 @@ import { claimMessage, releaseMessageClaimIfUndelivered, claimKeyDia, claimKeyMe
 import { formatDateSaoPaulo } from './assetMath'
 import { variacaoPeriodo } from './benchmarkMath'
 import { contasDaSemana } from './whatsappCommandHandler'
+import { carregarCategorias } from './expenseCategoryStore'
+import { nomeCategoria } from './expenseCategories'
 import { blocoCarteiraSemana, blocoChecklistsSemana, blocoGastosSemana, linhasContas, somarDias } from './whatsappCommands'
 
 function formatBRL(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-const NOMES_CATEGORIA: Record<string, string> = {
-  moradia: 'Moradia',
-  assinaturas: 'Assinaturas',
-  'serviços': 'Serviços',
-  'saúde': 'Saúde',
-  'educação': 'Educação',
-  transporte: 'Transporte',
-  'alimentação': 'Alimentação',
-  outro: 'Outro',
 }
 
 // --- Resumo semanal: contas da semana, carteira, checklists e gastos avulsos ---
@@ -168,9 +159,11 @@ export async function sendMonthlySummary(userId: string): Promise<void> {
   }
 
   if (fechamento.porCategoria.length) {
+    // Nome que o usuário deu (categoria criada ou renomeada), não a chave crua.
+    const categorias = await carregarCategorias(userId)
     msg += `\n*Contas por categoria:*\n`
     for (const c of fechamento.porCategoria) {
-      const nome = NOMES_CATEGORIA[c.category] ?? c.category
+      const nome = nomeCategoria(c.category, categorias)
       msg += `• ${nome}: R$ ${formatBRL(c.total)}\n`
     }
   }

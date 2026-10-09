@@ -25,6 +25,10 @@ describe('inferirCategoria', () => {
     ['Amazon', 'compras'],
     ['ração do cachorro', 'casa'],
     ['botijão de gás', 'casa'],
+    ['aluguel', 'casa'],
+    ['Netflix', 'assinaturas'],
+    ['conta de internet', 'serviços'],
+    ['mensalidade da escola', 'educação'],
     ['pão de queijo', 'outro'],
     ['', 'outro'],
   ])('%s → %s', (descricao, esperado) => {
@@ -57,7 +61,7 @@ const cats = montarCategorias(linhas)
 describe('montarCategorias', () => {
   it('padrão na ordem fixa, depois as criadas por nome', () => {
     expect(cats.map((c) => c.key)).toEqual([
-      'alimentação', 'restaurante', 'transporte', 'saúde', 'lazer', 'compras', 'casa', 'outro', 'uuid-filhos', 'uuid-pet',
+      'alimentação', 'restaurante', 'transporte', 'saúde', 'lazer', 'compras', 'casa', 'assinaturas', 'serviços', 'educação', 'outro', 'uuid-filhos', 'uuid-pet',
     ])
   })
 
@@ -71,7 +75,7 @@ describe('montarCategorias', () => {
   })
 
   it('sem linhas, só as padrão', () => {
-    expect(montarCategorias([])).toHaveLength(8)
+    expect(montarCategorias([])).toHaveLength(11)
   })
 })
 

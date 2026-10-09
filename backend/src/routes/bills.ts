@@ -4,6 +4,7 @@ import pool from '../db'
 import { generateOccurrencesForBill, regenerateOccurrencesForBill, aplicarValorDaConta } from '../services/occurrenceGenerator'
 import { encryptPix, decryptPix } from '../services/pixCrypto'
 import { validarConta, camposAlterados } from '../services/billValidation'
+import { carregarCategorias } from '../services/expenseCategoryStore'
 
 const router = Router()
 
@@ -81,6 +82,15 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 })
 
+// Categoria da conta: a mesma lista dos gastos (padrão + criadas pelo usuário).
+// Vazio limpa; chave que o usuário não tem é recusada em vez de virar "outro" calada.
+async function lerCategoria(userId: string, valor: unknown): Promise<{ ok: true; valor: string | null } | { ok: false }> {
+  if (valor === null || valor === '') return { ok: true, valor: null }
+  if (typeof valor !== 'string') return { ok: false }
+  const categorias = await carregarCategorias(userId)
+  return categorias.some((c) => c.key === valor) ? { ok: true, valor } : { ok: false }
+}
+
 // POST /api/bills
 router.post('/', async (req: Request, res: Response) => {
   try {
@@ -96,6 +106,9 @@ router.post('/', async (req: Request, res: Response) => {
     const erro = validarConta({ ...req.body, days_before_alert, is_fixed })
     if (erro) return res.status(400).json({ error: erro })
 
+    const cat = category === undefined ? { ok: true as const, valor: null } : await lerCategoria(req.userId!, category)
+    if (!cat.ok) return res.status(400).json({ error: 'Categoria inválida' })
+
     const id = uuidv4()
     const now = new Date()
 
@@ -107,7 +120,7 @@ router.post('/', async (req: Request, res: Response) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, req.userId,
-        name, category ?? null, description ?? null, amount, is_fixed ? 1 : 0, recurrence_type,
+        name, cat.valor, description ?? null, amount, is_fixed ? 1 : 0, recurrence_type,
         recurrence_day_of_month ?? null, recurrence_day_of_week ?? null,
         due_date ?? null, days_before_alert, is_active ? 1 : 0, now, now,
       ]
@@ -147,6 +160,12 @@ router.patch('/:id', async (req: Request, res: Response) => {
     ]
     const fields: string[] = []
     const values: any[] = []
+
+    if (req.body.category !== undefined) {
+      const cat = await lerCategoria(req.userId!, req.body.category)
+      if (!cat.ok) return res.status(400).json({ error: 'Categoria inválida' })
+      req.body.category = cat.valor
+    }
 
     for (const key of allowed) {
       if (req.body[key] !== undefined) {

@@ -77,9 +77,10 @@ interface Props {
 }
 
 /**
- * Criar, renomear, trocar ícone, ocultar e apagar categorias de gasto.
- * Padrão só se oculta (some das listas de escolha e da dedução automática);
- * apagar é só para as criadas, e os gastos delas vão para "Outro".
+ * Criar, renomear, trocar ícone, ocultar e apagar categorias — as mesmas de
+ * gastos e contas. Padrão só se oculta (some das listas de escolha e da
+ * dedução automática); apagar é só para as criadas, e gastos e contas delas
+ * vão para "Outro".
  */
 const GerenciarCategorias: React.FC<Props> = ({ categorias, onMudou, onFechar }) => {
   const [editando, setEditando] = useState<string | 'nova' | null>(null)
@@ -130,7 +131,11 @@ const GerenciarCategorias: React.FC<Props> = ({ categorias, onMudou, onFechar })
     try {
       const r = await expensesApi.apagarCategoria(apagar.key)
       onMudou(r.categorias, r.gastosMovidos > 0)
-      success(r.gastosMovidos > 0 ? `Categoria apagada. ${r.gastosMovidos} gasto(s) foram para ${nomeReserva}.` : 'Categoria apagada.')
+      const movidos = [
+        r.gastosMovidos > 0 && `${r.gastosMovidos} gasto(s)`,
+        r.contasMovidas > 0 && `${r.contasMovidas} conta(s)`,
+      ].filter(Boolean)
+      success(movidos.length ? `Categoria apagada. ${movidos.join(' e ')} foram para ${nomeReserva}.` : 'Categoria apagada.')
       setApagar(null)
     } catch (err) {
       showError(erroDaApi(err, 'Erro ao apagar categoria.'))
@@ -227,7 +232,7 @@ const GerenciarCategorias: React.FC<Props> = ({ categorias, onMudou, onFechar })
       )}
 
       <p className="px-5 pb-4 text-[11px] text-on-surface-variant/80 leading-relaxed">
-        Categoria oculta some das opções e da escolha automática, mas os gastos antigos continuam nela.
+        Vale para gastos e contas. Categoria oculta some das opções e da escolha automática, mas o que já estava nela continua.
         No WhatsApp, use o nome com <code className="font-mono text-primary">#</code>: <code className="font-mono text-primary">/gasto 50 ração #pet</code>.
       </p>
 
@@ -236,7 +241,7 @@ const GerenciarCategorias: React.FC<Props> = ({ categorias, onMudou, onFechar })
         onClose={() => setApagar(null)}
         onConfirm={confirmarApagar}
         title="Apagar categoria"
-        description={`Apagar "${apagar?.nome}"? Os gastos dela passam para ${nomeReserva}.`}
+        description={`Apagar "${apagar?.nome}"? Gastos e contas dela passam para ${nomeReserva}.`}
         confirmLabel="Apagar"
         cancelLabel="Cancelar"
         variant="danger"

@@ -7,7 +7,6 @@ import {
   formatBRL,
   formatDate,
   getBillIcon,
-  getCategoryLabel,
   getRecurrenceBadgeColor,
   getRecurrenceLabel,
   getRecurrenceShortLabel,
@@ -17,6 +16,8 @@ import NumberField from '../../components/ui/NumberField'
 import Modal from '../../components/ui/Modal'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 import { useToast } from '../../context/ToastContext'
+import { useCategorias } from '../../hooks/useCategorias'
+import { infoCategoria } from '../../utils/categoriasGasto'
 
 // --- Filter types ---
 type RecurrenceFilter = 'all' | RecurrenceType
@@ -132,6 +133,7 @@ interface BillCardProps {
 }
 
 const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, onOcorrenciaAtualizada, toggling }) => {
+  const categorias = useCategorias()
   const icon = getBillIcon(bill.name)
   const recurrenceLabel = getRecurrenceShortLabel(bill.recurrence_type)
   const recurrenceColor = getRecurrenceBadgeColor(bill.recurrence_type)
@@ -233,8 +235,9 @@ const BillCard: React.FC<BillCardProps> = ({ bill, onEdit, onToggle, onDelete, o
         </span>
 
         {bill.category && (
-          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant">
-            {getCategoryLabel(bill.category)}
+          <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant">
+            <span className="material-symbols-outlined text-xs" aria-hidden="true">{infoCategoria(bill.category, categorias).icone}</span>
+            {infoCategoria(bill.category, categorias).nome}
           </span>
         )}
 
@@ -291,6 +294,9 @@ const ContasLista: React.FC = () => {
   const [recurrenceFilter, setRecurrenceFilter] = useState<RecurrenceFilter>('all')
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('active')
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all')
+  const categorias = useCategorias()
+  // Sem categoria ou de categoria apagada conta como "outro", como na análise.
+  const categoriaDaConta = (b: Bill) => infoCategoria(b.category ?? 'outro', categorias).key
   const [deleteTarget, setDeleteTarget] = useState<Bill | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
@@ -347,7 +353,7 @@ const ContasLista: React.FC = () => {
       activeFilter === 'all' ||
       (activeFilter === 'active' && b.is_active) ||
       (activeFilter === 'inactive' && !b.is_active)
-    const categoryMatch = categoryFilter === 'all' || b.category === categoryFilter
+    const categoryMatch = categoryFilter === 'all' || categoriaDaConta(b) === categoryFilter
     return recMatch && activeMatch && categoryMatch
   })
 
@@ -368,16 +374,12 @@ const ContasLista: React.FC = () => {
     { value: 'once', label: 'Avulsa' },
   ]
 
+  // Só as categorias que alguma conta usa: a lista é a mesma dos gastos e
+  // mostrar as onze (mais as criadas) deixaria o filtro cheio de opção vazia.
+  const usadas = new Set(bills.map((b) => categoriaDaConta(b)))
   const categoryFilters: { value: CategoryFilter; label: string }[] = [
     { value: 'all', label: 'Categorias' },
-    { value: 'moradia', label: 'Moradia' },
-    { value: 'assinaturas', label: 'Assinaturas' },
-    { value: 'serviços', label: 'Serviços' },
-    { value: 'saúde', label: 'Saúde' },
-    { value: 'educação', label: 'Educação' },
-    { value: 'transporte', label: 'Transporte' },
-    { value: 'alimentação', label: 'Alimentação' },
-    { value: 'outro', label: 'Outro' },
+    ...categorias.filter((c) => usadas.has(c.key)).map((c) => ({ value: c.key, label: c.nome })),
   ]
 
   const activeFilters: { value: ActiveFilter; label: string }[] = [

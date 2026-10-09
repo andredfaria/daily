@@ -424,6 +424,17 @@ CREATE TABLE IF NOT EXISTS sessions (
       await addColumnIfNotExists('users', 'monthly_expense_budget_limit', 'DECIMAL(10,2) DEFAULT NULL', 'monthly_budget_limit')
     },
   },
+  {
+    // Contas passam a usar as categorias dos gastos (services/expenseCategories.ts).
+    // Assinaturas, serviços, educação, saúde, transporte, alimentação e outro têm
+    // a mesma chave nas duas listas; só "moradia" muda, para "casa". A coluna
+    // cresce para caber o id de categoria criada pelo usuário.
+    name: '026_unificar_categorias',
+    statements: splitStatements(`
+ALTER TABLE bills MODIFY COLUMN category VARCHAR(36) DEFAULT NULL;
+UPDATE bills SET category = 'casa' WHERE category = 'moradia'
+    `),
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

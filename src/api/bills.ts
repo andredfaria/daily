@@ -3,6 +3,8 @@ import type { Bill, PaymentMethod } from '../types'
 
 export interface CreateBillPayload {
   name: string
+  /** Chave da categoria (mesma lista dos gastos); null limpa. */
+  category?: string | null
   description?: string
   amount: number
   is_fixed?: boolean

@@ -121,7 +121,7 @@ router.patch('/categories/:key', async (req: Request, res: Response) => {
   }
 })
 
-// DELETE /api/expenses/categories/:key — só as criadas; os gastos dela vão para "outro"
+// DELETE /api/expenses/categories/:key — só as criadas; gastos e contas dela vão para "outro"
 router.delete('/categories/:key', async (req: Request, res: Response) => {
   const key = req.params.key
   if (ehPadrao(key)) return res.status(400).json({ error: 'Categoria padrão não pode ser apagada, só ocultada' })
@@ -138,8 +138,17 @@ router.delete('/categories/:key', async (req: Request, res: Response) => {
       'UPDATE expenses SET category = ? WHERE user_id = ? AND category = ?',
       [CATEGORIA_RESERVA, req.userId, key],
     )
+    // A lista é a mesma das contas desde a 026: conta da categoria apagada também vai para a reserva.
+    const [contas]: any = await conn.query(
+      'UPDATE bills SET category = ? WHERE user_id = ? AND category = ?',
+      [CATEGORIA_RESERVA, req.userId, key],
+    )
     await conn.commit()
-    res.json({ gastosMovidos: movidos.affectedRows, categorias: await carregarCategorias(req.userId!) })
+    res.json({
+      gastosMovidos: movidos.affectedRows,
+      contasMovidas: contas.affectedRows,
+      categorias: await carregarCategorias(req.userId!),
+    })
   } catch (err: any) {
     await conn.rollback()
     console.error(err)
