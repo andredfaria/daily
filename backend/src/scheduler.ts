@@ -10,6 +10,7 @@ import { checkAssetAlerts } from './services/assetAlertService'
 import { syncUserAssets } from './services/assetQuoteSync'
 import { configureWahaWebhook } from './services/waha'
 import { chaveDoTick } from './services/schedulerTick'
+import { completarOcorrencias } from './services/occurrenceGenerator'
 
 function getCurrentDayOfMonthSaoPaulo(): number {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -78,9 +79,22 @@ export async function initScheduler(): Promise<void> {
   // corrente é recuperada: as funções do tick consultam "agora", não uma data
   // passada. Repetir é seguro — envios passam por message_claims ou pelo claim
   // de notifications.status, e o snapshot é upsert.
-  executarTick('boot').catch((err: any) =>
-    console.error('[scheduler] erro na recuperação do tick:', err.message)
-  )
+  // Completa os vencimentos antes do tick: o lembrete de hoje só sai se a
+  // ocorrência existir.
+  completarVencimentos()
+    .then(() => executarTick('boot'))
+    .catch((err: any) =>
+      console.error('[scheduler] erro na recuperação do tick:', err.message)
+    )
+}
+
+async function completarVencimentos(): Promise<void> {
+  try {
+    const geradas = await completarOcorrencias()
+    if (geradas) console.log(`[scheduler] ${geradas} vencimento(s) completado(s)`)
+  } catch (err: any) {
+    console.error('[scheduler] erro ao completar vencimentos:', err.message)
+  }
 }
 
 async function runTick(hour: number): Promise<void> {
@@ -96,6 +110,9 @@ async function runTick(hour: number): Promise<void> {
       console.error('[scheduler] erro ao reafirmar webhook WAHA:', err.message)
     }
   }
+
+  // --- Vencimentos: uma vez por dia mantém 12 meses à frente ---
+  if (hour === 0) await completarVencimentos()
 
   // --- Envio de notificações de contas ---
   try {
