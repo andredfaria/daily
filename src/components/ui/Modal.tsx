@@ -1,4 +1,5 @@
 import React, { useEffect, useId } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ModalProps {
   isOpen: boolean
@@ -47,7 +48,9 @@ const Modal: React.FC<ModalProps> = ({
 
   if (!isOpen) return null
 
-  return (
+  // Vai direto para o <body>: dentro de um .glass-card o backdrop-filter vira
+  // referência do position: fixed, e o modal ficava preso ao tamanho do card.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
@@ -97,7 +100,8 @@ const Modal: React.FC<ModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
