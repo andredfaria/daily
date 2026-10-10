@@ -514,15 +514,15 @@ const ContasLista: React.FC = () => {
     )
   }
 
+  // Mesma ideia das categorias: só as recorrências que alguma conta usa, na
+  // ordem do mês para o ano. Oito botões fixos tomavam uma linha inteira.
+  const ordemRecorrencia: RecurrenceType[] = ['weekly', 'biweekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'once']
+  const recorrenciasUsadas = new Set(bills.map((b) => b.recurrence_type))
   const recurrenceFilters: { value: RecurrenceFilter; label: string }[] = [
-    { value: 'all', label: 'Todas' },
-    { value: 'monthly', label: 'Mensal' },
-    { value: 'weekly', label: 'Semanal' },
-    { value: 'biweekly', label: 'Quinzenal' },
-    { value: 'quarterly', label: 'Trimestral' },
-    { value: 'semiannual', label: 'Semestral' },
-    { value: 'annual', label: 'Anual' },
-    { value: 'once', label: 'Avulsa' },
+    { value: 'all', label: 'Recorrências' },
+    ...ordemRecorrencia
+      .filter((r) => recorrenciasUsadas.has(r))
+      .map((r) => ({ value: r, label: r === 'once' ? 'Avulsa' : getRecurrenceLabel(r) })),
   ]
 
   // Só as categorias que alguma conta usa: a lista é a mesma dos gastos e
@@ -553,17 +553,17 @@ const ContasLista: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="space-y-3">
-        {/* Recurrence filter pills — contained horizontal scroll on mobile */}
-        <div className="flex items-center gap-1.5 bg-surface-container rounded-xl p-1 overflow-x-auto no-scrollbar">
-          {recurrenceFilters.map((f) => (
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Active filter pills */}
+        <div className="flex items-center gap-1.5 bg-surface-container rounded-xl p-1">
+          {activeFilters.map((f) => (
             <button
               key={f.value}
-              onClick={() => setRecurrenceFilter(f.value)}
+              onClick={() => setActiveFilter(f.value)}
               className={`
-                flex-shrink-0 min-h-[44px] px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer
-                ${recurrenceFilter === f.value
-                  ? 'bg-primary text-on-primary-fixed shadow-sm'
+                min-h-[44px] px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer
+                ${activeFilter === f.value
+                  ? 'bg-surface-container-high text-on-surface shadow-sm'
                   : 'text-on-surface-variant hover:text-on-surface'
                 }
               `}
@@ -573,42 +573,33 @@ const ContasLista: React.FC = () => {
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Active filter pills */}
-          <div className="flex items-center gap-1.5 bg-surface-container rounded-xl p-1">
-            {activeFilters.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setActiveFilter(f.value)}
-                className={`
-                  min-h-[44px] px-3 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer
-                  ${activeFilter === f.value
-                    ? 'bg-surface-container-high text-on-surface shadow-sm'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                  }
-                `}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+        {/* Recurrence filter select */}
+        <select
+          value={recurrenceFilter}
+          onChange={(e) => setRecurrenceFilter(e.target.value as RecurrenceFilter)}
+          aria-label="Filtrar por recorrência"
+          className="min-h-[44px] px-3 rounded-xl text-xs font-semibold bg-surface-container text-on-surface-variant border-none outline-none cursor-pointer hover:text-on-surface transition-colors"
+        >
+          {recurrenceFilters.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
 
-          {/* Category filter select */}
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
-            aria-label="Filtrar por categoria"
-            className="min-h-[44px] px-3 rounded-xl text-xs font-semibold bg-surface-container text-on-surface-variant border-none outline-none cursor-pointer hover:text-on-surface transition-colors"
-          >
-            {categoryFilters.map((f) => (
-              <option key={f.value} value={f.value}>{f.label}</option>
-            ))}
-          </select>
+        {/* Category filter select */}
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
+          aria-label="Filtrar por categoria"
+          className="min-h-[44px] px-3 rounded-xl text-xs font-semibold bg-surface-container text-on-surface-variant border-none outline-none cursor-pointer hover:text-on-surface transition-colors"
+        >
+          {categoryFilters.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
 
-          <span className="text-xs text-on-surface-variant ml-auto">
-            {filtered.length} conta{filtered.length !== 1 ? 's' : ''}
-          </span>
-        </div>
+        <span className="text-xs text-on-surface-variant ml-auto">
+          {filtered.length} conta{filtered.length !== 1 ? 's' : ''}
+        </span>
       </div>
 
       {/* Bento Grid */}
