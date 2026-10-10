@@ -14,6 +14,7 @@ import GerenciarCategorias from '../../components/contas/GerenciarCategorias'
 import { useCategorias, definirCategorias } from '../../hooks/useCategorias'
 import DiaADiaGastos from '../../components/contas/DiaADiaGastos'
 import { resumoDiario } from '../../utils/gastosDiarios'
+import Select from '../../components/ui/Select'
 
 const hojeLocal = (): string => {
   const d = new Date()
@@ -82,14 +83,18 @@ interface SeletorProps {
 const SeletorCategoria: React.FC<SeletorProps> = ({ id, valor, onChange, categorias, automatica }) => (
   <div>
     <label className="label" htmlFor={id}>Categoria</label>
-    <select id={id} value={valor} onChange={(e) => onChange(e.target.value)} className="input-field">
-      {automatica && <option value="">Automática (pelo nome)</option>}
-      {categorias
-        .filter((c) => !c.oculta || c.key === valor)
-        .map((c) => (
-          <option key={c.key} value={c.key}>{c.nome}</option>
-        ))}
-    </select>
+    <Select
+      id={id}
+      value={valor}
+      onChange={onChange}
+      placeholder="Automática (pelo nome)"
+      options={[
+        ...(automatica ? [{ value: '', label: 'Automática (pelo nome)', icon: 'auto_awesome' }] : []),
+        ...categorias
+          .filter((c) => !c.oculta || c.key === valor)
+          .map((c) => ({ value: c.key, label: c.nome, icon: c.icone })),
+      ]}
+    />
   </div>
 )
 

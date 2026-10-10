@@ -6,6 +6,7 @@ import { wahaApi } from '../api/waha'
 import NumberField from '../components/ui/NumberField'
 import { parseNumericInput } from '../utils/numberInput'
 import { useCategorias } from '../hooks/useCategorias'
+import Select from '../components/ui/Select'
 
 type Step = 0 | 1 | 2 | 3
 
@@ -192,16 +193,12 @@ const Onboarding: React.FC = () => {
               </div>
               <div>
                 <label htmlFor="onb-categoria" className="label">Categoria</label>
-                <select
+                <Select
                   id="onb-categoria"
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="input-field bg-surface-container-high"
-                >
-                  {categorias.filter((c) => !c.oculta).map((c) => (
-                    <option key={c.key} value={c.key}>{c.nome}</option>
-                  ))}
-                </select>
+                  onChange={setCategory}
+                  options={categorias.filter((c) => !c.oculta).map((c) => ({ value: c.key, label: c.nome, icon: c.icone }))}
+                />
               </div>
               <p className="text-xs text-on-surface-variant">Recorrência mensal. Você poderá ajustar depois.</p>
               <button

@@ -19,6 +19,7 @@ import { useToast } from '../../context/ToastContext'
 import { useCategorias } from '../../hooks/useCategorias'
 import { infoCategoria } from '../../utils/categoriasGasto'
 import { rotuloPaga, valorSugeridoDoPagamento } from '../../utils/pagamento'
+import Select from '../../components/ui/Select'
 
 // --- Filter types ---
 type RecurrenceFilter = 'all' | RecurrenceType
@@ -518,19 +519,19 @@ const ContasLista: React.FC = () => {
   // ordem do mês para o ano. Oito botões fixos tomavam uma linha inteira.
   const ordemRecorrencia: RecurrenceType[] = ['weekly', 'biweekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'once']
   const recorrenciasUsadas = new Set(bills.map((b) => b.recurrence_type))
-  const recurrenceFilters: { value: RecurrenceFilter; label: string }[] = [
-    { value: 'all', label: 'Recorrências' },
+  const recurrenceFilters: { value: RecurrenceFilter; label: string; icon?: string }[] = [
+    { value: 'all', label: 'Recorrências', icon: 'event_repeat' },
     ...ordemRecorrencia
       .filter((r) => recorrenciasUsadas.has(r))
-      .map((r) => ({ value: r, label: r === 'once' ? 'Avulsa' : getRecurrenceLabel(r) })),
+      .map((r) => ({ value: r, label: r === 'once' ? 'Avulsa' : getRecurrenceLabel(r), icon: r === 'once' ? 'event' : 'event_repeat' })),
   ]
 
   // Só as categorias que alguma conta usa: a lista é a mesma dos gastos e
   // mostrar as onze (mais as criadas) deixaria o filtro cheio de opção vazia.
   const usadas = new Set(bills.map((b) => categoriaDaConta(b)))
-  const categoryFilters: { value: CategoryFilter; label: string }[] = [
-    { value: 'all', label: 'Categorias' },
-    ...categorias.filter((c) => usadas.has(c.key)).map((c) => ({ value: c.key, label: c.nome })),
+  const categoryFilters: { value: CategoryFilter; label: string; icon?: string }[] = [
+    { value: 'all', label: 'Categorias', icon: 'category' },
+    ...categorias.filter((c) => usadas.has(c.key)).map((c) => ({ value: c.key, label: c.nome, icon: c.icone })),
   ]
 
   const activeFilters: { value: ActiveFilter; label: string }[] = [
@@ -574,28 +575,24 @@ const ContasLista: React.FC = () => {
         </div>
 
         {/* Recurrence filter select */}
-        <select
-          value={recurrenceFilter}
-          onChange={(e) => setRecurrenceFilter(e.target.value as RecurrenceFilter)}
+        <Select
+          variant="chip"
           aria-label="Filtrar por recorrência"
-          className="min-h-[44px] px-3 rounded-xl text-xs font-semibold bg-surface-container text-on-surface-variant border-none outline-none cursor-pointer hover:text-on-surface transition-colors"
-        >
-          {recurrenceFilters.map((f) => (
-            <option key={f.value} value={f.value}>{f.label}</option>
-          ))}
-        </select>
+          value={recurrenceFilter}
+          onChange={setRecurrenceFilter}
+          ativo={recurrenceFilter !== 'all'}
+          options={recurrenceFilters}
+        />
 
         {/* Category filter select */}
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value as CategoryFilter)}
+        <Select
+          variant="chip"
           aria-label="Filtrar por categoria"
-          className="min-h-[44px] px-3 rounded-xl text-xs font-semibold bg-surface-container text-on-surface-variant border-none outline-none cursor-pointer hover:text-on-surface transition-colors"
-        >
-          {categoryFilters.map((f) => (
-            <option key={f.value} value={f.value}>{f.label}</option>
-          ))}
-        </select>
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          ativo={categoryFilter !== 'all'}
+          options={categoryFilters}
+        />
 
         <span className="text-xs text-on-surface-variant ml-auto">
           {filtered.length} conta{filtered.length !== 1 ? 's' : ''}

@@ -8,6 +8,7 @@ import { formatNumericInput, parseNumericInput } from '../../utils/numberInput'
 import { SkeletonCard } from '../../components/ui/Skeleton'
 import { AtivoCard } from '../../components/ativos/AtivoCard'
 import { totalCarteira } from '../../utils/carteira'
+import Select from '../../components/ui/Select'
 
 // O formato do código muda por tipo — o campo precisa dizer isso antes de o
 // usuário errar: ação/FII usam o ticker da B3, cripto usa o símbolo da moeda.
@@ -268,16 +269,16 @@ const AtivosCarteira: React.FC = () => {
             </div>
             <div>
               <label htmlFor="ativo-tipo" className="label">Tipo</label>
-              <select
+              <Select
                 id="ativo-tipo"
                 value={form.kind}
-                onChange={(e) => trocarTipo(e.target.value as AssetKind)}
-                className="input-field"
-              >
-                <option value="stock">Ação</option>
-                <option value="fii">FII</option>
-                <option value="crypto">Cripto</option>
-              </select>
+                onChange={trocarTipo}
+                options={[
+                  { value: 'stock', label: 'Ação', icon: 'candlestick_chart' },
+                  { value: 'fii', label: 'FII', icon: 'apartment' },
+                  { value: 'crypto', label: 'Cripto', icon: 'currency_bitcoin' },
+                ]}
+              />
             </div>
 
             <NumberField

@@ -8,6 +8,7 @@ import { formatNumericInput, parseNumericInput } from '../utils/numberInput'
 import { formatBRL, formatDate, getBillIcon } from '../utils/format'
 import { useCategorias } from '../hooks/useCategorias'
 import { infoCategoria } from '../utils/categoriasGasto'
+import Select from '../components/ui/Select'
 
 // --- Types ---
 interface PaymentMethodDraft {
@@ -248,17 +249,17 @@ const PaymentMethodCard: React.FC<PaymentMethodCardProps> = ({ method, index, to
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]">
           <div>
             <label htmlFor={`pix-tipo-${method.draftId}`} className="label">Tipo de chave</label>
-            <select
+            <Select
               id={`pix-tipo-${method.draftId}`}
               value={method.pix_key_type}
-              onChange={(e) => onChange(method.draftId, 'pix_key_type', e.target.value)}
-              className="input-field"
-            >
-              <option value="cpf">CPF/CNPJ</option>
-              <option value="email">E-mail</option>
-              <option value="phone">Telefone</option>
-              <option value="random">Aleatória</option>
-            </select>
+              onChange={(v) => onChange(method.draftId, 'pix_key_type', v)}
+              options={[
+                { value: 'cpf', label: 'CPF/CNPJ', icon: 'badge' },
+                { value: 'email', label: 'E-mail', icon: 'mail' },
+                { value: 'phone', label: 'Telefone', icon: 'call' },
+                { value: 'random', label: 'Aleatória', icon: 'key' },
+              ]}
+            />
           </div>
           <div>
             <label htmlFor={`pix-chave-${method.draftId}`} className="label">Chave PIX</label>

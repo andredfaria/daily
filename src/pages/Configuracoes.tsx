@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext'
 import { COMANDOS_WHATSAPP } from '../utils/comandosWhatsapp'
 import { WhatsAppProfileCard, WhatsAppProfile } from '../components/whatsapp/WhatsAppProfileCard'
 import DispositivosCard from '../components/sessoes/DispositivosCard'
+import Select from '../components/ui/Select'
 
 const NOTIFICATION_HOURS = [7, 8, 9, 10, 12, 18]
 // B3 negocia das 10h às 17h BRT; antes da abertura a brapi devolve o fechamento
@@ -426,18 +427,12 @@ const Configuracoes: React.FC = () => {
               {summarySettings.summary_enabled && (
                 <div>
                   <label htmlFor="resumo-dia" className="label">Dia do resumo</label>
-                  <select
+                  <Select
                     id="resumo-dia"
-                    value={summarySettings.summary_day_of_week}
-                    onChange={(e) =>
-                      setSummarySettings((prev) => ({ ...prev, summary_day_of_week: Number(e.target.value) }))
-                    }
-                    className="input-field"
-                  >
-                    {DAYS_OF_WEEK.map((day, idx) => (
-                      <option key={idx} value={idx}>{day}</option>
-                    ))}
-                  </select>
+                    value={String(summarySettings.summary_day_of_week)}
+                    onChange={(v) => setSummarySettings((prev) => ({ ...prev, summary_day_of_week: Number(v) }))}
+                    options={DAYS_OF_WEEK.map((day, idx) => ({ value: String(idx), label: day, icon: 'calendar_today' }))}
+                  />
                 </div>
               )}
 
@@ -554,40 +549,24 @@ const Configuracoes: React.FC = () => {
                 {notifSettings.whatsapp_alerts && (
                   <div>
                     <label htmlFor="notif-horario" className="label">Horário de envio</label>
-                    <select
+                    <Select
                       id="notif-horario"
-                      value={notifSettings.notification_time}
-                      onChange={(e) =>
-                        setNotifSettings((p) => ({ ...p, notification_time: Number(e.target.value) }))
-                      }
-                      className="input-field"
-                    >
-                      {NOTIFICATION_HOURS.map((h) => (
-                        <option key={h} value={h}>
-                          {String(h).padStart(2, '0')}:00
-                        </option>
-                      ))}
-                    </select>
+                      value={String(notifSettings.notification_time)}
+                      onChange={(v) => setNotifSettings((p) => ({ ...p, notification_time: Number(v) }))}
+                      options={NOTIFICATION_HOURS.map((h) => ({ value: String(h), label: `${String(h).padStart(2, '0')}:00`, icon: 'schedule' }))}
+                    />
                   </div>
                 )}
 
                 {notifSettings.asset_alerts_enabled && (
                   <div>
                     <label htmlFor="ativos-horario" className="label">Horário do alerta de ativos</label>
-                    <select
+                    <Select
                       id="ativos-horario"
-                      value={notifSettings.asset_alert_hour}
-                      onChange={(e) =>
-                        setNotifSettings((p) => ({ ...p, asset_alert_hour: Number(e.target.value) }))
-                      }
-                      className="input-field"
-                    >
-                      {ASSET_ALERT_HOURS.map((h) => (
-                        <option key={h} value={h}>
-                          {String(h).padStart(2, '0')}:00
-                        </option>
-                      ))}
-                    </select>
+                      value={String(notifSettings.asset_alert_hour)}
+                      onChange={(v) => setNotifSettings((p) => ({ ...p, asset_alert_hour: Number(v) }))}
+                      options={ASSET_ALERT_HOURS.map((h) => ({ value: String(h), label: `${String(h).padStart(2, '0')}:00`, icon: 'schedule' }))}
+                    />
                     <p className="text-xs text-on-surface-variant mt-1">
                       Você recebe um aviso quando algum ativo atingir o preço-alvo ou o stop.
                       Ações e FIIs só são checados após a abertura do pregão.

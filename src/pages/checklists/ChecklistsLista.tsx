@@ -9,6 +9,7 @@ import { ChecklistCard } from '../../components/checklist/ChecklistCard'
 import { LinhaItemHoje } from '../../components/checklist/LinhaItemHoje'
 import { RECURRENCE_LABELS, DAYS_LABELS } from '../../components/checklist/constants'
 import { separarItensColados } from '../../utils/checklistItem'
+import Select from '../../components/ui/Select'
 
 // -------- Checklist Page --------
 const ChecklistsLista: React.FC = () => {
@@ -384,31 +385,23 @@ const ChecklistsLista: React.FC = () => {
         {/* Send Time */}
         <div className="mb-4">
           <label htmlFor="checklist-horario" className="label mb-1">Horário de Envio</label>
-          <select
+          <Select
             id="checklist-horario"
-            className="input-field"
-            value={formSendTime}
-            onChange={(e) => setFormSendTime(Number(e.target.value))}
-          >
-            {Array.from({ length: 24 }).map((_, h) => (
-              <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
-            ))}
-          </select>
+            value={String(formSendTime)}
+            onChange={(v) => setFormSendTime(Number(v))}
+            options={Array.from({ length: 24 }).map((_, h) => ({ value: String(h), label: `${String(h).padStart(2, '0')}:00`, icon: 'schedule' }))}
+          />
         </div>
 
         {/* Recurrence */}
         <div className="mb-4">
           <label htmlFor="checklist-recorrencia" className="label mb-1">Recorrência</label>
-          <select
+          <Select
             id="checklist-recorrencia"
-            className="input-field"
             value={formRecurrenceType}
-            onChange={(e) => setFormRecurrenceType(e.target.value as ChecklistRecurrenceType)}
-          >
-            {(Object.keys(RECURRENCE_LABELS) as ChecklistRecurrenceType[]).map((key) => (
-              <option key={key} value={key}>{RECURRENCE_LABELS[key]}</option>
-            ))}
-          </select>
+            onChange={setFormRecurrenceType}
+            options={(Object.keys(RECURRENCE_LABELS) as ChecklistRecurrenceType[]).map((key) => ({ value: key, label: RECURRENCE_LABELS[key], icon: 'event_repeat' }))}
+          />
         </div>
 
         {formRecurrenceType === 'custom' && (
