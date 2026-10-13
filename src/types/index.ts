@@ -115,7 +115,6 @@ export interface User {
   summary_enabled: boolean
   summary_day_of_week: number
   monthly_summary_enabled: boolean
-  monthly_budget_limit: number | null
   monthly_expense_budget_limit: number | null
   onboarding_completed: boolean
   created_at: string
@@ -246,9 +245,7 @@ export interface ProjectionResponse {
 
 export interface BudgetResponse {
   total: number
-  /** Limite mensal das contas. */
-  orcamento: number | null
-  /** Limite mensal dos gastos avulsos, separado do das contas. */
+  /** Limite mensal dos gastos avulsos. Contas não têm limite. */
   orcamentoGastos: number | null
   qtdContas: number
   porCategoria: Array<{ category: string; total: number }>

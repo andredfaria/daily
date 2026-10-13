@@ -170,12 +170,12 @@ async function runTick(hour: number): Promise<void> {
     } catch (e: any) { console.error('[scheduler] monthly summary tick erro:', e.message) }
   }
 
-  // --- Alerta de orçamento (executa às 9h) ---
+  // --- Alerta de limite de gastos (executa às 9h) ---
   if (hour === 9) {
     try {
       const [budgetUsers]: any = await pool.query(
         `SELECT id FROM users
-          WHERE (monthly_budget_limit IS NOT NULL OR monthly_expense_budget_limit IS NOT NULL) AND is_active = 1`
+          WHERE monthly_expense_budget_limit IS NOT NULL AND is_active = 1`
       )
       for (const { id } of budgetUsers) {
         try { await checkBudgetAlert(id) } catch (e: any) { console.error('[scheduler] budget erro:', e.message) }

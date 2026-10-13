@@ -168,18 +168,12 @@ export async function sendMonthlySummary(userId: string): Promise<void> {
     }
   }
 
-  // Contas e gastos têm limites separados; cada um é julgado contra o seu.
-  const linhaOrcamento = (rotulo: string, total: number, limite: number): string => {
-    const diff = total - limite
-    return diff > 0
-      ? `⚠️ ${rotulo}: R$ ${formatBRL(diff)} acima do limite de R$ ${formatBRL(limite)}.\n`
-      : `✅ ${rotulo}: dentro do limite de R$ ${formatBRL(limite)}.\n`
-  }
-  if (fechamento.orcamento != null || fechamento.orcamentoGastos != null) {
-    msg += `\n`
-    if (fechamento.orcamento != null) msg += linhaOrcamento('Contas', fechamento.total, fechamento.orcamento)
-    if (fechamento.orcamentoGastos != null) msg += linhaOrcamento('Gastos', fechamento.gastosAvulsos, fechamento.orcamentoGastos)
-    msg = msg.trimEnd()
+  // Só gastos têm limite; conta é lembrete e não entra em orçamento.
+  if (fechamento.orcamentoGastos != null) {
+    const diff = fechamento.gastosAvulsos - fechamento.orcamentoGastos
+    msg += diff > 0
+      ? `\n⚠️ Gastos: R$ ${formatBRL(diff)} acima do limite de R$ ${formatBRL(fechamento.orcamentoGastos)}.`
+      : `\n✅ Gastos: dentro do limite de R$ ${formatBRL(fechamento.orcamentoGastos)}.`
   }
 
   const refKey = claimKeyMesAnterior()

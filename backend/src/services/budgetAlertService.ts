@@ -6,8 +6,8 @@ function brl(v: number): string {
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
 }
 
-// Contas e gastos têm limites separados (conta é controle do mês, gasto é do dia
-// a dia), então cada um tem o próprio alerta e a própria trava.
+// Limite é só de gastos avulsos. Conta é lembrete de vencimento e não tem
+// limite: somá-las num "orçamento" disparava alerta com o total das contas.
 async function enviarAlerta(userId: string, numero: string, kind: ClaimKind, msg: string): Promise<void> {
   // Chave diária: preserva a cadência atual (um aviso por dia enquanto o
   // orçamento estiver estourado) e barra só a duplicata entre instâncias.
@@ -25,32 +25,15 @@ async function enviarAlerta(userId: string, numero: string, kind: ClaimKind, msg
 
 export async function checkBudgetAlert(userId: string): Promise<void> {
   const [userRows]: any = await pool.query(
-    'SELECT whatsapp_number, monthly_budget_limit, monthly_expense_budget_limit FROM users WHERE id = ? AND is_active = 1',
+    'SELECT whatsapp_number, monthly_expense_budget_limit FROM users WHERE id = ? AND is_active = 1',
     [userId]
   )
   if (!userRows.length || !userRows[0].whatsapp_number) return
-  const { whatsapp_number: numero, monthly_budget_limit, monthly_expense_budget_limit } = userRows[0]
+  const { whatsapp_number: numero, monthly_expense_budget_limit } = userRows[0]
 
   const now = new Date()
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-
-  if (monthly_budget_limit != null) {
-    const limite = Number(monthly_budget_limit)
-    const [[stats]]: any = await pool.query(
-      `SELECT SUM(o.amount) AS total
-         FROM bill_occurrences o JOIN bills b ON b.id = o.bill_id
-        WHERE b.user_id = ? AND b.is_active = 1 AND o.due_date BETWEEN ? AND ?`,
-      [userId, firstOfMonth, lastOfMonth]
-    )
-    const total = Number(stats.total) || 0
-    if (total > limite) {
-      await enviarAlerta(userId, numero, 'budget_alert',
-        `⚠️ *Alerta de Orçamento — Rotina*\n\n` +
-        `Suas contas deste mês somam *R$ ${brl(total)}*, ` +
-        `acima do limite de contas de *R$ ${brl(limite)}*.`)
-    }
-  }
 
   if (monthly_expense_budget_limit != null) {
     const limite = Number(monthly_expense_budget_limit)

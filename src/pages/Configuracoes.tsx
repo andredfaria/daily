@@ -37,7 +37,6 @@ interface UserResponse extends User {
 interface SummaryBudgetSettings {
   summary_enabled: boolean
   summary_day_of_week: number
-  monthly_budget_limit: string
   monthly_expense_budget_limit: string
   monthly_summary_enabled: boolean
 }
@@ -66,7 +65,6 @@ const Configuracoes: React.FC = () => {
   const [summarySettings, setSummarySettings] = useState<SummaryBudgetSettings>({
     summary_enabled: false,
     summary_day_of_week: 1,
-    monthly_budget_limit: '',
     monthly_expense_budget_limit: '',
     monthly_summary_enabled: false,
   })
@@ -108,10 +106,6 @@ const Configuracoes: React.FC = () => {
       setSummarySettings({
         summary_enabled: u.summary_enabled ?? false,
         summary_day_of_week: u.summary_day_of_week ?? 1,
-        monthly_budget_limit:
-          u.monthly_budget_limit != null
-            ? formatNumericInput(Number(u.monthly_budget_limit), 2, { padDecimals: true })
-            : '',
         monthly_expense_budget_limit:
           u.monthly_expense_budget_limit != null
             ? formatNumericInput(Number(u.monthly_expense_budget_limit), 2, { padDecimals: true })
@@ -132,7 +126,6 @@ const Configuracoes: React.FC = () => {
         summary_enabled: false,
         summary_day_of_week: 1,
         monthly_summary_enabled: false,
-        monthly_budget_limit: null,
         monthly_expense_budget_limit: null,
         onboarding_completed: true,
         created_at: new Date().toISOString(),
@@ -222,12 +215,10 @@ const Configuracoes: React.FC = () => {
     const prev = { ...summarySettings }
     try {
       // Campo vazio desliga o alerta de orçamento — vira null, não zero.
-      const budgetVal = parseNumericInput(summarySettings.monthly_budget_limit)
       const expenseBudgetVal = parseNumericInput(summarySettings.monthly_expense_budget_limit)
       await client.patch('/users/me', {
         summary_enabled: summarySettings.summary_enabled,
         summary_day_of_week: summarySettings.summary_day_of_week,
-        monthly_budget_limit: budgetVal,
         monthly_expense_budget_limit: expenseBudgetVal,
         monthly_summary_enabled: summarySettings.monthly_summary_enabled,
       })
@@ -438,32 +429,19 @@ const Configuracoes: React.FC = () => {
 
               <div className="pt-2 border-t border-outline-variant/30">
                 <p className="text-xs text-on-surface-variant mb-3">
-                  Contas e gastos têm limites separados. Você recebe um alerta no WhatsApp quando o total do mês passar do limite. Deixe vazio para desativar.
+                  Você recebe um alerta no WhatsApp quando os gastos do mês passarem do limite. Contas não entram: elas servem só para lembrete de vencimento. Deixe vazio para desativar.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <NumberField
-                    label="Limite mensal de contas"
-                    mode="currency"
-                    min={0}
-                    prefix="R$"
-                    placeholder="Ex.: 2.000,00"
-                    value={summarySettings.monthly_budget_limit}
-                    onChange={(v) =>
-                      setSummarySettings((prev) => ({ ...prev, monthly_budget_limit: v }))
-                    }
-                  />
-                  <NumberField
-                    label="Limite mensal de gastos"
-                    mode="currency"
-                    min={0}
-                    prefix="R$"
-                    placeholder="Ex.: 800,00"
-                    value={summarySettings.monthly_expense_budget_limit}
-                    onChange={(v) =>
-                      setSummarySettings((prev) => ({ ...prev, monthly_expense_budget_limit: v }))
-                    }
-                  />
-                </div>
+                <NumberField
+                  label="Limite mensal de gastos"
+                  mode="currency"
+                  min={0}
+                  prefix="R$"
+                  placeholder="Ex.: 800,00"
+                  value={summarySettings.monthly_expense_budget_limit}
+                  onChange={(v) =>
+                    setSummarySettings((prev) => ({ ...prev, monthly_expense_budget_limit: v }))
+                  }
+                />
               </div>
 
               <button
