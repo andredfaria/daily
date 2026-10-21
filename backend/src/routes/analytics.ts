@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { gastosPorCategoria, projecaoMensal, historicoMensal, fechamentoMensal, topOcorrencias } from '../services/financialAnalytics'
-import { fechamentoContas, validarMes } from '../services/fechamentoContas'
+import { fechamentoContas, historicoContas, validarMes } from '../services/fechamentoContas'
 import { getTodaySaoPaulo } from '../services/notificationMaterializer'
 
 const router = Router()
@@ -108,6 +108,18 @@ router.get('/bills-month', async (req: Request, res: Response) => {
     const mes = req.query.mes === undefined ? getTodaySaoPaulo().slice(0, 7) : validarMes(req.query.mes)
     if (!mes) return res.status(400).json({ error: 'Mês inválido: use AAAA-MM' })
     res.json(await fechamentoContas(req.userId!, mes))
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro interno do servidor' })
+  }
+})
+
+// GET /api/analytics/bills-history?meses=12 — pago x em aberto por mês, do
+// mais antigo ao corrente.
+router.get('/bills-history', async (req: Request, res: Response) => {
+  try {
+    const meses = Math.min(Math.max(Number(req.query.meses) || 12, 1), 24)
+    res.json({ meses: await historicoContas(req.userId!, meses) })
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })

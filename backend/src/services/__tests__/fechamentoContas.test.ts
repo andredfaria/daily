@@ -1,4 +1,4 @@
-import { intervaloDoMes, montarFechamento, validarMes } from '../fechamentoContas'
+import { intervaloDoMes, mesesAte, montarFechamento, montarHistorico, validarMes } from '../fechamentoContas'
 
 describe('validarMes', () => {
   it('aceita AAAA-MM com mês de 01 a 12', () => {
@@ -25,7 +25,7 @@ describe('intervaloDoMes', () => {
 
 describe('montarFechamento', () => {
   const pago = (id: string, category: string, amount: number, due_date = '2026-10-05') =>
-    ({ id, bill_name: id, category, due_date, amount, paid_at: '2026-10-04T15:00:00.000Z' })
+    ({ id, bill_name: id, category, due_date, amount, paid_at: '2026-10-04T15:00:00.000Z', source: 'app' as const })
   const aberto = (id: string, category: string, amount: number, due_date: string, estimado = false) =>
     ({ id, bill_name: id, category, due_date, amount, estimado })
 
@@ -62,5 +62,26 @@ describe('montarFechamento', () => {
     expect(montarFechamento('2026-10', [], [], '2026-10-21')).toEqual({
       mes: '2026-10', pago: 0, aberto: 0, atrasado: 0, qtdPagas: 0, qtdAbertas: 0, qtdAtrasadas: 0, categorias: [],
     })
+  })
+})
+
+describe('mesesAte', () => {
+  it('lista os N meses até o informado, virando o ano', () => {
+    expect(mesesAte('2026-02', 4)).toEqual(['2025-11', '2025-12', '2026-01', '2026-02'])
+    expect(mesesAte('2026-10', 1)).toEqual(['2026-10'])
+  })
+})
+
+describe('montarHistorico', () => {
+  it('um item por mês, zerado quando não há conta', () => {
+    expect(montarHistorico(
+      ['2026-08', '2026-09', '2026-10'],
+      [{ mes: '2026-08', total: 100.005, qtd: 2 }, { mes: '2026-10', total: 50, qtd: 1 }],
+      [{ mes: '2026-10', total: 30, qtd: 1 }],
+    )).toEqual([
+      { mes: '2026-08', pago: 100.01, aberto: 0, qtdPagas: 2, qtdAbertas: 0 },
+      { mes: '2026-09', pago: 0, aberto: 0, qtdPagas: 0, qtdAbertas: 0 },
+      { mes: '2026-10', pago: 50, aberto: 30, qtdPagas: 1, qtdAbertas: 1 },
+    ])
   })
 })

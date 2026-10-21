@@ -12,6 +12,7 @@ export interface PagamentoRegistrado {
   due_date: string // YYYY-MM-DD
   amount: number
   paid_at: string // ISO 8601 (UTC)
+  source: 'app' | 'whatsapp'
 }
 
 export interface VencimentoAberto {
@@ -33,6 +34,8 @@ export interface ItemFechamento {
   amount: number
   situacao: SituacaoItem
   paid_at: string | null
+  /** Onde foi marcada como paga; null enquanto em aberto. */
+  source: 'app' | 'whatsapp' | null
   estimado: boolean
 }
 
@@ -98,7 +101,7 @@ export function montarFechamento(
     pago += p.amount
     g.itens.push({
       id: p.id, bill_name: p.bill_name, due_date: p.due_date, amount: p.amount,
-      situacao: 'paga', paid_at: p.paid_at, estimado: false,
+      situacao: 'paga', paid_at: p.paid_at, source: p.source, estimado: false,
     })
   }
 
@@ -113,7 +116,7 @@ export function montarFechamento(
     }
     g.itens.push({
       id: a.id, bill_name: a.bill_name, due_date: a.due_date, amount: a.amount,
-      situacao, paid_at: null, estimado: a.estimado,
+      situacao, paid_at: null, source: null, estimado: a.estimado,
     })
   }
 
@@ -144,7 +147,7 @@ export async function fechamentoContas(userId: string, mes: string): Promise<Fec
   const { from, to } = intervaloDoMes(mes)
 
   const [pagos]: any = await pool.query(
-    `SELECT id, bill_name, category, DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date, amount, paid_at
+    `SELECT id, bill_name, category, DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date, amount, paid_at, source
        FROM bill_payments
       WHERE user_id = ? AND due_date BETWEEN ? AND ?`,
     [userId, from, to]
@@ -171,6 +174,7 @@ export async function fechamentoContas(userId: string, mes: string): Promise<Fec
       due_date: data(r.due_date),
       amount: Number(r.amount) || 0,
       paid_at: r.paid_at instanceof Date ? r.paid_at.toISOString() : String(r.paid_at),
+      source: r.source,
     })),
     abertos.map((r: any) => ({
       id: r.id,
@@ -182,4 +186,66 @@ export async function fechamentoContas(userId: string, mes: string): Promise<Fec
     })),
     getTodaySaoPaulo(),
   )
+}
+
+export interface MesHistorico {
+  mes: string // YYYY-MM
+  pago: number
+  aberto: number
+  qtdPagas: number
+  qtdAbertas: number
+}
+
+// Os N meses (YYYY-MM) que terminam em `ate`, do mais antigo ao mais novo.
+export function mesesAte(ate: string, n: number): string[] {
+  const [ano, mes] = ate.split('-').map(Number)
+  const lista: string[] = []
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(ano, mes - 1 - i, 1))
+    lista.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`)
+  }
+  return lista
+}
+
+// Parte pura: um item por mês da lista, inclusive mês sem conta (zerado).
+export function montarHistorico(
+  meses: string[],
+  pagos: Array<{ mes: string; total: number; qtd: number }>,
+  abertos: Array<{ mes: string; total: number; qtd: number }>,
+): MesHistorico[] {
+  const p = new Map(pagos.map((r) => [r.mes, r]))
+  const a = new Map(abertos.map((r) => [r.mes, r]))
+  return meses.map((mes) => ({
+    mes,
+    pago: centavos(p.get(mes)?.total ?? 0),
+    aberto: centavos(a.get(mes)?.total ?? 0),
+    qtdPagas: p.get(mes)?.qtd ?? 0,
+    qtdAbertas: a.get(mes)?.qtd ?? 0,
+  }))
+}
+
+// Pago x em aberto dos últimos N meses até o corrente, pelo mês do vencimento.
+export async function historicoContas(userId: string, n: number): Promise<MesHistorico[]> {
+  const meses = mesesAte(getTodaySaoPaulo().slice(0, 7), n)
+  const from = `${meses[0]}-01`
+  const to = intervaloDoMes(meses[meses.length - 1]).to
+
+  const [pagos]: any = await pool.query(
+    `SELECT DATE_FORMAT(due_date, '%Y-%m') AS mes, SUM(amount) AS total, COUNT(*) AS qtd
+       FROM bill_payments
+      WHERE user_id = ? AND due_date BETWEEN ? AND ?
+      GROUP BY mes`,
+    [userId, from, to]
+  )
+  const [abertos]: any = await pool.query(
+    `SELECT DATE_FORMAT(o.due_date, '%Y-%m') AS mes, SUM(o.amount) AS total, COUNT(*) AS qtd
+       FROM bill_occurrences o
+       JOIN bills b ON b.id = o.bill_id
+      WHERE b.user_id = ? AND b.is_active = 1 AND o.paid_at IS NULL
+        AND o.due_date BETWEEN ? AND ?
+      GROUP BY mes`,
+    [userId, from, to]
+  )
+  const linhas = (rows: any[]) => rows.map((r) => ({ mes: r.mes, total: Number(r.total) || 0, qtd: Number(r.qtd) || 0 }))
+  return montarHistorico(meses, linhas(pagos), linhas(abertos))
 }

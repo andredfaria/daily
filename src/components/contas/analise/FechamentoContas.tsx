@@ -6,17 +6,7 @@ import { infoCategoria } from '../../../utils/categoriasGasto'
 import { useCategorias } from '../../../hooks/useCategorias'
 import { formatBRL, formatDate } from '../../../utils/format'
 import { rotuloPaga } from '../../../utils/pagamento'
-
-const mesLocal = (): string => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
-const somarMeses = (mes: string, n: number): string => {
-  const [a, m] = mes.split('-').map(Number)
-  const d = new Date(a, m - 1 + n, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
+import { mesLocal, somarMeses } from '../../../utils/historicoContas'
 
 const SELO: Record<ItemFechamentoContas['situacao'], string> = {
   paga: 'bg-tertiary/15 text-tertiary',

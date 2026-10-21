@@ -1,5 +1,5 @@
 import client from './client'
-import type { ByCategoryResponse, ProjectionResponse, BudgetResponse, TopOccurrencesResponse, FechamentoContasResponse } from '../types'
+import type { ByCategoryResponse, ProjectionResponse, BudgetResponse, TopOccurrencesResponse, FechamentoContasResponse, MesHistoricoContas } from '../types'
 
 export const analyticsApi = {
   byCategory: async (from?: string, to?: string): Promise<ByCategoryResponse> => {
@@ -41,5 +41,13 @@ export const analyticsApi = {
       params: { mes },
     })
     return res.data
+  },
+
+  /** Pago x em aberto dos últimos N meses, do mais antigo ao corrente. */
+  historicoContas: async (meses = 12): Promise<MesHistoricoContas[]> => {
+    const res = await client.get<{ meses: MesHistoricoContas[] }>('/analytics/bills-history', {
+      params: { meses },
+    })
+    return res.data.meses
   },
 }

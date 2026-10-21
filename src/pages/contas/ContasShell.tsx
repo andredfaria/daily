@@ -8,6 +8,7 @@ const ContasShell: React.FC = () => (
       tabs={[
         { to: 'lista', label: 'Contas', icon: 'receipt_long' },
         { to: 'analise', label: 'Análise', icon: 'monitoring' },
+        { to: 'historico', label: 'Histórico', icon: 'history' },
       ]}
     />
     <Outlet />

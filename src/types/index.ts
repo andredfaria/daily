@@ -264,6 +264,8 @@ export interface ItemFechamentoContas {
   amount: number
   situacao: SituacaoContaMes
   paid_at: string | null
+  /** Onde foi marcada como paga; null enquanto em aberto. */
+  source: 'app' | 'whatsapp' | null
   /** Conta variável sem valor real informado: o valor é a estimativa. */
   estimado: boolean
 }
@@ -285,6 +287,15 @@ export interface FechamentoContasResponse {
   qtdAbertas: number
   qtdAtrasadas: number
   categorias: CategoriaFechamentoContas[]
+}
+
+/** Pago x em aberto de um mês (GET /api/analytics/bills-history). */
+export interface MesHistoricoContas {
+  mes: string // YYYY-MM
+  pago: number
+  aberto: number
+  qtdPagas: number
+  qtdAbertas: number
 }
 
 export interface Expense {
