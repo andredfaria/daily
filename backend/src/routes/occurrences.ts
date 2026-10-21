@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import axios from 'axios'
 import pool from '../db'
 import { validarValorReal } from '../services/billValidation'
-import { marcarPaga, desmarcarPaga, ErroPagamento } from '../services/billPayment'
+import { marcarPaga, desmarcarPaga, registrarPagamento, ErroPagamento } from '../services/billPayment'
 
 const router = Router()
 
@@ -220,6 +220,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
       'UPDATE bill_occurrences SET amount = ?, amount_is_actual = ?, updated_at = ? WHERE id = ?',
       [amount, r.valor !== null ? 1 : 0, new Date(), req.params.id]
     )
+    // Ocorrência já paga: o registro do pagamento acompanha o valor corrigido.
+    await registrarPagamento(req.params.id)
     const [atualizada]: any = await pool.query(
       `SELECT id, bill_id, DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date, amount, amount_is_actual
          FROM bill_occurrences WHERE id = ?`,

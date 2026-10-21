@@ -1,5 +1,5 @@
 import client from './client'
-import type { ByCategoryResponse, ProjectionResponse, BudgetResponse, TopOccurrencesResponse } from '../types'
+import type { ByCategoryResponse, ProjectionResponse, BudgetResponse, TopOccurrencesResponse, FechamentoContasResponse } from '../types'
 
 export const analyticsApi = {
   byCategory: async (from?: string, to?: string): Promise<ByCategoryResponse> => {
@@ -31,6 +31,14 @@ export const analyticsApi = {
   topOccurrences: async (from: string, to: string, limit = 5): Promise<TopOccurrencesResponse> => {
     const res = await client.get<TopOccurrencesResponse>('/analytics/top-occurrences', {
       params: { from, to, limit },
+    })
+    return res.data
+  },
+
+  /** Contas pagas e em aberto do mês (YYYY-MM), por categoria. Sem mes, o corrente. */
+  fechamentoContas: async (mes?: string): Promise<FechamentoContasResponse> => {
+    const res = await client.get<FechamentoContasResponse>('/analytics/bills-month', {
+      params: { mes },
     })
     return res.data
   },

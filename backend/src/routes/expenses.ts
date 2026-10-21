@@ -143,6 +143,11 @@ router.delete('/categories/:key', async (req: Request, res: Response) => {
       'UPDATE bills SET category = ? WHERE user_id = ? AND category = ?',
       [CATEGORIA_RESERVA, req.userId, key],
     )
+    // E o histórico de pagamentos, senão o fechamento teria dois grupos "Outro".
+    await conn.query(
+      'UPDATE bill_payments SET category = ? WHERE user_id = ? AND category = ?',
+      [CATEGORIA_RESERVA, req.userId, key],
+    )
     await conn.commit()
     res.json({
       gastosMovidos: movidos.affectedRows,

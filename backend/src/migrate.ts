@@ -444,6 +444,42 @@ UPDATE bills SET category = 'casa' WHERE category = 'moradia'
       await addColumnIfNotExists('bill_occurrences', 'paid_source', "ENUM('app','whatsapp') NULL", 'paid_at')
     },
   },
+  {
+    // Registro de cada pagamento, com nome, categoria e valor da conta no
+    // momento em que foi paga. A ocorrência sozinha não serve de histórico:
+    // apagar a conta leva as ocorrências junto (CASCADE), trocar a data apaga
+    // as futuras e mudar o valor da fixa reescreve as futuras. Aqui a ligação
+    // com conta e ocorrência vira NULL e o pagamento continua no fechamento.
+    // O INSERT final traz o que já estava pago antes da tabela existir.
+    name: '028_bill_payments',
+    statements: splitStatements(`
+CREATE TABLE IF NOT EXISTS bill_payments (
+  id            CHAR(36)      NOT NULL DEFAULT (UUID()),
+  user_id       CHAR(36)      NOT NULL,
+  occurrence_id CHAR(36)      NULL,
+  bill_id       CHAR(36)      NULL,
+  bill_name     VARCHAR(255)  NOT NULL,
+  category      VARCHAR(36)   NOT NULL DEFAULT 'outro',
+  due_date      DATE          NOT NULL,
+  amount        DECIMAL(10,2) NOT NULL,
+  paid_at       DATETIME      NOT NULL,
+  source        ENUM('app','whatsapp') NOT NULL,
+  created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_payment_occurrence (occurrence_id),
+  KEY idx_payment_user_due (user_id, due_date),
+  CONSTRAINT fk_payment_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_payment_occurrence FOREIGN KEY (occurrence_id) REFERENCES bill_occurrences(id) ON DELETE SET NULL,
+  CONSTRAINT fk_payment_bill FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT IGNORE INTO bill_payments (user_id, occurrence_id, bill_id, bill_name, category, due_date, amount, paid_at, source)
+SELECT b.user_id, o.id, b.id, b.name, COALESCE(b.category, 'outro'), o.due_date, o.amount, o.paid_at, COALESCE(o.paid_source, 'app')
+  FROM bill_occurrences o
+  JOIN bills b ON b.id = o.bill_id
+ WHERE o.paid_at IS NOT NULL
+    `),
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

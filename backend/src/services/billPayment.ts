@@ -100,16 +100,35 @@ export async function marcarPaga(
     [agora, occurrenceId]
   )
 
+  await registrarPagamento(occurrenceId)
   return buscar(occurrenceId)
 }
 
-// Zera paid_at/paid_source. Valor real informado continua.
-// Lembrete já pulado não volta; os dos dias seguintes voltam a ser criados.
+// Grava (ou atualiza) o registro do pagamento em bill_payments com nome,
+// categoria e valor de agora. Marcar de novo atualiza o valor e mantém a data.
+// Também chamada quando o valor real de uma ocorrência já paga muda.
+export async function registrarPagamento(occurrenceId: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO bill_payments (user_id, occurrence_id, bill_id, bill_name, category, due_date, amount, paid_at, source)
+     SELECT b.user_id, o.id, b.id, b.name, COALESCE(b.category, 'outro'), o.due_date, o.amount, o.paid_at,
+            COALESCE(o.paid_source, 'app')
+       FROM bill_occurrences o
+       JOIN bills b ON b.id = o.bill_id
+      WHERE o.id = ? AND o.paid_at IS NOT NULL
+     ON DUPLICATE KEY UPDATE amount = VALUES(amount), bill_name = VALUES(bill_name), category = VALUES(category)`,
+    [occurrenceId]
+  )
+}
+
+// Zera paid_at/paid_source e apaga o registro em bill_payments. Valor real
+// informado continua. Lembrete já pulado não volta; os dos dias seguintes
+// voltam a ser criados.
 export async function desmarcarPaga(occurrenceId: string): Promise<OcorrenciaPaga> {
   await pool.query(
     'UPDATE bill_occurrences SET paid_at = NULL, paid_source = NULL, updated_at = ? WHERE id = ?',
     [new Date(), occurrenceId]
   )
+  await pool.query('DELETE FROM bill_payments WHERE occurrence_id = ?', [occurrenceId])
   return buscar(occurrenceId)
 }
 

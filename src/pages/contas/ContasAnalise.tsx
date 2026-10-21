@@ -6,6 +6,7 @@ import { TopOccurrencesList } from '../../components/contas/analise/TopOccurrenc
 import { SpendingTrendChart } from '../../components/contas/analise/SpendingTrendChart'
 import { CategoryBreakdown } from '../../components/contas/analise/CategoryBreakdown'
 import { SummaryStats } from '../../components/contas/analise/SummaryStats'
+import { FechamentoContas } from '../../components/contas/analise/FechamentoContas'
 
 function mesAtualRange(): { from: string; to: string } {
   const now = new Date()
@@ -58,6 +59,8 @@ const ContasAnalise: React.FC = () => {
       )}
 
       <SummaryStats byCat={byCat} history={history} projection={projection} loading={loading} />
+
+      <FechamentoContas />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <BudgetCard data={budget} loading={loading} />

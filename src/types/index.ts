@@ -254,6 +254,39 @@ export interface BudgetResponse {
   qtdGastos: number
 }
 
+/** Fechamento das contas de um mês (GET /api/analytics/bills-month). */
+export type SituacaoContaMes = 'paga' | 'atrasada' | 'a_vencer'
+
+export interface ItemFechamentoContas {
+  id: string
+  bill_name: string
+  due_date: string
+  amount: number
+  situacao: SituacaoContaMes
+  paid_at: string | null
+  /** Conta variável sem valor real informado: o valor é a estimativa. */
+  estimado: boolean
+}
+
+export interface CategoriaFechamentoContas {
+  category: string
+  pago: number
+  aberto: number
+  total: number
+  itens: ItemFechamentoContas[]
+}
+
+export interface FechamentoContasResponse {
+  mes: string // YYYY-MM
+  pago: number
+  aberto: number
+  atrasado: number
+  qtdPagas: number
+  qtdAbertas: number
+  qtdAtrasadas: number
+  categorias: CategoriaFechamentoContas[]
+}
+
 export interface Expense {
   id: string
   amount: number
