@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resumoDiario } from '../gastosDiarios'
+import { acumularPorCategoria, resumoDiario } from '../gastosDiarios'
 
 const g = (spent_on: string, amount: number) => ({ spent_on, amount })
 
@@ -49,5 +49,26 @@ describe('resumoDiario', () => {
   it('ignora gasto de outro mês', () => {
     const r = resumoDiario([g('2026-08-31', 50)], '2026-09', '2026-10-02')
     expect(r.serie[29].acumulado).toBe(0)
+  })
+})
+
+describe('acumularPorCategoria', () => {
+  it('soma corrida por categoria, preservando dia e número', () => {
+    const r = acumularPorCategoria(
+      [
+        { dia: '2026-09-01', numero: 1, mercado: 0.1, bar: 0 },
+        { dia: '2026-09-02', numero: 2, mercado: 0.2, bar: 30 },
+        { dia: '2026-09-03', numero: 3, mercado: 0, bar: 0 },
+      ],
+      ['mercado', 'bar'],
+    )
+    expect(r[0]).toEqual({ dia: '2026-09-01', numero: 1, mercado: 0.1, bar: 0 })
+    expect(r[1]).toMatchObject({ mercado: 0.3, bar: 30 })
+    expect(r[2]).toMatchObject({ mercado: 0.3, bar: 30 })
+  })
+
+  it('categoria ausente no ponto conta como zero', () => {
+    const r = acumularPorCategoria([{ dia: '2026-09-01', numero: 1 }], ['mercado'])
+    expect(r[0].mercado).toBe(0)
   })
 })

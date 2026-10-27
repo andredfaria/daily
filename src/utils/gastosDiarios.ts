@@ -64,3 +64,22 @@ export function resumoDiario(
     diasComGasto: serie.filter((p) => p.quantidade > 0).length,
   }
 }
+
+/**
+ * Soma corrida de cada categoria ao longo da série diária — vira as áreas
+ * empilhadas do acumulado, cujo topo é o acumulado total do mês.
+ */
+export function acumularPorCategoria(
+  serie: Array<Record<string, string | number>>,
+  chaves: string[],
+): Array<Record<string, string | number>> {
+  const soma: Record<string, number> = Object.fromEntries(chaves.map((k) => [k, 0]))
+  return serie.map((ponto) => {
+    const acumulado: Record<string, string | number> = { ...ponto }
+    for (const k of chaves) {
+      soma[k] += Number(ponto[k] ?? 0)
+      acumulado[k] = centavos(soma[k])
+    }
+    return acumulado
+  })
+}

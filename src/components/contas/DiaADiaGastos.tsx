@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import {
   BarChart, Bar, AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Cell,
 } from 'recharts'
-import type { DiaGasto, ResumoDiario } from '../../utils/gastosDiarios'
+import { acumularPorCategoria, type DiaGasto, type ResumoDiario } from '../../utils/gastosDiarios'
 import { formatBRL, formatDate } from '../../utils/format'
 
 // Mesmas cores dos outros gráficos (SpendingTrendChart): o app é só tema escuro.
@@ -12,7 +12,6 @@ const COR_EIXO = '#c7c4d7'
 const COR_REFERENCIA = '#908fa0'
 
 type Visao = 'barras' | 'linha' | 'acumulado' | 'categorias'
-type VisaoDica = 'dia' | 'acumulado'
 
 interface Props {
   resumo: ResumoDiario
@@ -28,25 +27,16 @@ const CORES_CATEGORIA = ['#c0c1ff', '#ffb4ab', '#a8dab5', '#f2c078', '#80d5df', 
 
 const rotuloDia = (dia: string) => formatDate(dia, 'EEE, dd/MM')
 
-const Dica: React.FC<{ active?: boolean; payload?: Array<{ payload: DiaGasto }>; visao: VisaoDica }> = ({ active, payload, visao }) => {
+const Dica: React.FC<{ active?: boolean; payload?: Array<{ payload: DiaGasto }> }> = ({ active, payload }) => {
   const p = active ? payload?.[0]?.payload : undefined
   if (!p) return null
   return (
     <div className="rounded-xl border border-outline-variant bg-[#1f1f25] px-3 py-2 text-xs shadow-lg">
       <p className="text-on-surface-variant capitalize mb-0.5">{rotuloDia(p.dia)}</p>
-      {visao === 'dia' ? (
-        <>
-          <p className="text-sm font-semibold text-on-surface">{formatBRL(p.total)}</p>
-          <p className="text-on-surface-variant">
-            {p.quantidade === 0 ? 'Sem gasto' : p.quantidade === 1 ? '1 gasto' : `${p.quantidade} gastos`}
-          </p>
-        </>
-      ) : (
-        <>
-          <p className="text-sm font-semibold text-on-surface">{formatBRL(p.acumulado)}</p>
-          <p className="text-on-surface-variant">acumulado no mês</p>
-        </>
-      )}
+      <p className="text-sm font-semibold text-on-surface">{formatBRL(p.total)}</p>
+      <p className="text-on-surface-variant">
+        {p.quantidade === 0 ? 'Sem gasto' : p.quantidade === 1 ? '1 gasto' : `${p.quantidade} gastos`}
+      </p>
     </div>
   )
 }
@@ -55,7 +45,8 @@ const TooltipCategorias: React.FC<{
   active?: boolean
   payload?: Array<{ payload: Record<string, string | number> }>
   categoriasData: Array<{ nome: string; total: number; key: string }>
-}> = ({ active, payload, categoriasData }) => {
+  acumulado?: boolean
+}> = ({ active, payload, categoriasData, acumulado }) => {
   const ponto = active ? payload?.[0]?.payload : undefined
   if (!ponto || typeof ponto.dia !== 'string') return null
   const valores = categoriasData
@@ -70,7 +61,7 @@ const TooltipCategorias: React.FC<{
           <span>{categoria.nome}</span><span className="text-on-surface">{formatBRL(categoria.valor)}</span>
         </p>
       ))}
-      <p className="mt-1 border-t border-outline-variant pt-1 font-semibold text-on-surface">Total {formatBRL(total)}</p>
+      <p className="mt-1 border-t border-outline-variant pt-1 font-semibold text-on-surface">{acumulado ? 'Acumulado no mês' : 'Total'} {formatBRL(total)}</p>
     </div>
   )
 }
@@ -86,6 +77,8 @@ const Destaque: React.FC<{ rotulo: React.ReactNode; valor: string; detalhe?: str
 const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onSelecionarDia, categoriasData, serieCategorias }) => {
   const [visao, setVisao] = useState<Visao>('barras')
   const { serie, mediaPorDia, maiorDia, diasComGasto } = resumo
+  const serieAcumulada = acumularPorCategoria(serieCategorias, categoriasData.map((c) => c.key))
+  const corCategoria = (i: number) => CORES_CATEGORIA[i % CORES_CATEGORIA.length]
 
   // A coluna inteira é a área de toque, não só a barra: dia de R$ 5 vira um
   // retângulo de 2px. Dia sem gasto não seleciona — a lista ficaria vazia.
@@ -173,7 +166,7 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
               {eixoY}
               <Tooltip content={<TooltipCategorias categoriasData={categoriasData} />} cursor={{ fill: COR_SERIE, fillOpacity: 0.08 }} />
               {categoriasData.map((item, i) => (
-                <Bar key={item.key} dataKey={item.key} name={item.nome} stackId="gastos" fill={CORES_CATEGORIA[i % CORES_CATEGORIA.length]} maxBarSize={18} isAnimationActive={false} />
+                <Bar key={item.key} dataKey={item.key} name={item.nome} stackId="gastos" fill={corCategoria(i)} maxBarSize={18} isAnimationActive={false} />
               ))}
             </BarChart>
           ) : visao === 'linha' ? (
@@ -181,7 +174,7 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
               <CartesianGrid vertical={false} stroke={COR_GRADE} strokeOpacity={0.3} />
               {eixoX}
               {eixoY}
-              <Tooltip content={<Dica visao="dia" />} cursor={{ stroke: COR_REFERENCIA, strokeDasharray: '3 3' }} />
+              <Tooltip content={<Dica />} cursor={{ stroke: COR_REFERENCIA, strokeDasharray: '3 3' }} />
               {mediaPorDia > 0 && <ReferenceLine y={mediaPorDia} stroke={COR_REFERENCIA} strokeDasharray="3 3" />}
               <Line type="monotone" dataKey="total" stroke={COR_SERIE} strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} isAnimationActive={false} />
             </LineChart>
@@ -190,45 +183,47 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
               <CartesianGrid vertical={false} stroke={COR_GRADE} strokeOpacity={0.3} />
               {eixoX}
               {eixoY}
-              <Tooltip content={<Dica visao="dia" />} cursor={{ fill: COR_SERIE, fillOpacity: 0.08 }} />
+              <Tooltip content={<Dica />} cursor={{ fill: COR_SERIE, fillOpacity: 0.08 }} />
               {mediaPorDia > 0 && <ReferenceLine y={mediaPorDia} stroke={COR_REFERENCIA} strokeDasharray="3 3" />}
               <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={18} isAnimationActive={false} className="cursor-pointer">
                 {serie.map((p) => <Cell key={p.dia} fill={COR_SERIE} fillOpacity={diaSelecionado && p.dia !== diaSelecionado ? 0.3 : 1} />)}
               </Bar>
             </BarChart>
           ) : (
-            <AreaChart data={serie} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} onClick={tocar}>
-              <defs>
-                <linearGradient id="acumuladoFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={COR_SERIE} stopOpacity={0.3} />
-                  <stop offset="100%" stopColor={COR_SERIE} stopOpacity={0} />
-                </linearGradient>
-              </defs>
+            // Uma área por categoria, empilhadas: o topo é o acumulado total e a
+            // espessura de cada faixa é quanto a categoria já somou no mês.
+            <AreaChart data={serieAcumulada} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} onClick={tocar}>
               <CartesianGrid vertical={false} stroke={COR_GRADE} strokeOpacity={0.3} />
               {eixoX}
               {eixoY}
-              <Tooltip content={<Dica visao="acumulado" />} cursor={{ stroke: COR_REFERENCIA, strokeDasharray: '3 3' }} />
+              <Tooltip content={<TooltipCategorias categoriasData={categoriasData} acumulado />} cursor={{ stroke: COR_REFERENCIA, strokeDasharray: '3 3' }} />
               {diaSelecionado && (
                 <ReferenceLine x={Number(diaSelecionado.slice(8, 10))} stroke={COR_SERIE} strokeOpacity={0.6} />
               )}
-              <Area
-                type="monotone"
-                dataKey="acumulado"
-                stroke={COR_SERIE}
-                strokeWidth={2}
-                fill="url(#acumuladoFill)"
-                activeDot={{ r: 4, stroke: '#1f1f25', strokeWidth: 2 }}
-                isAnimationActive={false}
-              />
+              {categoriasData.map((item, i) => (
+                <Area
+                  key={item.key}
+                  type="monotone"
+                  dataKey={item.key}
+                  name={item.nome}
+                  stackId="acumulado"
+                  stroke={corCategoria(i)}
+                  strokeWidth={1.5}
+                  fill={corCategoria(i)}
+                  fillOpacity={0.35}
+                  activeDot={false}
+                  isAnimationActive={false}
+                />
+              ))}
             </AreaChart>
           )}
         </ResponsiveContainer>
       </div>
-      {visao === 'categorias' && (
+      {(visao === 'categorias' || visao === 'acumulado') && categoriasData.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2" aria-label="Legenda de categorias">
           {categoriasData.map((item, i) => (
             <span key={item.key} className="flex items-center gap-1.5 text-[11px] text-on-surface-variant">
-              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: CORES_CATEGORIA[i % CORES_CATEGORIA.length] }} />
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: corCategoria(i) }} />
               {item.nome}
             </span>
           ))}
