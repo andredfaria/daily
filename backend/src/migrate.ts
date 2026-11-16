@@ -480,6 +480,38 @@ SELECT b.user_id, o.id, b.id, b.name, COALESCE(b.category, 'outro'), o.due_date,
  WHERE o.paid_at IS NOT NULL
     `),
   },
+  {
+    // Meta de gasto por fim de semana (quinta a domingo). Só acompanhamento na
+    // página de Gastos, sem alerta no WhatsApp.
+    name: '029_weekend_expense_goal',
+    run: async () => {
+      await addColumnIfNotExists('users', 'weekend_expense_goal', 'DECIMAL(10,2) DEFAULT NULL', 'monthly_expense_budget_limit')
+    },
+  },
+  {
+    // A meta semanal ganha dias escolhidos (0=domingo; padrão quinta a domingo,
+    // podendo virar a semana, ex.: sexta a segunda). expense_goals guarda metas
+    // avulsas por período (viagem, feriado), com o total gasto somado na leitura.
+    name: '030_expense_goals',
+    run: async () => {
+      await addColumnIfNotExists('users', 'weekend_goal_start_dow', 'TINYINT NOT NULL DEFAULT 4', 'weekend_expense_goal')
+      await addColumnIfNotExists('users', 'weekend_goal_end_dow', 'TINYINT NOT NULL DEFAULT 0', 'weekend_goal_start_dow')
+      await pool.query(`
+CREATE TABLE IF NOT EXISTS expense_goals (
+  id          CHAR(36)      NOT NULL DEFAULT (UUID()),
+  user_id     CHAR(36)      NOT NULL,
+  name        VARCHAR(60)   NOT NULL,
+  start_date  DATE          NOT NULL,
+  end_date    DATE          NOT NULL,
+  amount      DECIMAL(10,2) NOT NULL,
+  created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_goal_user_start (user_id, start_date),
+  CONSTRAINT fk_goal_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+    },
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

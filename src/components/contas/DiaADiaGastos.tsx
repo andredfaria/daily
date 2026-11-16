@@ -19,11 +19,10 @@ interface Props {
   categoria: string | null
   diaSelecionado: string | null
   onSelecionarDia: (dia: string | null) => void
-  categoriasData: Array<{ nome: string; total: number; key: string }>
+  /** `cor` vem da página: a mesma do card Por categoria, mesmo com filtro. */
+  categoriasData: Array<{ nome: string; total: number; key: string; cor: string }>
   serieCategorias: Array<Record<string, string | number>>
 }
-
-const CORES_CATEGORIA = ['#c0c1ff', '#ffb4ab', '#a8dab5', '#f2c078', '#80d5df', '#e8b7d4', '#d0bcff', '#f5a97f']
 
 const rotuloDia = (dia: string) => formatDate(dia, 'EEE, dd/MM')
 
@@ -78,7 +77,6 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
   const [visao, setVisao] = useState<Visao>('barras')
   const { serie, mediaPorDia, maiorDia, diasComGasto } = resumo
   const serieAcumulada = acumularPorCategoria(serieCategorias, categoriasData.map((c) => c.key))
-  const corCategoria = (i: number) => CORES_CATEGORIA[i % CORES_CATEGORIA.length]
 
   // A coluna inteira é a área de toque, não só a barra: dia de R$ 5 vira um
   // retângulo de 2px. Dia sem gasto não seleciona — a lista ficaria vazia.
@@ -165,8 +163,8 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
               {eixoX}
               {eixoY}
               <Tooltip content={<TooltipCategorias categoriasData={categoriasData} />} cursor={{ fill: COR_SERIE, fillOpacity: 0.08 }} />
-              {categoriasData.map((item, i) => (
-                <Bar key={item.key} dataKey={item.key} name={item.nome} stackId="gastos" fill={corCategoria(i)} maxBarSize={18} isAnimationActive={false} />
+              {categoriasData.map((item) => (
+                <Bar key={item.key} dataKey={item.key} name={item.nome} stackId="gastos" fill={item.cor} maxBarSize={18} isAnimationActive={false} />
               ))}
             </BarChart>
           ) : visao === 'linha' ? (
@@ -200,16 +198,16 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
               {diaSelecionado && (
                 <ReferenceLine x={Number(diaSelecionado.slice(8, 10))} stroke={COR_SERIE} strokeOpacity={0.6} />
               )}
-              {categoriasData.map((item, i) => (
+              {categoriasData.map((item) => (
                 <Area
                   key={item.key}
                   type="monotone"
                   dataKey={item.key}
                   name={item.nome}
                   stackId="acumulado"
-                  stroke={corCategoria(i)}
+                  stroke={item.cor}
                   strokeWidth={1.5}
-                  fill={corCategoria(i)}
+                  fill={item.cor}
                   fillOpacity={0.35}
                   activeDot={false}
                   isAnimationActive={false}
@@ -221,9 +219,9 @@ const DiaADiaGastos: React.FC<Props> = ({ resumo, categoria, diaSelecionado, onS
       </div>
       {(visao === 'categorias' || visao === 'acumulado') && categoriasData.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2" aria-label="Legenda de categorias">
-          {categoriasData.map((item, i) => (
+          {categoriasData.map((item) => (
             <span key={item.key} className="flex items-center gap-1.5 text-[11px] text-on-surface-variant">
-              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: corCategoria(i) }} />
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: item.cor }} />
               {item.nome}
             </span>
           ))}

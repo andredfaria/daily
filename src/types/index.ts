@@ -116,6 +116,11 @@ export interface User {
   summary_day_of_week: number
   monthly_summary_enabled: boolean
   monthly_expense_budget_limit: number | null
+  /** Meta por fim de semana (quinta a domingo). */
+  weekend_expense_goal?: number | null
+  /** Dias do bloco da meta semanal, 0=domingo (padrão quinta a domingo). */
+  weekend_goal_start_dow?: number
+  weekend_goal_end_dow?: number
   onboarding_completed: boolean
   created_at: string
   updated_at: string

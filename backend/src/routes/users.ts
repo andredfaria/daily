@@ -25,7 +25,8 @@ router.patch('/me', async (req: Request, res: Response) => {
       'name', 'whatsapp_number', 'timezone', 'is_active',
       'notification_time', 'whatsapp_alerts_enabled',
       'weekly_summary_enabled', 'default_days_before_alert',
-      'summary_enabled', 'summary_day_of_week', 'monthly_expense_budget_limit',
+      'summary_enabled', 'summary_day_of_week', 'monthly_expense_budget_limit', 'weekend_expense_goal',
+      'weekend_goal_start_dow', 'weekend_goal_end_dow',
       'monthly_summary_enabled',
       'asset_alerts_enabled', 'asset_alert_hour',
       'onboarding_completed',
@@ -75,17 +76,17 @@ router.patch('/me', async (req: Request, res: Response) => {
         continue
       }
 
-      if (key === 'summary_day_of_week') {
+      if (key === 'summary_day_of_week' || key === 'weekend_goal_start_dow' || key === 'weekend_goal_end_dow') {
         const dow = Number(req.body[key])
         if (!Number.isInteger(dow) || dow < 0 || dow > 6) {
-          return res.status(400).json({ error: 'summary_day_of_week deve ser um inteiro entre 0 e 6' })
+          return res.status(400).json({ error: `${key} deve ser um inteiro entre 0 e 6` })
         }
         fields.push(`${key} = ?`)
         values.push(dow)
         continue
       }
 
-      if (key === 'monthly_expense_budget_limit') {
+      if (key === 'monthly_expense_budget_limit' || key === 'weekend_expense_goal') {
         const val = req.body[key]
         if (val === null || val === '') {
           fields.push(`${key} = ?`)

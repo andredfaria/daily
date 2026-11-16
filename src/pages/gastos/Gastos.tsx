@@ -15,6 +15,15 @@ import { useCategorias, definirCategorias } from '../../hooks/useCategorias'
 import DiaADiaGastos from '../../components/contas/DiaADiaGastos'
 import { resumoDiario } from '../../utils/gastosDiarios'
 import Select from '../../components/ui/Select'
+import PorCategoriaGastos from '../../components/contas/PorCategoriaGastos'
+import { CORES_CATEGORIA, resumoPorCategoria } from '../../utils/gastosCategorias'
+import FinsDeSemanaGastos from '../../components/contas/FinsDeSemanaGastos'
+import { finsDeSemanaDoMes } from '../../utils/gastosFimDeSemana'
+import MetasPeriodoGastos from '../../components/contas/MetasPeriodoGastos'
+import { expenseGoalsApi, type DadosMetaPeriodo, type DadosMetaSemanal } from '../../api/expenseGoals'
+import type { MetaPeriodo } from '../../utils/metasPeriodo'
+
+const erroDaApi = (err: any, padrao: string): string => err?.response?.data?.error ?? padrao
 
 const hojeLocal = (): string => {
   const d = new Date()
@@ -186,6 +195,12 @@ const Gastos: React.FC = () => {
   const mesAtual = hojeLocal().slice(0, 7)
   const [mes, setMes] = useState(mesAtual)
   const [gastos, setGastos] = useState<Expense[]>([])
+  // Mês anterior, só para a comparação por categoria; null se não carregou.
+  const [anteriores, setAnteriores] = useState<Expense[] | null>(null)
+  // Mês seguinte, só para o fim de semana que termina nele (meses passados).
+  const [seguintes, setSeguintes] = useState<Expense[]>([])
+  // Metas por período não dependem do mês aberto; null enquanto não carregou (ou falhou).
+  const [metas, setMetas] = useState<MetaPeriodo[] | null>(null)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
 
@@ -203,21 +218,37 @@ const Gastos: React.FC = () => {
   const [apagar, setApagar] = useState<Expense | null>(null)
   const [apagando, setApagando] = useState(false)
   const { success, error: showError } = useToast()
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const limiteGastos = user?.monthly_expense_budget_limit != null ? Number(user.monthly_expense_budget_limit) : null
+  const metaFimDeSemana = user?.weekend_expense_goal != null ? Number(user.weekend_expense_goal) : null
+  const inicioFimDeSemana = user?.weekend_goal_start_dow ?? 4
+  const fimFimDeSemana = user?.weekend_goal_end_dow ?? 0
+
+  // Falha só esconde o card; o gasto somado vem do backend, então recarrega a cada mudança de gasto.
+  const carregarMetas = useCallback(() => {
+    expenseGoalsApi.list().then(setMetas, () => setMetas(null))
+  }, [])
 
   const carregar = useCallback(async () => {
     setLoading(true)
+    carregarMetas()
+    // Falha no mês anterior só esconde a comparação, não a página.
+    const anterior = expensesApi.list(somarMeses(mes, -1)).then((d) => d.gastos, () => null)
+    const seguinte = mes < mesAtual
+      ? expensesApi.list(somarMeses(mes, 1)).then((d) => d.gastos, () => [])
+      : Promise.resolve([])
     try {
       const data = await expensesApi.list(mes)
       setGastos(data.gastos)
       setTotal(data.total)
+      setAnteriores(await anterior)
+      setSeguintes(await seguinte)
     } catch {
       showError('Erro ao carregar gastos.')
     } finally {
       setLoading(false)
     }
-  }, [mes, showError])
+  }, [mes, mesAtual, showError, carregarMetas])
 
   useEffect(() => { carregar() }, [carregar])
   // Dia escolhido no gráfico é do mês que estava aberto.
@@ -266,6 +297,54 @@ const Gastos: React.FC = () => {
     }
   }
 
+  const salvarMetaSemanal = async (dados: DadosMetaSemanal) => {
+    try {
+      await expenseGoalsApi.salvarSemanal(dados)
+      await refreshUser()
+      success('Meta do fim de semana salva!')
+      return true
+    } catch (err) {
+      showError(erroDaApi(err, 'Erro ao salvar a meta.'))
+      return false
+    }
+  }
+
+  const criarMeta = async (dados: DadosMetaPeriodo) => {
+    try {
+      await expenseGoalsApi.create(dados)
+      success('Meta criada!')
+      carregarMetas()
+      return true
+    } catch (err) {
+      showError(erroDaApi(err, 'Erro ao criar a meta.'))
+      return false
+    }
+  }
+
+  const atualizarMeta = async (id: string, dados: DadosMetaPeriodo) => {
+    try {
+      await expenseGoalsApi.update(id, dados)
+      success('Meta atualizada!')
+      carregarMetas()
+      return true
+    } catch (err) {
+      showError(erroDaApi(err, 'Erro ao salvar a meta.'))
+      return false
+    }
+  }
+
+  const apagarMeta = async (id: string) => {
+    try {
+      await expenseGoalsApi.delete(id)
+      setMetas((prev) => prev?.filter((m) => m.id !== id) ?? prev)
+      success('Meta excluída.')
+      return true
+    } catch (err) {
+      showError(erroDaApi(err, 'Erro ao excluir a meta.'))
+      return false
+    }
+  }
+
   const confirmarApagar = async () => {
     if (!apagar) return
     setApagando(true)
@@ -273,6 +352,7 @@ const Gastos: React.FC = () => {
       await expensesApi.delete(apagar.id)
       setGastos((prev) => prev.filter((g) => g.id !== apagar.id))
       setTotal((t) => t - apagar.amount)
+      carregarMetas()
       success('Gasto excluído.')
       setApagar(null)
     } catch {
@@ -283,6 +363,13 @@ const Gastos: React.FC = () => {
   }
 
   const totais = totaisPorCategoria(gastos, categorias)
+  const chaveCategoria = (c: string) => infoCategoria(c, categorias).key
+  const resumoCategorias = resumoPorCategoria(gastos, anteriores ?? [], chaveCategoria, mes, hojeLocal())
+  // Cor pela posição no mês inteiro: o filtro não troca a cor da categoria no gráfico.
+  const corCategoria = (key: string) => {
+    const i = totais.findIndex((t) => t.categoria === key)
+    return CORES_CATEGORIA[Math.max(i, 0) % CORES_CATEGORIA.length]
+  }
   // Filtro de categoria que sumiu (mês trocado, gasto apagado) deixa de valer.
   const filtroAtivo = filtro && totais.some((t) => t.categoria === filtro) ? filtro : null
   const daCategoria = filtroAtivo ? gastos.filter((g) => infoCategoria(g.category, categorias).key === filtroAtivo) : gastos
@@ -301,6 +388,9 @@ const Gastos: React.FC = () => {
   })
   const diaAtivo = diaFiltro && daCategoria.some((g) => g.spent_on === diaFiltro) ? diaFiltro : null
   const visiveis = diaAtivo ? daCategoria.filter((g) => g.spent_on === diaAtivo) : daCategoria
+
+  // Fins de semana usam o mês inteiro, sem filtro: a meta é do total.
+  const finsDeSemana = finsDeSemanaDoMes([...(anteriores ?? []), ...gastos, ...seguintes], mes, hojeLocal(), metaFimDeSemana, inicioFimDeSemana, fimFimDeSemana)
 
   const nomeMes = formatDate(`${mes}-01`, "MMMM 'de' yyyy").replace(/^./, (c) => c.toUpperCase())
 
@@ -380,38 +470,49 @@ const Gastos: React.FC = () => {
       </div>
       {!loading && <LimiteGastos total={total} limite={limiteGastos} />}
 
-      {/* Por categoria — tocar filtra a lista. O gerenciador vem primeiro: no fim
-          da faixa rolável ele ficava escondido no celular. */}
+      {!loading && (
+        <FinsDeSemanaGastos
+          resumo={finsDeSemana}
+          meta={metaFimDeSemana}
+          inicioDow={inicioFimDeSemana}
+          fimDow={fimFimDeSemana}
+          onSalvar={salvarMetaSemanal}
+        />
+      )}
+
+      {!loading && metas !== null && (
+        <MetasPeriodoGastos
+          metas={metas}
+          hoje={hojeLocal()}
+          onCriar={criarMeta}
+          onAtualizar={atualizarMeta}
+          onApagar={apagarMeta}
+        />
+      )}
+
+      {/* Por categoria — tocar filtra a lista e o gráfico. */}
       {gerenciando ? (
         <GerenciarCategorias categorias={categorias} onMudou={categoriasMudaram} onFechar={() => setGerenciando(false)} />
+      ) : !loading && gastos.length > 0 ? (
+        <PorCategoriaGastos
+          resumo={resumoCategorias}
+          info={(key) => infoCategoria(key, categorias)}
+          cor={corCategoria}
+          mesAnterior={formatDate(`${somarMeses(mes, -1)}-01`, 'MMMM')}
+          diaCorte={Number(hojeLocal().slice(8, 10))}
+          comparar={anteriores !== null}
+          filtro={filtroAtivo}
+          onFiltrar={setFiltro}
+          onGerenciar={() => setGerenciando(true)}
+        />
       ) : !loading && (
-        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap" role="group" aria-label="Filtrar por categoria">
-          <button
-            onClick={() => setGerenciando(true)}
-            className="shrink-0 flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl text-xs font-semibold border border-dashed border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary/50 transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-base">tune</span>
-            Categorias
-          </button>
-          {totais.map(({ categoria: c, total: t }) => {
-            const info = infoCategoria(c, categorias)
-            const ativo = filtroAtivo === c
-            return (
-              <button
-                key={c}
-                onClick={() => setFiltro(ativo ? null : c)}
-                aria-pressed={ativo}
-                className={`shrink-0 flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
-                  ativo ? 'bg-primary text-on-primary-fixed' : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                <span className="material-symbols-outlined text-base">{info.icone}</span>
-                {info.nome}
-                <span className={ativo ? '' : 'text-on-surface'}>{formatBRL(t)}</span>
-              </button>
-            )
-          })}
-        </div>
+        <button
+          onClick={() => setGerenciando(true)}
+          className="flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl text-xs font-semibold border border-dashed border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary/50 transition-colors cursor-pointer"
+        >
+          <span className="material-symbols-outlined text-base">tune</span>
+          Categorias
+        </button>
       )}
 
       {!loading && gastos.length > 0 && (
@@ -420,7 +521,7 @@ const Gastos: React.FC = () => {
           categoria={filtroAtivo ? infoCategoria(filtroAtivo, categorias).nome : null}
           diaSelecionado={diaAtivo}
           onSelecionarDia={setDiaFiltro}
-          categoriasData={categoriasGrafico.map(({ categoria: key, total }) => ({ key, total, nome: infoCategoria(key, categorias).nome }))}
+          categoriasData={categoriasGrafico.map(({ categoria: key, total }) => ({ key, total, nome: infoCategoria(key, categorias).nome, cor: corCategoria(key) }))}
           serieCategorias={serieCategorias}
         />
       )}
