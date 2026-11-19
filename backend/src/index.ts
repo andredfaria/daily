@@ -21,6 +21,8 @@ import expensesRouter from './routes/expenses'
 import expenseGoalsRouter from './routes/expenseGoals'
 import { activityErrorsMiddleware } from './middleware/activityErrors'
 import { authMiddleware } from './middleware/auth'
+import { adminMiddleware } from './middleware/admin'
+import adminRouter from './routes/admin'
 import { initScheduler } from './scheduler'
 import { runMigrations } from './migrate'
 import { configureWahaWebhook } from './services/waha'
@@ -90,6 +92,7 @@ app.use('/api/analytics', analyticsRouter)
 app.use('/api/assets', assetsRouter)
 app.use('/api/expenses', expensesRouter)
 app.use('/api/expense-goals', expenseGoalsRouter)
+app.use('/api/admin', adminMiddleware, adminRouter)
 
 app.use((req: Request, res: Response) => {
   console.warn(`[404] rota não encontrada: ${req.method} ${req.path}`)
