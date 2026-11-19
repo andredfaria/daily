@@ -108,6 +108,7 @@ export interface User {
   whatsapp_number: string
   timezone: string
   is_active: boolean
+  is_admin?: boolean
   whatsapp_alerts_enabled: boolean
   weekly_summary_enabled: boolean
   default_days_before_alert: number
@@ -386,4 +387,72 @@ export interface AssetBenchmarkResponse {
   pontos: AssetBenchmarkPoint[]
   cdi_disponivel: boolean
   ibov_disponivel: boolean
+}
+
+// ── Painel admin (espelha backend/src/routes/admin.ts) ──
+export type StatusAtividade = 'ok' | 'falha' | 'ignorado'
+
+export interface LinhaAtividade {
+  id: number
+  user_id: string | null
+  user_name: string | null
+  kind: string
+  status: StatusAtividade
+  ref: string | null
+  detail: string | null
+  error: string | null
+  meta: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface UsuarioAdmin {
+  id: string
+  name: string | null
+  whatsapp_number: string
+  created_at: string
+  is_admin: number | boolean
+  ultimo_acesso: string | null
+  sessoes_ativas: number
+  logins_30d: number
+  comandos_30d: number
+  mensagens_30d: number
+  falhas_30d: number
+  contas_ativas: number
+  gastos_mes: number
+  ativos: number
+  checklists: number
+}
+
+export interface SessaoAdmin {
+  id: string
+  user_agent: string | null
+  created_at: string
+  last_used_at: string
+}
+
+export interface UsuarioAdminDetalhe extends UsuarioAdmin {
+  sessoes: SessaoAdmin[]
+  whatsapp_alerts_enabled: number | boolean
+  notification_time: number
+  summary_enabled: number | boolean
+}
+
+export interface VisaoGeralAdmin {
+  falhasPorTipo: { kind: string; ref: string | null; total: number }[]
+  ativos: { h24: number; d7: number; d30: number }
+  enviadasHoje: number
+  ultimasFalhas: LinhaAtividade[]
+}
+
+export interface FiltrosAtividade {
+  user_id?: string
+  kind?: string
+  status?: StatusAtividade
+  antes_de?: string
+  limite?: number
+}
+
+export interface PaginaAtividade {
+  itens: LinhaAtividade[]
+  proximo: string | number | null
 }

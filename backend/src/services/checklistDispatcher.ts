@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
+import { registrarAtividade } from './activityLog'
 import { sendWhatsAppPoll, sendWhatsAppText, WhatsAppNumberNotFoundError } from './waha'
 import { nextMissState, buildInactivityMessage, INACTIVITY_THRESHOLD } from './checklistInactivity'
 import { shouldSendToday, getDayOfWeekSaoPaulo } from './checklistRecurrence'
@@ -70,7 +71,10 @@ async function applyInactivityCheck(checklistId: string, userId: string, today: 
   const phone = userRows[0]?.whatsapp_number
   if (phone && await claimMessage(userId, 'checklist_inactivity', `${checklistId}:${today}`)) {
     try {
-      await sendWhatsAppText(phone, buildInactivityMessage(checklistRows[0].name))
+      await sendWhatsAppText(phone, buildInactivityMessage(checklistRows[0].name), {
+        userId,
+        tipo: 'aviso_pausa_checklist',
+      })
     } catch (err: any) {
       // Falhar o aviso não pode desfazer a pausa — o checklist já está pausado
       // e o usuário ainda encontra o botão de reativar na tela. O claim só volta
@@ -126,6 +130,7 @@ export async function sendDailyPoll(
       )
       if (existingRows.length) {
         console.log(`[checklistDispatcher] poll já enviado hoje (checklist ${checklistId})`)
+        void registrarAtividade({ userId, kind: 'msg_enviada', status: 'ignorado', ref: 'enquete', error: 'poll de hoje já enviado', meta: { checklist_id: checklistId } })
         return
       }
 
@@ -152,6 +157,7 @@ export async function sendDailyPoll(
     )
     if (itemRows.length < 2) {
       console.log(`[checklistDispatcher] checklist ${checklistId} tem menos de 2 itens`)
+      void registrarAtividade({ userId, kind: 'msg_enviada', status: 'ignorado', ref: 'enquete', error: 'checklist com menos de 2 itens', meta: { checklist_id: checklistId } })
       return
     }
 
@@ -159,6 +165,7 @@ export async function sendDailyPoll(
     const phone = checklist.whatsapp_number
     if (!phone || phone.replace(/\D/g, '').length < 10) {
       console.log(`[checklistDispatcher] usuário ${userId} sem whatsapp válido`)
+      void registrarAtividade({ userId, kind: 'msg_enviada', status: 'ignorado', ref: 'enquete', error: 'usuário sem WhatsApp válido', meta: { checklist_id: checklistId } })
       return
     }
 
@@ -169,12 +176,13 @@ export async function sendDailyPoll(
     // antes de qualquer uma chamar o WAHA.
     if (!await claimMessage(userId, 'checklist_poll', `${checklistId}:${today}`)) {
       console.log(`[checklistDispatcher] poll de ${checklistId} em ${today} já reivindicado por outra instância`)
+      void registrarAtividade({ userId, kind: 'msg_enviada', status: 'ignorado', ref: 'enquete', error: 'trava já tomada', meta: { checklist_id: checklistId } })
       return
     }
 
     let result: { id: string | null }
     try {
-      result = await sendWhatsAppPoll(phone, pollName, options)
+      result = await sendWhatsAppPoll(phone, pollName, options, { userId, tipo: 'enquete' })
     } catch (err) {
       await releaseMessageClaimIfUndelivered(userId, 'checklist_poll', `${checklistId}:${today}`, err)
       throw err
@@ -194,6 +202,7 @@ export async function sendDailyPoll(
       return
     }
     console.error(`[checklistDispatcher] erro ao enviar poll:`, err.message)
+    void registrarAtividade({ userId, kind: 'erro_tick', status: 'falha', ref: 'checklistDispatcher', error: err.message, meta: { checklist_id: checklistId } })
   }
 }
 
@@ -227,6 +236,7 @@ export async function sendPollsForHour(hour: number): Promise<void> {
         await sendDailyPoll(row.id, row.user_id)
       } catch (err: any) {
         console.error(`[checklistDispatcher] erro checklist ${row.id}:`, err.message)
+        void registrarAtividade({ userId: row.user_id, kind: 'erro_tick', status: 'falha', ref: 'checklistDispatcher', error: err.message, meta: { checklist_id: row.id } })
       }
     }
   } catch (err: any) {

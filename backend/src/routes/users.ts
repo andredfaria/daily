@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import pool from '../db'
 import { reactivateUserChecklists } from '../services/checklistDispatcher'
+import { decidirAcessoAdmin } from '../services/adminAccess'
 
 const router = Router()
 
@@ -11,7 +12,7 @@ router.get('/me', async (req: Request, res: Response) => {
     if (!rows.length) {
       return res.status(404).json({ error: 'Usuário não encontrado' })
     }
-    res.json(rows[0])
+    res.json({ ...rows[0], is_admin: decidirAcessoAdmin(rows[0]) })
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })

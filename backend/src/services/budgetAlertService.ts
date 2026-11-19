@@ -1,5 +1,6 @@
 import pool from '../db'
 import { sendWhatsAppText } from './waha'
+import { registrarAtividade } from './activityLog'
 import { claimMessage, releaseMessageClaimIfUndelivered, claimKeyDia, ClaimKind } from './messageClaim'
 
 function brl(v: number): string {
@@ -12,10 +13,13 @@ async function enviarAlerta(userId: string, numero: string, kind: ClaimKind, msg
   // Chave diária: preserva a cadência atual (um aviso por dia enquanto o
   // orçamento estiver estourado) e barra só a duplicata entre instâncias.
   const refKey = claimKeyDia()
-  if (!await claimMessage(userId, kind, refKey)) return
+  if (!await claimMessage(userId, kind, refKey)) {
+    void registrarAtividade({ userId, kind: 'msg_enviada', status: 'ignorado', ref: 'alerta_orcamento', error: 'trava já tomada' })
+    return
+  }
 
   try {
-    await sendWhatsAppText(numero, msg)
+    await sendWhatsAppText(numero, msg, { userId, tipo: 'alerta_orcamento' })
   } catch (err) {
     await releaseMessageClaimIfUndelivered(userId, kind, refKey, err)
     throw err

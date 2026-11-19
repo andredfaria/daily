@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import pool from '../db'
 import { sendTextToChat, resolveLid } from './waha'
+import { registrarAtividade, nomeDoComando, eventoDeComando } from './activityLog'
 import { fetchQuote } from './quotes'
 import { carregarCategorias } from './expenseCategoryStore'
 import { nomeCategoria } from './expenseCategories'
@@ -77,19 +78,28 @@ export async function handleIncomingMessage(data: any): Promise<void> {
   // continua único por mensagem. A trava vem antes da resposta porque /gasto,
   // /marcar e /paguei gravam: reentrega do webhook não pode anotar o gasto duas vezes.
   const refKey = crypto.createHash('sha256').update(mensagemId).digest('hex').slice(0, 40)
-  if (!await claimMessage(userId, 'command_reply', refKey)) return
+  if (!await claimMessage(userId, 'command_reply', refKey)) {
+    void registrarAtividade({ userId, kind: 'msg_enviada', status: 'ignorado', ref: 'resposta_comando', error: 'trava já tomada' })
+    return
+  }
+
+  // Só o nome do comando vai para o log: os argumentos são texto do usuário.
+  const nomeLog = nomeDoComando(textoRecebido)
 
   let texto: string
   try {
     texto = await montarResposta(comando, userId, argumentosDoComando(textoRecebido), refKey)
   } catch (err) {
+    void registrarAtividade(eventoDeComando(userId, nomeLog, { erro: err }))
     // Nada foi gravado nem enviado: a reentrega pode tentar de novo.
     await releaseMessageClaim(userId, 'command_reply', refKey)
     throw err
   }
+  // Um único evento por comando tratado: ok depois de montar a resposta.
+  void registrarAtividade(eventoDeComando(userId, nomeLog))
 
   try {
-    await sendTextToChat(chatId, texto)
+    await sendTextToChat(chatId, texto, { userId, tipo: 'resposta_comando' })
   } catch (err) {
     await releaseMessageClaimIfUndelivered(userId, 'command_reply', refKey, err)
     throw err

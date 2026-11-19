@@ -1,6 +1,7 @@
 // backend/src/scheduler.ts
 import cron from 'node-cron'
 import pool from './db'
+import { registrarAtividade, limparAtividadeAntiga } from './services/activityLog'
 import { runDispatchForUser } from './dispatcher'
 import { materializeForUser, getTodaySaoPaulo } from './services/notificationMaterializer'
 import { sendPollsForHour } from './services/checklistDispatcher'
@@ -94,6 +95,7 @@ async function completarVencimentos(): Promise<void> {
     if (geradas) console.log(`[scheduler] ${geradas} vencimento(s) completado(s)`)
   } catch (err: any) {
     console.error('[scheduler] erro ao completar vencimentos:', err.message)
+    void registrarAtividade({ kind: 'erro_tick', status: 'falha', ref: 'vencimentos', error: err.message })
   }
 }
 
@@ -108,11 +110,21 @@ async function runTick(hour: number): Promise<void> {
       await configureWahaWebhook(backendPublicUrl)
     } catch (err: any) {
       console.error('[scheduler] erro ao reafirmar webhook WAHA:', err.message)
+      void registrarAtividade({ kind: 'erro_tick', status: 'falha', ref: 'webhook_waha', error: err.message })
     }
   }
 
   // --- Vencimentos: uma vez por dia mantém 12 meses à frente ---
-  if (hour === 0) await completarVencimentos()
+  if (hour === 0) {
+    await completarVencimentos()
+    // Retenção do log de atividade (90 dias).
+    try {
+      const apagados = await limparAtividadeAntiga()
+      console.log(`[scheduler] ${apagados} evento(s) antigo(s) do log de atividade apagado(s)`)
+    } catch (err: any) {
+      console.error('[scheduler] erro ao limpar log de atividade:', err.message)
+    }
+  }
 
   // --- Envio de notificações de contas ---
   try {
@@ -130,11 +142,13 @@ async function runTick(hour: number): Promise<void> {
           await runDispatchForUser(userId)
         } catch (err: any) {
           console.error(`[scheduler] erro ao processar usuário ${userId}:`, err.message)
+          void registrarAtividade({ userId, kind: 'erro_tick', status: 'falha', ref: 'scheduler:contas', error: err.message })
         }
       }
     }
   } catch (err: any) {
     console.error('[scheduler] erro no tick de contas:', err.message)
+    void registrarAtividade({ kind: 'erro_tick', status: 'falha', ref: 'contas', error: err.message })
   }
 
   // --- Envio de checklists ---
@@ -142,6 +156,7 @@ async function runTick(hour: number): Promise<void> {
     await sendPollsForHour(hour)
   } catch (err: any) {
     console.error('[scheduler] erro no tick de checklists:', err.message)
+    void registrarAtividade({ kind: 'erro_tick', status: 'falha', ref: 'checklists', error: err.message })
   }
 
   // --- Resumo semanal (apenas às 8h BRT) ---
@@ -153,9 +168,15 @@ async function runTick(hour: number): Promise<void> {
         [dayOfWeek]
       )
       for (const { id } of summaryUsers) {
-        try { await sendWeeklySummary(id) } catch (e: any) { console.error('[scheduler] summary erro:', e.message) }
+        try { await sendWeeklySummary(id) } catch (e: any) {
+          console.error('[scheduler] summary erro:', e.message)
+          void registrarAtividade({ userId: id, kind: 'erro_tick', status: 'falha', ref: 'summaryService', error: e.message })
+        }
       }
-    } catch (e: any) { console.error('[scheduler] summary tick erro:', e.message) }
+    } catch (e: any) {
+      console.error('[scheduler] summary tick erro:', e.message)
+      void registrarAtividade({ kind: 'erro_tick', status: 'falha', ref: 'resumo_semanal', error: e.message })
+    }
   }
 
   // --- Sumário mensal (dia 1, 8h BRT) ---
@@ -165,9 +186,15 @@ async function runTick(hour: number): Promise<void> {
         `SELECT id FROM users WHERE monthly_summary_enabled = 1 AND is_active = 1 AND whatsapp_alerts_enabled = 1`
       )
       for (const { id } of monthlyUsers) {
-        try { await sendMonthlySummary(id) } catch (e: any) { console.error('[scheduler] monthly summary erro:', e.message) }
+        try { await sendMonthlySummary(id) } catch (e: any) {
+          console.error('[scheduler] monthly summary erro:', e.message)
+          void registrarAtividade({ userId: id, kind: 'erro_tick', status: 'falha', ref: 'summaryService:mensal', error: e.message })
+        }
       }
-    } catch (e: any) { console.error('[scheduler] monthly summary tick erro:', e.message) }
+    } catch (e: any) {
+      console.error('[scheduler] monthly summary tick erro:', e.message)
+      void registrarAtividade({ kind: 'erro_tick', status: 'falha', ref: 'resumo_mensal', error: e.message })
+    }
   }
 
   // --- Alerta de limite de gastos (executa às 9h) ---
@@ -178,9 +205,15 @@ async function runTick(hour: number): Promise<void> {
           WHERE monthly_expense_budget_limit IS NOT NULL AND is_active = 1`
       )
       for (const { id } of budgetUsers) {
-        try { await checkBudgetAlert(id) } catch (e: any) { console.error('[scheduler] budget erro:', e.message) }
+        try { await checkBudgetAlert(id) } catch (e: any) {
+          console.error('[scheduler] budget erro:', e.message)
+          void registrarAtividade({ userId: id, kind: 'erro_tick', status: 'falha', ref: 'budgetAlertService', error: e.message })
+        }
       }
-    } catch (e: any) { console.error('[scheduler] budget tick erro:', e.message) }
+    } catch (e: any) {
+      console.error('[scheduler] budget tick erro:', e.message)
+      void registrarAtividade({ kind: 'erro_tick', status: 'falha', ref: 'orcamento', error: e.message })
+    }
   }
 
   // --- Ativos: coleta diária de cotação + alerta (hora configurável, default 11h) ---
@@ -200,7 +233,13 @@ async function runTick(hour: number): Promise<void> {
         if (u.asset_alerts_enabled && u.whatsapp_alerts_enabled) {
           await checkAssetAlerts(u.id, synced)
         }
-      } catch (e: any) { console.error('[scheduler] asset erro:', e.message) }
+      } catch (e: any) {
+        console.error('[scheduler] asset erro:', e.message)
+        void registrarAtividade({ userId: u.id, kind: 'erro_tick', status: 'falha', ref: 'assetAlertService', error: e.message })
+      }
     }
-  } catch (e: any) { console.error('[scheduler] asset tick erro:', e.message) }
+  } catch (e: any) {
+      console.error('[scheduler] asset tick erro:', e.message)
+      void registrarAtividade({ kind: 'erro_tick', status: 'falha', ref: 'ativos', error: e.message })
+    }
 }

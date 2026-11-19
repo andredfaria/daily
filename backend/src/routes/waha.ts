@@ -103,7 +103,7 @@ router.post('/test-message', async (req: Request, res: Response) => {
     const body = `✅ *Teste de Integração — Rotina*\n\nOlá, ${userName}! Esta é uma mensagem de teste enviada em ${now}.\n\nSe você está recebendo isso, o envio de notificações está funcionando corretamente. 🎉`
 
     try {
-      const { id: messageId } = await sendWhatsAppText(rawNumber, body)
+      const { id: messageId } = await sendWhatsAppText(rawNumber, body, { userId: req.userId, tipo: 'teste_integracao' })
       return res.json({ success: true, to: rawNumber, message_id: messageId })
     } catch (sendErr) {
       if (sendErr instanceof WhatsAppNumberNotFoundError) {

@@ -20,6 +20,12 @@ import ChecklistsAnalise from './pages/checklists/ChecklistsAnalise'
 import AtivosShell from './pages/ativos/AtivosShell'
 import AtivosCarteira from './pages/ativos/AtivosCarteira'
 import AtivosAnalise from './pages/ativos/AtivosAnalise'
+import AdminShell from './pages/admin/AdminShell'
+import AdminGeral from './pages/admin/AdminGeral'
+import AdminUsuarios from './pages/admin/AdminUsuarios'
+import AdminUsuario from './pages/admin/AdminUsuario'
+import AdminMensagens from './pages/admin/AdminMensagens'
+import AdminErros from './pages/admin/AdminErros'
 // Protects all children — redirects to /login if not authenticated
 const ProtectedRoute: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -72,6 +78,14 @@ const App: React.FC = () => {
                   <Route index element={<Navigate to="lista" replace />} />
                   <Route path="lista" element={<ChecklistsLista />} />
                   <Route path="analise" element={<ChecklistsAnalise />} />
+                </Route>
+                <Route path="/admin" element={<AdminShell />}>
+                  <Route index element={<Navigate to="geral" replace />} />
+                  <Route path="geral" element={<AdminGeral />} />
+                  <Route path="usuarios" element={<AdminUsuarios />} />
+                  <Route path="usuarios/:id" element={<AdminUsuario />} />
+                  <Route path="mensagens" element={<AdminMensagens />} />
+                  <Route path="erros" element={<AdminErros />} />
                 </Route>
                 <Route path="/notificacoes" element={<Notificacoes />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />

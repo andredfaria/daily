@@ -3,7 +3,9 @@ import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 // short: rótulo da barra inferior do celular, onde sete itens dividem a largura.
-const navItems: { path: string; label: string; icon: string; exact?: boolean; short?: string }[] = [
+type NavItem = { path: string; label: string; icon: string; exact?: boolean; short?: string }
+
+const navItems: NavItem[] = [
   { path: '/', label: 'Home', icon: 'home', exact: true },
   { path: '/contas', label: 'Contas', icon: 'receipt_long' },
   { path: '/gastos', label: 'Gastos', icon: 'payments' },
@@ -13,10 +15,19 @@ const navItems: { path: string; label: string; icon: string; exact?: boolean; sh
   { path: '/configuracoes', label: 'Configurações', icon: 'settings', short: 'Ajustes' },
 ]
 
+const itemAdmin: NavItem = { path: '/admin', label: 'Admin', icon: 'admin_panel_settings' }
+
+// Item Admin só aparece para o dono; Sidebar e barra inferior usam a mesma lista.
+export const useNavItems = (): NavItem[] => {
+  const { user } = useAuth()
+  return user?.is_admin ? [...navItems, itemAdmin] : navItems
+}
+
 export { navItems }
 
 const Sidebar: React.FC = () => {
   const { logout } = useAuth()
+  const items = useNavItems()
 
   return (
     <aside className="hidden md:flex fixed left-0 top-0 h-screen w-[220px] bg-surface-container-lowest border-r border-outline-variant/50 flex-col z-40">
@@ -37,7 +48,7 @@ const Sidebar: React.FC = () => {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
+        {items.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}

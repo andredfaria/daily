@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import crypto from 'crypto'
 import rateLimit from 'express-rate-limit'
 import pool from '../db'
-import { wahaClient } from '../services/waha'
+import { sendTextToChat } from '../services/waha'
 import { handleIncomingMessage } from '../services/whatsappCommandHandler'
 import { lerListaJson, unirMarcados } from '../services/whatsappCommands'
 
@@ -197,13 +197,22 @@ async function handlePollVoteFailed(data: any): Promise<void> {
     return
   }
 
+    // Dono do poll, se for achável sem custo; senão o evento fica sem usuário.
+    let apologyUserId: string | null = null
     try {
-      const session = process.env.WAHA_SESSION || 'default'
-      await wahaClient().post('/api/sendText', {
-      session,
-      chatId,
-      text: 'Desculpe, não conseguimos ler seu voto. Por favor, marque novamente na enquete acima.',
-    })
+      const [donos]: any = await pool.query(
+        'SELECT user_id FROM checklist_daily_polls WHERE waha_poll_id LIKE ? LIMIT 1',
+        [`%${pollMessageId}`],
+      )
+      apologyUserId = donos[0]?.user_id ?? null
+    } catch { /* sem dono: segue com null */ }
+
+    try {
+      await sendTextToChat(
+        chatId,
+        'Desculpe, não conseguimos ler seu voto. Por favor, marque novamente na enquete acima.',
+        { userId: apologyUserId, tipo: 'apology' },
+      )
     console.log(`[webhook] mensagem de apology enviada para ${chatId}`)
   } catch (err: any) {
     console.error('[webhook] erro ao enviar apology:', err.message)

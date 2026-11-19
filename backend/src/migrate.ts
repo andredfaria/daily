@@ -512,6 +512,34 @@ CREATE TABLE IF NOT EXISTS expense_goals (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
     },
   },
+  {
+    // Painel de administrador: users.is_admin e o log de atividade (retenção de 90 dias).
+    name: '031_admin_activity_log',
+    run: async () => {
+      await addColumnIfNotExists('users', 'is_admin', 'BOOLEAN NOT NULL DEFAULT FALSE')
+      await pool.query(
+        `UPDATE users SET is_admin = TRUE WHERE whatsapp_number IN ('553591404064','5535991404064')`
+      )
+      await pool.query(`
+CREATE TABLE IF NOT EXISTS activity_log (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id     CHAR(36)     NULL,
+  kind        VARCHAR(30)  NOT NULL,
+  status      ENUM('ok','falha','ignorado') NOT NULL DEFAULT 'ok',
+  ref         VARCHAR(60)  NULL,
+  detail      TEXT         NULL,
+  error       TEXT         NULL,
+  meta        JSON         NULL,
+  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_activity_created (created_at),
+  KEY idx_activity_user_time (user_id, created_at),
+  KEY idx_activity_kind_time (kind, created_at),
+  KEY idx_activity_status_time (status, created_at),
+  CONSTRAINT fk_activity_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`)
+    },
+  },
 ]
 
 export async function runMigrations(): Promise<void> {

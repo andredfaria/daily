@@ -163,7 +163,7 @@ router.post('/:id/resend', async (req: Request, res: Response) => {
       )
     }
 
-    const result = await sendSingleNotification(req.params.id)
+    const result = await sendSingleNotification(req.params.id, 'reenvio')
 
     const [rows]: any = await pool.query(
       `SELECT n.*, b.name AS bill_name, o.due_date, o.amount
