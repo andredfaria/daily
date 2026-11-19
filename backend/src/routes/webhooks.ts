@@ -197,11 +197,21 @@ async function handlePollVoteFailed(data: any): Promise<void> {
     return
   }
 
+    // Dono do poll, se for achável sem custo; senão o evento fica sem usuário.
+    let apologyUserId: string | null = null
+    try {
+      const [donos]: any = await pool.query(
+        'SELECT user_id FROM checklist_daily_polls WHERE waha_poll_id LIKE ? LIMIT 1',
+        [`%${pollMessageId}`],
+      )
+      apologyUserId = donos[0]?.user_id ?? null
+    } catch { /* sem dono: segue com null */ }
+
     try {
       await sendTextToChat(
         chatId,
         'Desculpe, não conseguimos ler seu voto. Por favor, marque novamente na enquete acima.',
-        { userId: null, tipo: 'apology' },
+        { userId: apologyUserId, tipo: 'apology' },
       )
     console.log(`[webhook] mensagem de apology enviada para ${chatId}`)
   } catch (err: any) {

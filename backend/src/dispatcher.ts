@@ -28,6 +28,12 @@ function getTodayStringBRT(): string {
   return `${p.year}-${p.month}-${p.day}`
 }
 
+// Falha antes de chamar o WhatsApp: o lembrete é marcado 'failed' sem passar
+// por sendWhatsAppText, então o log de envio não o veria.
+function registrarFalhaLembrete(userId: string, tipo: string, motivo: string, meta: Record<string, unknown>): void {
+  void registrarAtividade({ userId, kind: 'msg_enviada', status: 'falha', ref: tipo, error: motivo, meta })
+}
+
 export async function sendSingleNotification(
   notifId: string,
   tipo = 'lembrete_conta',
@@ -90,6 +96,7 @@ export async function sendSingleNotification(
 
   if (!notif.whatsapp_number) {
     const detail = 'Nenhum usuário com WhatsApp configurado'
+    registrarFalhaLembrete(notif.user_id, tipo, detail, { notification_id: notifId })
     await pool.query(`UPDATE notifications SET status='failed', error_detail=? WHERE id=?`, [detail, notifId])
     return 'failed'
   }
@@ -110,6 +117,7 @@ export async function sendSingleNotification(
   const digits = notif.whatsapp_number.replace(/\D/g, '')
   if (digits.length < 10) {
     const detail = `Número WhatsApp inválido: ${notif.whatsapp_number}`
+    registrarFalhaLembrete(notif.user_id, tipo, detail, { notification_id: notifId })
     await pool.query(`UPDATE notifications SET status='failed', error_detail=? WHERE id=?`, [detail, notifId])
     return 'failed'
   }
@@ -119,11 +127,13 @@ export async function sendSingleNotification(
     const { data: sessionData } = await wahaClient().get(`/api/sessions/${session}`)
     if (sessionData.status !== 'WORKING') {
       const detail = `Sessão WAHA inativa: ${sessionData.status}`
+      registrarFalhaLembrete(notif.user_id, tipo, detail, { notification_id: notifId })
       await pool.query(`UPDATE notifications SET status='failed', error_detail=? WHERE id=?`, [detail, notifId])
       return 'failed'
     }
   } catch (err: any) {
     const detail = `Erro ao verificar sessão WAHA: ${err.message}`
+    registrarFalhaLembrete(notif.user_id, tipo, detail, { notification_id: notifId })
     await pool.query(`UPDATE notifications SET status='failed', error_detail=? WHERE id=?`, [detail, notifId])
     return 'failed'
   }
@@ -195,6 +205,7 @@ export async function runDispatchForUser(userId: string): Promise<{ sent: number
         [userId]
       )
       stats.failed = updateResult.affectedRows ?? 0
+      if (stats.failed > 0) registrarFalhaLembrete(userId, 'lembrete_conta', 'Sessão WAHA inativa', { notificacoes: stats.failed })
       return stats
     }
   } catch (err: any) {
@@ -208,6 +219,7 @@ export async function runDispatchForUser(userId: string): Promise<{ sent: number
       [`Erro ao verificar sessão WAHA: ${err.message}`, userId]
     )
     stats.failed = updateResult.affectedRows ?? 0
+    if (stats.failed > 0) registrarFalhaLembrete(userId, 'lembrete_conta', `Erro ao verificar sessão WAHA: ${err.message}`, { notificacoes: stats.failed })
     return stats
   }
 
