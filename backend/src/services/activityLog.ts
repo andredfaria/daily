@@ -1,15 +1,11 @@
 import pool from '../db'
 
-export type KindAtividade =
-  | 'login'
-  | 'login_falha'
-  | 'otp_pedido'
-  | 'logout'
-  | 'acesso'
-  | 'msg_enviada'
-  | 'comando'
-  | 'erro_api'
-  | 'erro_tick'
+export const KINDS_ATIVIDADE = [
+  'login', 'login_falha', 'otp_pedido', 'logout', 'acesso',
+  'msg_enviada', 'comando', 'erro_api', 'erro_tick',
+] as const
+
+export type KindAtividade = typeof KINDS_ATIVIDADE[number]
 
 export type StatusAtividade = 'ok' | 'falha' | 'ignorado'
 
