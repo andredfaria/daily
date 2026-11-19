@@ -8,6 +8,7 @@ import {
   normalizarUserId,
   registrarAtividade,
   eventoDeEnvio,
+  eventoDeComando,
 } from '../activityLog'
 
 jest.mock('../../db', () => ({
@@ -102,5 +103,16 @@ describe('eventoDeEnvio', () => {
   it('extra entra no meta', () => {
     const ev = eventoDeEnvio({ tipo: 'x' }, 'oi', { id: null }, { chatId: 'c' })
     expect(ev.meta?.chatId).toBe('c')
+  })
+})
+
+describe('eventoDeComando', () => {
+  it('sucesso gera um evento ok só com o nome', () => {
+    expect(eventoDeComando('u1', '/gasto')).toEqual({ userId: 'u1', kind: 'comando', status: 'ok', ref: '/gasto' })
+  })
+  it('falha gera um único evento falha com o erro', () => {
+    const ev = eventoDeComando('u1', '/gasto', { erro: { response: { status: 500 } } })
+    expect(ev.status).toBe('falha')
+    expect(ev.error).toContain('HTTP 500')
   })
 })

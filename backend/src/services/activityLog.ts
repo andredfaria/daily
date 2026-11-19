@@ -90,6 +90,17 @@ export function eventoDeEnvio(
   }
 }
 
+/** Evento único de um comando tratado: ok, ou falha quando a resposta não saiu. */
+export function eventoDeComando(
+  userId: string,
+  nome: string | null,
+  resultado?: { erro: any },
+): EventoAtividade {
+  return resultado
+    ? { userId, kind: 'comando', status: 'falha', ref: nome, error: descreverErroEnvio(resultado.erro) }
+    : { userId, kind: 'comando', status: 'ok', ref: nome }
+}
+
 /** Grava o evento. Nunca lança nem rejeita: log não derruba o fluxo. */
 export async function registrarAtividade(ev: EventoAtividade): Promise<void> {
   try {
