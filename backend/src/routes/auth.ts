@@ -63,7 +63,7 @@ router.post('/request-otp', async (req: Request, res: Response) => {
     }
 
     try {
-      await sendWhatsAppOtpButton(digits, code)
+      await sendWhatsAppOtpButton(digits, code, { userId: null, tipo: 'otp' })
     } catch (btnErr) {
       if (btnErr instanceof WhatsAppNumberNotFoundError) {
         return res.status(400).json({ error: 'Número não encontrado no WhatsApp. Verifique o número e tente novamente.' })
@@ -71,8 +71,8 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       // Fallback: sendButtons indisponível (tier Core ou deprecated) — envia 2 mensagens de texto
       console.warn('[auth] sendButtons indisponível — usando fallback de texto')
       try {
-        await sendWhatsAppText(digits, `Seu código de acesso Rotina (válido por 5 min):`)
-        await sendWhatsAppText(digits, code)
+        await sendWhatsAppText(digits, `Seu código de acesso Rotina (válido por 5 min):`, { userId: null, tipo: 'otp' })
+        await sendWhatsAppText(digits, code, { userId: null, tipo: 'otp' })
       } catch (txtErr) {
         if (txtErr instanceof WhatsAppNumberNotFoundError) {
           return res.status(400).json({ error: 'Número não encontrado no WhatsApp. Verifique o número e tente novamente.' })

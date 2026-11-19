@@ -1,4 +1,5 @@
 import pool from '../db'
+import { registrarAtividade } from './activityLog'
 import { fetchQuote, Quote } from './quotes'
 import { buildSnapshotRow } from './assetSnapshotMath'
 import { formatDateSaoPaulo } from './assetMath'
@@ -54,6 +55,7 @@ export async function syncUserAssets(userId: string): Promise<SyncedAsset[]> {
       }
     } catch (e: any) {
       console.error(`[assetSync] erro no ativo ${asset.ticker}:`, e.message)
+      void registrarAtividade({ userId: userId, kind: 'erro_tick', status: 'falha', ref: 'assetQuoteSync', error: e.message })
     }
 
     synced.push({ asset, quote })

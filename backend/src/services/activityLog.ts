@@ -23,6 +23,12 @@ export interface EventoAtividade {
   meta?: Record<string, unknown> | null
 }
 
+/** Contexto de um envio de WhatsApp: quem recebe e que tipo de mensagem é. */
+export interface ContextoEnvio {
+  userId?: string | null
+  tipo: string
+}
+
 export function cortarTexto(s: string | null | undefined, max = 2000): string | null {
   if (s === null || s === undefined || s === '') return null
   return s.length > max ? s.slice(0, max) : s
@@ -53,6 +59,35 @@ export function nomeDoComando(texto: string): string | null {
 export function normalizarUserId(id: string | null | undefined): string | null {
   if (!id || id === '__service__') return null
   return id
+}
+
+/** Monta o evento de um envio. O texto do OTP nunca vai inteiro para o log. */
+export function eventoDeEnvio(
+  ctx: ContextoEnvio | undefined,
+  texto: string,
+  resultado: { id: string | null } | { erro: any },
+  extra?: Record<string, unknown>,
+): EventoAtividade {
+  const tipo = ctx?.tipo ?? 'desconhecido'
+  const base = {
+    userId: ctx?.userId ?? null,
+    kind: 'msg_enviada' as const,
+    ref: tipo,
+    detail: tipo === 'otp' ? mascararOtp(texto) : texto,
+  }
+  if ('erro' in resultado) {
+    return {
+      ...base,
+      status: 'falha',
+      error: descreverErroEnvio(resultado.erro),
+      meta: extra ?? null,
+    }
+  }
+  return {
+    ...base,
+    status: 'ok',
+    meta: { ...(resultado.id ? { waha_message_id: resultado.id } : {}), ...(extra ?? {}) },
+  }
 }
 
 /** Grava o evento. Nunca lança nem rejeita: log não derruba o fluxo. */

@@ -1,6 +1,7 @@
 // backend/src/scheduler.ts
 import cron from 'node-cron'
 import pool from './db'
+import { registrarAtividade } from './services/activityLog'
 import { runDispatchForUser } from './dispatcher'
 import { materializeForUser, getTodaySaoPaulo } from './services/notificationMaterializer'
 import { sendPollsForHour } from './services/checklistDispatcher'
@@ -130,6 +131,7 @@ async function runTick(hour: number): Promise<void> {
           await runDispatchForUser(userId)
         } catch (err: any) {
           console.error(`[scheduler] erro ao processar usuário ${userId}:`, err.message)
+          void registrarAtividade({ userId, kind: 'erro_tick', status: 'falha', ref: 'scheduler:contas', error: err.message })
         }
       }
     }
@@ -153,7 +155,10 @@ async function runTick(hour: number): Promise<void> {
         [dayOfWeek]
       )
       for (const { id } of summaryUsers) {
-        try { await sendWeeklySummary(id) } catch (e: any) { console.error('[scheduler] summary erro:', e.message) }
+        try { await sendWeeklySummary(id) } catch (e: any) {
+          console.error('[scheduler] summary erro:', e.message)
+          void registrarAtividade({ userId: id, kind: 'erro_tick', status: 'falha', ref: 'summaryService', error: e.message })
+        }
       }
     } catch (e: any) { console.error('[scheduler] summary tick erro:', e.message) }
   }
@@ -165,7 +170,10 @@ async function runTick(hour: number): Promise<void> {
         `SELECT id FROM users WHERE monthly_summary_enabled = 1 AND is_active = 1 AND whatsapp_alerts_enabled = 1`
       )
       for (const { id } of monthlyUsers) {
-        try { await sendMonthlySummary(id) } catch (e: any) { console.error('[scheduler] monthly summary erro:', e.message) }
+        try { await sendMonthlySummary(id) } catch (e: any) {
+          console.error('[scheduler] monthly summary erro:', e.message)
+          void registrarAtividade({ userId: id, kind: 'erro_tick', status: 'falha', ref: 'summaryService:mensal', error: e.message })
+        }
       }
     } catch (e: any) { console.error('[scheduler] monthly summary tick erro:', e.message) }
   }
@@ -178,7 +186,10 @@ async function runTick(hour: number): Promise<void> {
           WHERE monthly_expense_budget_limit IS NOT NULL AND is_active = 1`
       )
       for (const { id } of budgetUsers) {
-        try { await checkBudgetAlert(id) } catch (e: any) { console.error('[scheduler] budget erro:', e.message) }
+        try { await checkBudgetAlert(id) } catch (e: any) {
+          console.error('[scheduler] budget erro:', e.message)
+          void registrarAtividade({ userId: id, kind: 'erro_tick', status: 'falha', ref: 'budgetAlertService', error: e.message })
+        }
       }
     } catch (e: any) { console.error('[scheduler] budget tick erro:', e.message) }
   }
@@ -200,7 +211,10 @@ async function runTick(hour: number): Promise<void> {
         if (u.asset_alerts_enabled && u.whatsapp_alerts_enabled) {
           await checkAssetAlerts(u.id, synced)
         }
-      } catch (e: any) { console.error('[scheduler] asset erro:', e.message) }
+      } catch (e: any) {
+        console.error('[scheduler] asset erro:', e.message)
+        void registrarAtividade({ userId: u.id, kind: 'erro_tick', status: 'falha', ref: 'assetAlertService', error: e.message })
+      }
     }
   } catch (e: any) { console.error('[scheduler] asset tick erro:', e.message) }
 }

@@ -2,6 +2,7 @@
 import pool from './db'
 import axios from 'axios'
 import { materializeForUser } from './services/notificationMaterializer'
+import { registrarAtividade } from './services/activityLog'
 import { sendWhatsAppText, WhatsAppNumberNotFoundError } from './services/waha'
 import { decryptPix } from './services/pixCrypto'
 import { buildMessage, lembreteDevePular } from './services/lembreteConta'
@@ -27,7 +28,10 @@ function getTodayStringBRT(): string {
   return `${p.year}-${p.month}-${p.day}`
 }
 
-export async function sendSingleNotification(notifId: string): Promise<'sent' | 'failed' | 'skipped'> {
+export async function sendSingleNotification(
+  notifId: string,
+  tipo = 'lembrete_conta',
+): Promise<'sent' | 'failed' | 'skipped'> {
   // Claim atômico — só prossegue se conseguir mudar de 'scheduled' para 'processing'
   const [claimResult]: any = await pool.query(
     `UPDATE notifications SET status = 'processing' WHERE id = ? AND status = 'scheduled'`,
@@ -37,6 +41,14 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
     // Outra instância já pegou ou a notificação não existe mais em 'scheduled'
     const [check]: any = await pool.query(`SELECT status FROM notifications WHERE id = ?`, [notifId])
     const currentStatus = check[0]?.status
+    // Sem userId aqui (a consulta do usuário vem depois): o evento fica sem dono.
+    void registrarAtividade({
+      kind: 'msg_enviada',
+      status: 'ignorado',
+      ref: tipo,
+      error: `notificação já em '${currentStatus ?? 'inexistente'}' (outra instância ou já tratada)`,
+      meta: { notification_id: notifId },
+    })
     if (currentStatus === 'sent' || currentStatus === 'skipped') return 'skipped'
     // Em processamento por outro worker ou status inesperado — evita duplicata
     return 'skipped'
@@ -46,7 +58,7 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
     `SELECT n.id, n.bill_occurrence_id, n.type,
             o.due_date, o.amount, o.amount_is_actual, o.paid_at,
             b.name AS bill_name, b.is_active AS bill_is_active, b.is_fixed AS bill_is_fixed,
-            u.whatsapp_number, u.whatsapp_alerts_enabled,
+            b.user_id, u.whatsapp_number, u.whatsapp_alerts_enabled,
             pm.type AS pm_type, pm.pix_key_type, pm.pix_key, pm.pix_beneficiary, pm.boleto_code
      FROM notifications n
      JOIN bill_occurrences o ON o.id = n.bill_occurrence_id
@@ -63,6 +75,15 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
   // Conta desativada ou vencimento já pago (inclusive pago depois de o
   // lembrete entrar na fila): não envia.
   if (lembreteDevePular(notif)) {
+    void registrarAtividade({
+      userId: notif.user_id,
+      kind: 'msg_enviada',
+      status: 'ignorado',
+      ref: tipo,
+      detail: notif.bill_name,
+      error: notif.paid_at ? 'conta já paga' : 'conta desativada',
+      meta: { notification_id: notifId },
+    })
     await pool.query(`UPDATE notifications SET status='skipped' WHERE id=?`, [notifId])
     return 'skipped'
   }
@@ -73,6 +94,15 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
     return 'failed'
   }
   if (!notif.whatsapp_alerts_enabled) {
+    void registrarAtividade({
+      userId: notif.user_id,
+      kind: 'msg_enviada',
+      status: 'ignorado',
+      ref: tipo,
+      detail: notif.bill_name,
+      error: 'alertas de WhatsApp desligados',
+      meta: { notification_id: notifId },
+    })
     await pool.query(`UPDATE notifications SET status='skipped' WHERE id=?`, [notifId])
     return 'skipped'
   }
@@ -112,7 +142,10 @@ export async function sendSingleNotification(notifId: string): Promise<'sent' | 
   const messageBody = buildMessage(notif.bill_name, Number(notif.amount), dueDateStr, pm, estimado, getTodayStringBRT())
 
   try {
-    const { id: wahaMessageId } = await sendWhatsAppText(notif.whatsapp_number, messageBody)
+    const { id: wahaMessageId } = await sendWhatsAppText(notif.whatsapp_number, messageBody, {
+      userId: notif.user_id,
+      tipo,
+    })
     await pool.query(
       `UPDATE notifications SET status='sent', sent_at=NOW(), waha_message_id=?, message_body=?, error_detail=NULL WHERE id=?`,
       [wahaMessageId, messageBody, notifId]
@@ -224,6 +257,7 @@ export async function runDispatch(): Promise<{ sent: number; failed: number; ski
       totals.skipped += stats.skipped
     } catch (err: any) {
       console.error(`[dispatcher] erro ao processar usuário ${userId}:`, err.message)
+      void registrarAtividade({ userId, kind: 'erro_tick', status: 'falha', ref: 'dispatcher', error: err.message })
     }
   }
 

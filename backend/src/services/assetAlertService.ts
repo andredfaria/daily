@@ -1,5 +1,6 @@
 import pool from '../db'
 import { sendWhatsAppText } from './waha'
+import { registrarAtividade } from './activityLog'
 import { SyncedAsset } from './assetQuoteSync'
 import {
   AlertHit,
@@ -53,6 +54,7 @@ export async function checkAssetAlerts(userId: string, synced: SyncedAsset[]): P
       }
     } catch (e: any) {
       console.error(`[assetAlert] erro no ativo ${asset.ticker}:`, e.message)
+      void registrarAtividade({ userId, kind: 'erro_tick', status: 'falha', ref: 'assetAlertService', error: e.message })
       continue
     }
   }
@@ -62,10 +64,13 @@ export async function checkAssetAlerts(userId: string, synced: SyncedAsset[]): P
   // O par "ler target_triggered_at, depois gravar" não é atômico: três
   // instâncias leem null no mesmo tick e as três enviam. O claim decide antes.
   const refKey = claimKeyDia()
-  if (!await claimMessage(userId, 'asset_alert', refKey)) return
+  if (!await claimMessage(userId, 'asset_alert', refKey)) {
+    void registrarAtividade({ userId, kind: 'msg_enviada', status: 'ignorado', ref: 'alerta_ativo', error: 'trava já tomada' })
+    return
+  }
 
   try {
-    await sendWhatsAppText(userRows[0].whatsapp_number, buildAlertMessage(hits))
+    await sendWhatsAppText(userRows[0].whatsapp_number, buildAlertMessage(hits), { userId, tipo: 'alerta_ativo' })
   } catch (err) {
     await releaseMessageClaimIfUndelivered(userId, 'asset_alert', refKey, err)
     throw err

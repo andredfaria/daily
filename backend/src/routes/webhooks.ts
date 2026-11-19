@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import crypto from 'crypto'
 import rateLimit from 'express-rate-limit'
 import pool from '../db'
-import { wahaClient } from '../services/waha'
+import { sendTextToChat } from '../services/waha'
 import { handleIncomingMessage } from '../services/whatsappCommandHandler'
 import { lerListaJson, unirMarcados } from '../services/whatsappCommands'
 
@@ -198,12 +198,11 @@ async function handlePollVoteFailed(data: any): Promise<void> {
   }
 
     try {
-      const session = process.env.WAHA_SESSION || 'default'
-      await wahaClient().post('/api/sendText', {
-      session,
-      chatId,
-      text: 'Desculpe, não conseguimos ler seu voto. Por favor, marque novamente na enquete acima.',
-    })
+      await sendTextToChat(
+        chatId,
+        'Desculpe, não conseguimos ler seu voto. Por favor, marque novamente na enquete acima.',
+        { userId: null, tipo: 'apology' },
+      )
     console.log(`[webhook] mensagem de apology enviada para ${chatId}`)
   } catch (err: any) {
     console.error('[webhook] erro ao enviar apology:', err.message)

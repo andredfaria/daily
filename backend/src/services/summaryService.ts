@@ -1,5 +1,6 @@
 import pool from '../db'
 import { sendWhatsAppText } from './waha'
+import { registrarAtividade } from './activityLog'
 import { fechamentoMensal } from './financialAnalytics'
 import { claimMessage, releaseMessageClaimIfUndelivered, claimKeyDia, claimKeyMesAnterior } from './messageClaim'
 import { formatDateSaoPaulo } from './assetMath'
@@ -54,10 +55,13 @@ export async function sendWeeklySummary(userId: string): Promise<void> {
   if (blocos.length) msg += `\n${blocos.join('\n\n')}`
 
   const refKey = claimKeyDia()
-  if (!await claimMessage(userId, 'weekly_summary', refKey)) return
+  if (!await claimMessage(userId, 'weekly_summary', refKey)) {
+    void registrarAtividade({ userId, kind: 'msg_enviada', status: 'ignorado', ref: 'resumo_semanal', error: 'trava já tomada' })
+    return
+  }
 
   try {
-    await sendWhatsAppText(userRows[0].whatsapp_number, msg)
+    await sendWhatsAppText(userRows[0].whatsapp_number, msg, { userId, tipo: 'resumo_semanal' })
   } catch (err) {
     await releaseMessageClaimIfUndelivered(userId, 'weekly_summary', refKey, err)
     throw err
@@ -177,10 +181,13 @@ export async function sendMonthlySummary(userId: string): Promise<void> {
   }
 
   const refKey = claimKeyMesAnterior()
-  if (!await claimMessage(userId, 'monthly_summary', refKey)) return
+  if (!await claimMessage(userId, 'monthly_summary', refKey)) {
+    void registrarAtividade({ userId, kind: 'msg_enviada', status: 'ignorado', ref: 'resumo_mensal', error: 'trava já tomada' })
+    return
+  }
 
   try {
-    await sendWhatsAppText(userRows[0].whatsapp_number, msg)
+    await sendWhatsAppText(userRows[0].whatsapp_number, msg, { userId, tipo: 'resumo_mensal' })
   } catch (err) {
     await releaseMessageClaimIfUndelivered(userId, 'monthly_summary', refKey, err)
     throw err

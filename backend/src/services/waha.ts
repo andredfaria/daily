@@ -1,4 +1,7 @@
 import axios from 'axios'
+import { registrarAtividade, eventoDeEnvio, ContextoEnvio } from './activityLog'
+
+export type { ContextoEnvio }
 
 export function wahaClient() {
   return axios.create({
@@ -90,11 +93,19 @@ export async function resolveWhatsAppNumber(phone: string): Promise<string> {
 export async function sendWhatsAppText(
   phone: string,
   text: string,
+  ctx?: ContextoEnvio,
 ): Promise<{ id: string | null }> {
-  const chatId = await resolveWhatsAppChatId(phone)
-  const session = process.env.WAHA_SESSION || 'default'
-  const { data } = await wahaClient().post('/api/sendText', { session, chatId, text })
-  return { id: data.id ?? data.key?.id ?? null }
+  try {
+    const chatId = await resolveWhatsAppChatId(phone)
+    const session = process.env.WAHA_SESSION || 'default'
+    const { data } = await wahaClient().post('/api/sendText', { session, chatId, text })
+    const resultado = { id: data.id ?? data.key?.id ?? null }
+    void registrarAtividade(eventoDeEnvio(ctx, text, resultado))
+    return resultado
+  } catch (erro) {
+    void registrarAtividade(eventoDeEnvio(ctx, text, { erro }))
+    throw erro
+  }
 }
 
 /**
@@ -102,10 +113,21 @@ export async function sendWhatsAppText(
  * recebida). Não passa por resolveWhatsAppChatId: o chat existe, e um LID não
  * sobreviveria à checagem de número.
  */
-export async function sendTextToChat(chatId: string, text: string): Promise<{ id: string | null }> {
-  const session = process.env.WAHA_SESSION || 'default'
-  const { data } = await wahaClient().post('/api/sendText', { session, chatId, text })
-  return { id: data?.id ?? data?.key?.id ?? null }
+export async function sendTextToChat(
+  chatId: string,
+  text: string,
+  ctx?: ContextoEnvio,
+): Promise<{ id: string | null }> {
+  try {
+    const session = process.env.WAHA_SESSION || 'default'
+    const { data } = await wahaClient().post('/api/sendText', { session, chatId, text })
+    const resultado = { id: data?.id ?? data?.key?.id ?? null }
+    void registrarAtividade(eventoDeEnvio(ctx, text, resultado, { chatId }))
+    return resultado
+  } catch (erro) {
+    void registrarAtividade(eventoDeEnvio(ctx, text, { erro }, { chatId }))
+    throw erro
+  }
 }
 
 /** Telefone por trás de um LID (`123@lid` → `5511...@c.us`), ou null. */
@@ -122,42 +144,62 @@ export async function resolveLid(lid: string): Promise<string | null> {
 export async function sendWhatsAppOtpButton(
   phone: string,
   code: string,
+  ctx?: ContextoEnvio,
 ): Promise<{ id: string | null }> {
-  const chatId = await resolveWhatsAppChatId(phone)
-  const session = process.env.WAHA_SESSION || 'default'
-  const { data } = await wahaClient().post('/api/sendButtons', {
-    session,
-    chatId,
-    body: `Seu código de acesso Rotina:`,
-    footer: 'Válido por 5 minutos. Não compartilhe.',
-    buttons: [
-      {
-        type: 'copy',
-        text: 'Copiar código',
-        copyCode: code,
-      },
-    ],
-  })
-  return { id: data.id ?? data.key?.id ?? null }
+  // O texto logado não contém o código; o tipo 'otp' ainda mascara por garantia.
+  const ctxOtp: ContextoEnvio = { ...ctx, tipo: 'otp' }
+  const textoLog = 'Seu código de acesso Rotina (botão copiar)'
+  try {
+    const chatId = await resolveWhatsAppChatId(phone)
+    const session = process.env.WAHA_SESSION || 'default'
+    const { data } = await wahaClient().post('/api/sendButtons', {
+      session,
+      chatId,
+      body: `Seu código de acesso Rotina:`,
+      footer: 'Válido por 5 minutos. Não compartilhe.',
+      buttons: [
+        {
+          type: 'copy',
+          text: 'Copiar código',
+          copyCode: code,
+        },
+      ],
+    })
+    const resultado = { id: data.id ?? data.key?.id ?? null }
+    void registrarAtividade(eventoDeEnvio(ctxOtp, textoLog, resultado))
+    return resultado
+  } catch (erro) {
+    void registrarAtividade(eventoDeEnvio(ctxOtp, textoLog, { erro }))
+    throw erro
+  }
 }
 
 export async function sendWhatsAppPoll(
   phone: string,
   name: string,
   options: string[],
+  ctx?: ContextoEnvio,
 ): Promise<{ id: string | null }> {
-  const chatId = await resolveWhatsAppChatId(phone)
-  const session = process.env.WAHA_SESSION || 'default'
-  const { data } = await wahaClient().post('/api/sendPoll', {
-    session,
-    chatId,
-    poll: {
-      name,
-      options,
-      multipleAnswers: true,
-    },
-  })
-  return { id: data.id ?? data.key?.id ?? null }
+  const textoLog = name + ' | ' + options.join(', ')
+  try {
+    const chatId = await resolveWhatsAppChatId(phone)
+    const session = process.env.WAHA_SESSION || 'default'
+    const { data } = await wahaClient().post('/api/sendPoll', {
+      session,
+      chatId,
+      poll: {
+        name,
+        options,
+        multipleAnswers: true,
+      },
+    })
+    const resultado = { id: data.id ?? data.key?.id ?? null }
+    void registrarAtividade(eventoDeEnvio(ctx, textoLog, resultado))
+    return resultado
+  } catch (erro) {
+    void registrarAtividade(eventoDeEnvio(ctx, textoLog, { erro }))
+    throw erro
+  }
 }
 
 export async function fetchWhatsAppName(phone: string): Promise<string | null> {
