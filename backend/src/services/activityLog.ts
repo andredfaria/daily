@@ -35,6 +35,18 @@ export function mascararOtp(texto: string): string {
   return texto.replace(/\d{4,8}/g, '******')
 }
 
+/**
+ * Esconde chave PIX e código de boleto do lembrete antes de ir para o log.
+ * Segue o formato de buildPaymentSection: "PIX — rótulo: valor" e "Boleto:\ncódigo".
+ */
+export function mascararDadosPagamento(texto: string): string {
+  return texto
+    .replace(/^(PIX — [^:\n]*: ).*$/gm, '$1******')
+    .replace(/^(Boleto:\r?\n).*$/gm, '$1******')
+}
+
+const TIPOS_COM_PAGAMENTO = new Set(['lembrete_conta', 'reenvio'])
+
 // Não importa ./waha (waha importa este módulo): detecta pelo name.
 export function descreverErroEnvio(err: any): string {
   if (err?.name === 'WhatsAppNumberNotFoundError') return 'número não encontrado no WhatsApp'
@@ -69,7 +81,9 @@ export function eventoDeEnvio(
     userId: ctx?.userId ?? null,
     kind: 'msg_enviada' as const,
     ref: tipo,
-    detail: tipo === 'otp' ? mascararOtp(texto) : texto,
+    detail: tipo === 'otp'
+      ? mascararOtp(texto)
+      : TIPOS_COM_PAGAMENTO.has(tipo) ? mascararDadosPagamento(texto) : texto,
   }
   if ('erro' in resultado) {
     return {

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express'
-import { decidirAcessoAdmin } from '../services/adminAccess'
+import { decidirAcessoAdmin, ehNumeroAdmin } from '../services/adminAccess'
 import jwt from 'jsonwebtoken'
 import { randomInt } from 'crypto'
 import { v4 as uuidv4 } from 'uuid'
@@ -196,6 +196,16 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       }
     }
 
+    // Fallback do admin: só aqui, com o número provado pelo OTP. Nunca em requisição comum.
+    if (!user.is_admin && ehNumeroAdmin(digits, process.env.ADMIN_WHATSAPP)) {
+      try {
+        await pool.query('UPDATE users SET is_admin = TRUE WHERE id = ?', [user.id])
+        user.is_admin = 1
+      } catch (err) {
+        console.error('[auth] falha ao promover admin por ADMIN_WHATSAPP:', err)
+      }
+    }
+
     const token = await criarSessao(user.id, req.headers['user-agent'])
     void registrarAtividade({ userId: user.id, kind: 'login', meta: { user_agent: req.headers['user-agent'] ?? null } })
 
@@ -207,7 +217,7 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       is_active: user.is_active,
       created_at: user.created_at,
       updated_at: user.updated_at,
-      is_admin: decidirAcessoAdmin(user, process.env.ADMIN_WHATSAPP),
+      is_admin: decidirAcessoAdmin(user),
     }
     return res.json({ token, user: safeUser })
   } catch (err: any) {
@@ -228,7 +238,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Usuário não encontrado' })
     }
 
-    return res.json({ ...rows[0], is_admin: decidirAcessoAdmin(rows[0], process.env.ADMIN_WHATSAPP) })
+    return res.json({ ...rows[0], is_admin: decidirAcessoAdmin(rows[0]) })
   } catch (err: any) {
     console.error(err)
     return res.status(500).json({ error: 'Erro interno do servidor' })

@@ -19,13 +19,13 @@ export function ehNumeroAdmin(numero: string, adminEnv: string | undefined): boo
   return variantes(numero).some(v => admin.includes(v))
 }
 
-export function decidirAcessoAdmin(
-  user: { is_admin: number | boolean; whatsapp_number: string } | null,
-  adminEnv: string | undefined,
-): boolean {
-  if (!user) return false
-  if (user.is_admin) return true
-  return ehNumeroAdmin(user.whatsapp_number, adminEnv)
+/**
+ * Em requisição, admin é só a coluna users.is_admin. O número do WhatsApp é editável
+ * sem verificação em PATCH /users/me, então nunca decide acesso aqui; o fallback
+ * ADMIN_WHATSAPP só vale no login por OTP (número provado), em routes/auth.ts.
+ */
+export function decidirAcessoAdmin(user: { is_admin: number | boolean } | null): boolean {
+  return !!user && !!user.is_admin
 }
 
 const TTL_MS = 60_000
@@ -36,10 +36,10 @@ export async function usuarioEhAdmin(userId: string): Promise<boolean> {
   const hit = cache.get(userId)
   if (hit && hit.expira > agora) return hit.valor
   const [rows]: any = await pool.query(
-    'SELECT is_admin, whatsapp_number FROM users WHERE id = ? LIMIT 1',
+    'SELECT is_admin FROM users WHERE id = ? LIMIT 1',
     [userId],
   )
-  const valor = decidirAcessoAdmin(rows[0] ?? null, process.env.ADMIN_WHATSAPP)
+  const valor = decidirAcessoAdmin(rows[0] ?? null)
   cache.set(userId, { valor, expira: agora + TTL_MS })
   return valor
 }

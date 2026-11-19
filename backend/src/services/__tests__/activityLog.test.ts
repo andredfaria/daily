@@ -1,8 +1,10 @@
 import pool from '../../db'
+import { buildPaymentSection } from '../lembreteConta'
 import { WhatsAppNumberNotFoundError } from '../waha'
 import {
   cortarTexto,
   mascararOtp,
+  mascararDadosPagamento,
   descreverErroEnvio,
   nomeDoComando,
   normalizarUserId,
@@ -127,5 +129,27 @@ describe('rotaNormalizada', () => {
       rotaNormalizada('', undefined, '/api/bills/0b7c1f2e-3a4b-4c5d-8e9f-1234567890ab/x')
     ).toBe('/api/bills/:id/x')
     expect(rotaNormalizada('', undefined, '/api/assets/42')).toBe('/api/assets/:id')
+  })
+})
+
+describe('mascararDadosPagamento', () => {
+  it('esconde a chave PIX e mantém o resto', () => {
+    const t = `Conta *Luz*\n${buildPaymentSection({ type: 'pix', pix_key_type: 'cpf', pix_key: '12345678900', pix_beneficiary: 'Enel' })}`
+    const m = mascararDadosPagamento(t)
+    expect(m).not.toContain('12345678900')
+    expect(m).toContain('PIX — CPF: ******')
+    expect(m).toContain('Favorecido: Enel')
+  })
+  it('esconde o código do boleto', () => {
+    const t = `Conta\n${buildPaymentSection({ type: 'boleto', boleto_code: '23793.38128 60000.000003 00000.000400' })}\nrodapé`
+    const m = mascararDadosPagamento(t)
+    expect(m).not.toContain('23793')
+    expect(m).toContain('Boleto:\n******\nrodapé')
+  })
+  it('eventoDeEnvio mascara lembrete e reenvio, não outros tipos', () => {
+    const t = 'PIX — E-mail: a@b.com'
+    expect(eventoDeEnvio({ tipo: 'lembrete_conta' }, t, { id: null }).detail).toBe('PIX — E-mail: ******')
+    expect(eventoDeEnvio({ tipo: 'reenvio' }, t, { id: null }).detail).toBe('PIX — E-mail: ******')
+    expect(eventoDeEnvio({ tipo: 'outro' }, t, { id: null }).detail).toBe(t)
   })
 })

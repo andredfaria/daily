@@ -532,6 +532,7 @@ CREATE TABLE IF NOT EXISTS activity_log (
   meta        JSON         NULL,
   created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  KEY idx_activity_created (created_at),
   KEY idx_activity_user_time (user_id, created_at),
   KEY idx_activity_kind_time (kind, created_at),
   KEY idx_activity_status_time (status, created_at),

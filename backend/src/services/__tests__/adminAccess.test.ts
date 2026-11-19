@@ -12,10 +12,13 @@ describe('ehNumeroAdmin', () => {
 })
 
 describe('decidirAcessoAdmin', () => {
-  it('is_admin liga o acesso', () => expect(decidirAcessoAdmin({ is_admin: 1, whatsapp_number: 'x' }, undefined)).toBe(true))
-  it('número da variável liga o acesso', () =>
-    expect(decidirAcessoAdmin({ is_admin: 0, whatsapp_number: '553591404064' }, '553591404064')).toBe(true))
-  it('outro número é recusado', () =>
-    expect(decidirAcessoAdmin({ is_admin: 0, whatsapp_number: '5511999999999' }, '553591404064')).toBe(false))
-  it('usuário inexistente é recusado', () => expect(decidirAcessoAdmin(null, '553591404064')).toBe(false))
+  it('is_admin liga o acesso', () => expect(decidirAcessoAdmin({ is_admin: 1 })).toBe(true))
+  it('is_admin 0 é recusado', () => expect(decidirAcessoAdmin({ is_admin: 0 })).toBe(false))
+  it('número do admin sem is_admin não dá acesso em requisição', () => {
+    // O número é editável sem verificação; só a coluna vale fora do login por OTP.
+    const linha = { is_admin: 0, whatsapp_number: '5535991404064' }
+    expect(ehNumeroAdmin(linha.whatsapp_number, '553591404064')).toBe(true)
+    expect(decidirAcessoAdmin(linha)).toBe(false)
+  })
+  it('usuário inexistente é recusado', () => expect(decidirAcessoAdmin(null)).toBe(false))
 })

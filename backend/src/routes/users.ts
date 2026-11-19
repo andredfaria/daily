@@ -12,7 +12,7 @@ router.get('/me', async (req: Request, res: Response) => {
     if (!rows.length) {
       return res.status(404).json({ error: 'Usuário não encontrado' })
     }
-    res.json({ ...rows[0], is_admin: decidirAcessoAdmin(rows[0], process.env.ADMIN_WHATSAPP) })
+    res.json({ ...rows[0], is_admin: decidirAcessoAdmin(rows[0]) })
   } catch (err: any) {
     console.error(err)
     res.status(500).json({ error: 'Erro interno do servidor' })
