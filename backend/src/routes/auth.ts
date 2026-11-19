@@ -164,8 +164,8 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
     const candidates = buildPhoneCandidates(digits, resolvedNumber)
     const placeholders = candidates.map(() => '?').join(', ')
     const [userRows]: any = await pool.query(
-      `SELECT * FROM users WHERE whatsapp_number IN (${placeholders}) LIMIT 1`,
-      candidates
+      `SELECT * FROM users WHERE whatsapp_number IN (${placeholders}) ORDER BY whatsapp_number = ? DESC LIMIT 1`,
+      [...candidates, digits]
     )
 
     let user: any
@@ -197,7 +197,8 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
     }
 
     // Fallback do admin: só aqui, com o número provado pelo OTP. Nunca em requisição comum.
-    if (!user.is_admin && ehNumeroAdmin(digits, process.env.ADMIN_WHATSAPP)) {
+    // O número do usuário escolhido tem de ser exatamente o provado pelo OTP.
+    if (!user.is_admin && user.whatsapp_number === digits && ehNumeroAdmin(digits, process.env.ADMIN_WHATSAPP)) {
       try {
         await pool.query('UPDATE users SET is_admin = TRUE WHERE id = ?', [user.id])
         user.is_admin = 1
