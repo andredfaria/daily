@@ -1,5 +1,7 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { getUsuariosAdmin } from '../../api/admin'
+import type { UsuarioAdmin } from '../../types'
 import FeedAtividade from '../../components/admin/FeedAtividade'
 
 const TIPOS = [
@@ -12,6 +14,12 @@ const AdminMensagens: React.FC = () => {
   const [params, setParams] = useSearchParams()
   const soFalhas = params.get('falhas') === '1'
   const tipo = TIPOS.find((t) => t.valor === params.get('tipo'))?.valor ?? TIPOS[0].valor
+
+  const usuario = params.get('usuario') ?? ''
+  const [usuarios, setUsuarios] = useState<UsuarioAdmin[]>([])
+  useEffect(() => {
+    getUsuariosAdmin().then(setUsuarios).catch(() => setUsuarios([]))
+  }, [])
 
   const mudar = (chave: string, valor: string | null) => {
     const novo = new URLSearchParams(params)
@@ -44,9 +52,22 @@ const AdminMensagens: React.FC = () => {
         >
           <span className="material-symbols-outlined text-[18px]">error</span>Só falhas
         </button>
+        <select
+          aria-label="Filtrar por usuário"
+          value={usuario}
+          onChange={(e) => mudar('usuario', e.target.value || null)}
+          className="flex-shrink-0 min-h-[44px] px-3 rounded-full bg-surface-container text-sm text-on-surface-variant"
+        >
+          <option value="">Todos os usuários</option>
+          {usuarios.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name ?? u.whatsapp_number}
+            </option>
+          ))}
+        </select>
       </div>
       <FeedAtividade
-        filtros={{ kind: tipo, ...(soFalhas ? { status: 'falha' as const } : {}) }}
+        filtros={{ kind: tipo, ...(usuario ? { user_id: usuario } : {}), ...(soFalhas ? { status: 'falha' as const } : {}) }}
         vazio={soFalhas ? 'Nenhuma falha de envio.' : 'Nenhuma mensagem ainda.'}
       />
     </div>

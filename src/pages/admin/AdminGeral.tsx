@@ -19,7 +19,12 @@ const AdminGeral: React.FC = () => {
   if (!dados) return <p className="text-sm text-on-surface-variant text-center py-8">Carregando…</p>
 
   const totalFalhas = dados.falhasPorTipo.reduce((s, f) => s + f.total, 0)
-  const destino = (kind: string) => (kind === 'msg_enviada' ? '/admin/mensagens?falhas=1' : '/admin/erros')
+  const destino = (kind: string) =>
+    kind === 'msg_enviada'
+      ? '/admin/mensagens?falhas=1'
+      : kind === 'comando'
+        ? '/admin/mensagens?tipo=comando&falhas=1'
+        : '/admin/erros'
 
   return (
     <div className="space-y-5">
