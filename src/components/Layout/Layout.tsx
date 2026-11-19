@@ -1,9 +1,10 @@
 import React from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import Sidebar, { navItems } from './Sidebar'
+import Sidebar, { useNavItems } from './Sidebar'
 import Header from './Header'
 
 const BottomNav: React.FC = () => {
+  const navItems = useNavItems()
   // Sem botão Sair: ação destrutiva não divide barra com navegação, e a largura
   // liberada deixa os sete rótulos legíveis no mobile. Sair vive em Configurações.
   return (
