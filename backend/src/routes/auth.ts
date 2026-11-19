@@ -5,10 +5,24 @@ import { v4 as uuidv4 } from 'uuid'
 import pool from '../db'
 import { fetchWhatsAppName, resolveWhatsAppNumber, sendWhatsAppText, sendWhatsAppOtpButton, WhatsAppNumberNotFoundError, buildPhoneCandidates } from '../services/waha'
 import { authMiddleware } from '../middleware/auth'
+import { registrarAtividade, descreverErroEnvio } from '../services/activityLog'
 import { criarSessao } from '../services/sessions'
 import { ehTokenLegado } from '../services/sessionToken'
 
 const router = Router()
+
+// Quem pediu código: usuário quando o número já existe (com ou sem o 9º dígito).
+async function registrarPedidoOtp(digits: string, status: 'ok' | 'falha', error?: string): Promise<void> {
+  let userId: string | null = null
+  try {
+    const [rows]: any = await pool.query(
+      `SELECT id FROM users WHERE whatsapp_number IN (${buildPhoneCandidates(digits, digits).map(() => '?').join(', ')}) LIMIT 1`,
+      buildPhoneCandidates(digits, digits)
+    )
+    userId = rows[0]?.id ?? null
+  } catch { /* sem usuário no log: segue */ }
+  void registrarAtividade({ userId, kind: 'otp_pedido', status, error: error ?? null, meta: { telefone: digits.slice(-4) } })
+}
 
 // POST /api/auth/request-otp
 router.post('/request-otp', async (req: Request, res: Response) => {
@@ -59,6 +73,7 @@ router.post('/request-otp', async (req: Request, res: Response) => {
 
     if (devBypass) {
       console.log(`[dev-otp] phone=${digits} code=${code}`)
+      void registrarPedidoOtp(digits, 'ok')
       return res.json({ success: true, message: 'Código gerado (dev bypass — veja o log do backend)' })
     }
 
@@ -66,6 +81,7 @@ router.post('/request-otp', async (req: Request, res: Response) => {
       await sendWhatsAppOtpButton(digits, code, { userId: null, tipo: 'otp' })
     } catch (btnErr) {
       if (btnErr instanceof WhatsAppNumberNotFoundError) {
+        void registrarPedidoOtp(digits, 'falha', 'número não encontrado no WhatsApp')
         return res.status(400).json({ error: 'Número não encontrado no WhatsApp. Verifique o número e tente novamente.' })
       }
       // Fallback: sendButtons indisponível (tier Core ou deprecated) — envia 2 mensagens de texto
@@ -75,12 +91,15 @@ router.post('/request-otp', async (req: Request, res: Response) => {
         await sendWhatsAppText(digits, code, { userId: null, tipo: 'otp' })
       } catch (txtErr) {
         if (txtErr instanceof WhatsAppNumberNotFoundError) {
+          void registrarPedidoOtp(digits, 'falha', 'número não encontrado no WhatsApp')
           return res.status(400).json({ error: 'Número não encontrado no WhatsApp. Verifique o número e tente novamente.' })
         }
+        void registrarPedidoOtp(digits, 'falha', descreverErroEnvio(txtErr))
         throw txtErr
       }
     }
 
+    void registrarPedidoOtp(digits, 'ok')
     return res.json({ success: true, message: 'Código enviado via WhatsApp' })
   } catch (err: any) {
     console.error(err)
@@ -104,6 +123,7 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
     )
 
     if (!otpRows.length) {
+      void registrarAtividade({ kind: 'login_falha', status: 'falha', error: 'código inválido ou expirado', meta: { telefone: digits.slice(-4) } })
       return res.status(401).json({ error: 'Código inválido ou expirado' })
     }
 
@@ -115,6 +135,7 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
       [row.id]
     )
     if (incResult.affectedRows === 0) {
+      void registrarAtividade({ kind: 'login_falha', status: 'falha', error: 'código bloqueado ou expirado', meta: { telefone: digits.slice(-4) } })
       return res.status(401).json({ error: 'Código bloqueado por excesso de tentativas ou expirado' })
     }
 
@@ -123,6 +144,7 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
     const expected = Buffer.from(row.code)
     const provided = Buffer.from((code || '').trim().padEnd(row.code.length, '\0').slice(0, row.code.length))
     if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
+      void registrarAtividade({ kind: 'login_falha', status: 'falha', error: 'código incorreto', meta: { telefone: digits.slice(-4) } })
       return res.status(401).json({ error: 'Código incorreto' })
     }
 
@@ -174,6 +196,7 @@ router.post('/verify-otp', async (req: Request, res: Response) => {
     }
 
     const token = await criarSessao(user.id, req.headers['user-agent'])
+    void registrarAtividade({ userId: user.id, kind: 'login', meta: { user_agent: req.headers['user-agent'] ?? null } })
 
     const safeUser = {
       id: user.id,
@@ -233,6 +256,7 @@ router.post('/upgrade-session', async (req: Request, res: Response) => {
     const [rows]: any = await pool.query(`SELECT id FROM users WHERE id = ? LIMIT 1`, [userId])
     if (!rows.length) return res.status(401).json({ error: 'Usuário não encontrado' })
     const token = await criarSessao(userId, req.headers['user-agent'])
+    void registrarAtividade({ userId, kind: 'login', ref: 'upgrade-session', meta: { user_agent: req.headers['user-agent'] ?? null } })
     return res.json({ token })
   } catch (err: any) {
     console.error(err)
@@ -244,6 +268,7 @@ router.post('/upgrade-session', async (req: Request, res: Response) => {
 router.post('/logout', authMiddleware, async (req: Request, res: Response) => {
   try {
     await pool.query(`DELETE FROM sessions WHERE id = ?`, [req.sessionId])
+    void registrarAtividade({ userId: req.userId, kind: 'logout' })
     return res.json({ success: true })
   } catch (err: any) {
     console.error(err)
@@ -275,6 +300,9 @@ router.delete('/sessions', authMiddleware, async (req: Request, res: Response) =
       `DELETE FROM sessions WHERE user_id = ? AND id <> ?`,
       [req.userId, req.sessionId]
     )
+    if (result.affectedRows > 0) {
+      void registrarAtividade({ userId: req.userId, kind: 'logout', meta: { sessao_encerrada: 'outras', quantidade: result.affectedRows } })
+    }
     return res.json({ removed: result.affectedRows })
   } catch (err: any) {
     console.error(err)
@@ -291,6 +319,7 @@ router.delete('/sessions/:id', authMiddleware, async (req: Request, res: Respons
       [req.params.id, req.userId]
     )
     if (!result.affectedRows) return res.status(404).json({ error: 'Sessão não encontrada' })
+    void registrarAtividade({ userId: req.userId, kind: 'logout', meta: { sessao_encerrada: req.params.id } })
     return res.json({ success: true })
   } catch (err: any) {
     console.error(err)

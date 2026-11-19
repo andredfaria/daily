@@ -9,6 +9,7 @@ import {
   registrarAtividade,
   eventoDeEnvio,
   eventoDeComando,
+  rotaNormalizada,
 } from '../activityLog'
 
 jest.mock('../../db', () => ({
@@ -114,5 +115,17 @@ describe('eventoDeComando', () => {
     const ev = eventoDeComando('u1', '/gasto', { erro: { response: { status: 500 } } })
     expect(ev.status).toBe('falha')
     expect(ev.error).toContain('HTTP 500')
+  })
+})
+
+describe('rotaNormalizada', () => {
+  it('usa baseUrl + rota quando o express casou', () => {
+    expect(rotaNormalizada('/api/bills', '/:id', '/api/bills/abc')).toBe('/api/bills/:id')
+  })
+  it('troca uuid e número por :id quando não casou rota', () => {
+    expect(
+      rotaNormalizada('', undefined, '/api/bills/0b7c1f2e-3a4b-4c5d-8e9f-1234567890ab/x')
+    ).toBe('/api/bills/:id/x')
+    expect(rotaNormalizada('', undefined, '/api/assets/42')).toBe('/api/assets/:id')
   })
 })

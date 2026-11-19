@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import { validarSessao } from '../services/sessions'
+import { registrarAtividade } from '../services/activityLog'
 
 declare global {
   namespace Express {
@@ -34,7 +35,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
   // JWT antigo não passa daqui: só é aceito em POST /api/auth/upgrade-session,
   // que o troca por uma sessão.
-  let sessao: { sessionId: string; userId: string } | null
+  let sessao: { sessionId: string; userId: string; renovada: boolean } | null
   try {
     sessao = await validarSessao(header.slice(7), req.headers['user-agent'])
   } catch (err) {
@@ -43,6 +44,10 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   }
   if (!sessao) {
     return res.status(401).json({ error: 'Token inválido ou expirado' })
+  }
+  if (sessao.renovada) {
+    // No máximo uma vez por hora por sessão: é o "acesso" do painel.
+    void registrarAtividade({ userId: sessao.userId, kind: 'acesso', meta: { user_agent: req.headers['user-agent'] ?? null } })
   }
   req.userId = sessao.userId
   req.sessionId = sessao.sessionId

@@ -101,6 +101,15 @@ export function eventoDeComando(
     : { userId, kind: 'comando', status: 'ok', ref: nome }
 }
 
+/** Rota sem ids: com a rota casada pelo express usa base + rota; senão troca UUID e número por :id. */
+export function rotaNormalizada(baseUrl: string, routePath: string | undefined, path: string): string {
+  if (routePath !== undefined) return `${baseUrl}${routePath}`
+  return path
+    .split('/')
+    .map(seg => (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg) || /^\d+$/.test(seg) ? ':id' : seg))
+    .join('/')
+}
+
 /** Grava o evento. Nunca lança nem rejeita: log não derruba o fluxo. */
 export async function registrarAtividade(ev: EventoAtividade): Promise<void> {
   try {

@@ -19,6 +19,7 @@ import analyticsRouter from './routes/analytics'
 import assetsRouter from './routes/assets'
 import expensesRouter from './routes/expenses'
 import expenseGoalsRouter from './routes/expenseGoals'
+import { activityErrorsMiddleware } from './middleware/activityErrors'
 import { authMiddleware } from './middleware/auth'
 import { initScheduler } from './scheduler'
 import { runMigrations } from './migrate'
@@ -36,6 +37,7 @@ app.use(cors({
 }))
 
 app.use(express.json())
+app.use(activityErrorsMiddleware)
 
 // Security headers
 app.use((_req, res, next) => {
@@ -96,6 +98,7 @@ app.use((req: Request, res: Response) => {
 
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   console.error(`[500] erro em ${req.method} ${req.path}:`, err)
+  res.locals.erroResposta = err?.stack || err?.message || 'erro interno'
   res.status(500).json({ error: err.message || 'erro interno' })
 })
 

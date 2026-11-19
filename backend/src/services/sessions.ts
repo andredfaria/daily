@@ -22,7 +22,7 @@ export async function criarSessao(userId: string, userAgent: unknown): Promise<s
 export async function validarSessao(
   token: string,
   userAgent: unknown
-): Promise<{ sessionId: string; userId: string } | null> {
+): Promise<{ sessionId: string; userId: string; renovada: boolean } | null> {
   const [rows]: any = await pool.query(
     `SELECT id, user_id FROM sessions WHERE token_hash = ? AND expires_at > NOW() LIMIT 1`,
     [hashTokenSessao(token)]
@@ -31,7 +31,7 @@ export async function validarSessao(
 
   // Prazo deslizante: uso renova os 90 dias. O filtro em last_used_at segura a
   // escrita a uma por hora por dispositivo.
-  await pool.query(
+  const [upd]: any = await pool.query(
     `UPDATE sessions
         SET last_used_at = NOW(),
             expires_at = DATE_ADD(NOW(), INTERVAL ${SESSAO_DIAS_SEM_USO} DAY),
@@ -40,5 +40,5 @@ export async function validarSessao(
     [limitarUserAgent(userAgent), rows[0].id]
   )
 
-  return { sessionId: rows[0].id, userId: rows[0].user_id }
+  return { sessionId: rows[0].id, userId: rows[0].user_id, renovada: (upd?.affectedRows ?? 0) > 0 }
 }
